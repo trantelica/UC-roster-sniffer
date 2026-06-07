@@ -84,7 +84,10 @@ SC -> GR -> PW -> MM -> GI -> BA
 {
   "playerId": "player-generated-id",
   "canonicalName": "Jordan Smith",
-  "notes": "Free text notes."
+  "notes": "Free text notes.",
+  "cohortOffsetStatus": "zDown",
+  "cohortOffsetFirstSeasonId": "2026",
+  "cohortOffsetSource": "yearOverYearReview"
 }
 ```
 
@@ -92,6 +95,24 @@ SC -> GR -> PW -> MM -> GI -> BA
 
 - Player identity is name-based at import, then can be linked to a canonical `playerId`.
 - Collisions should be surfaced during import.
+- `cohortOffsetStatus` is optional and records a preserved y-up or z-down classification once identified.
+- Y-up/z-down is treated as a cohort reclassification event that can persist while the player continues with the reclassified cohort.
+
+### Cohort offset values
+
+```text
+none
+yUp
+zDown
+```
+
+### Cohort offset source values
+
+```text
+yearOverYearReview
+explicitImport
+manualOverride
+```
 
 ## Player Season Assignment
 
@@ -105,7 +126,9 @@ SC -> GR -> PW -> MM -> GI -> BA
   "ageDivisionId": "GR",
   "teamId": "2026-alta-GR-B1",
   "derivedStatus": "returning",
-  "identityConfidence": "high"
+  "identityConfidence": "high",
+  "cohortOffsetStatusForSeason": "zDown",
+  "cohortOffsetReviewRequired": false
 }
 ```
 
@@ -113,6 +136,8 @@ SC -> GR -> PW -> MM -> GI -> BA
 
 - A player may have only one assignment per season.
 - The assignment carries season-specific roster context.
+- `cohortOffsetStatusForSeason` allows the UI to show that a preserved y-up or z-down classification applies to the current assignment.
+- `cohortOffsetReviewRequired` should be true when the preserved cohort path appears broken or ambiguous.
 
 ## Coach
 
