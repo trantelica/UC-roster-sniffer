@@ -110,20 +110,53 @@ A player returning to a prior district after playing elsewhere should still be c
 
 ## Y-Up / Z-Down
 
-A y-up or z-down status is based on age cohort relative to assigned age division.
+Y-up and z-down should be treated primarily as a cohort reclassification event discovered during year-over-year review, not as a field that must be recalculated from birthdate every season.
 
-Restrictions:
+### Initial detection
 
-- maximum one division removed from age cohort
-- never more than one year removed from age cohort
+The system should flag a y-up or z-down when a player appears to move into a cohort path that is one age division above or below the expected age progression.
+
+Examples:
+
+```text
+Expected: 2025 GR -> 2026 PW
+Observed: 2025 GR -> 2026 GR
+Possible z-down / repeat cohort
+```
+
+```text
+Expected: 2025 GR -> 2026 PW
+Observed: 2025 GR -> 2026 MM
+Possible y-up
+```
+
+### Preservation rule
+
+Once a player is identified as y-up or z-down, that reclassification status should be preserved while the player continues traveling with the newly established cohort path.
+
+In other words, the first reclassification year creates a cohort offset. Later years should carry that offset forward if the player progresses with that cohort.
+
+### Reset / review conditions
+
+The app should require review or reset the preserved cohort offset when:
+
+- the player skips a season
+- the player changes district and identity confidence is low
+- the player moves more than one division away from the preserved cohort path
+- the player stops following the expected annual progression for the preserved cohort
+
+### Restrictions
+
+- maximum one division removed from original age cohort
+- never more than one year removed from original age cohort
 
 Known special cases:
 
 - Scout is an official two-year age band.
 - Bantam includes 13- and 14-year-olds.
-- All 14-year-old Bantams are z-downs.
+- A 14-year-old Bantam may be treated as a preserved z-down case when the historical cohort path supports that interpretation.
 
-Open item: player birthdate or age-cohort source is not yet defined. Without birthdate or explicit age, y-up/z-down cannot be reliably derived from name-only roster imports.
+Open item: the app does not need birthdate for basic one-time detection and preservation. However, if birthdate or explicit age is later available, it can improve validation and reduce false positives.
 
 ## Promotion
 
@@ -131,7 +164,7 @@ A player is promoted when:
 
 - prior-season match exists
 - same district
-- expected age progression is satisfied
+- expected age progression is satisfied, including any preserved y-up/z-down cohort offset
 - current team competitive rank is higher than prior team competitive rank
 
 Example:
@@ -146,7 +179,7 @@ A player is relegated when:
 
 - prior-season match exists
 - same district
-- expected age progression is satisfied
+- expected age progression is satisfied, including any preserved y-up/z-down cohort offset
 - current team competitive rank is lower than prior team competitive rank
 
 Example:
@@ -161,7 +194,7 @@ A player has lateral movement when:
 
 - prior-season match exists
 - same district
-- expected age progression is satisfied
+- expected age progression is satisfied, including any preserved y-up/z-down cohort offset
 - current and prior competitive ranks are equivalent
 
 Example:
