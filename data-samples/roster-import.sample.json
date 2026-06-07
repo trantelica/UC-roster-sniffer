@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "0.1",
+  "importType": "roster",
+  "seasonId": "2026",
+  "teams": [
+    {
+      "teamId": "2026-alta-GR-B1",
+      "districtId": "alta",
+      "ageDivisionId": "GR",
+      "teamCode": "B1",
+      "draftOrder": 2,
+      "divisionTeamCount": 4,
+      "headCoach": {
+        "name": "Jane Smith"
+      },
+      "assistantCoaches": [
+        {
+          "name": "Sam Lee"
+        },
+        {
+          "name": "Morgan Davis"
+        }
+      ],
+      "players": [
+        {
+          "name": "Jordan Smith",
+          "notes": "Example returning player candidate."
+        },
+        {
+          "name": "Taylor Johnson",
+          "notes": "Example transfer candidate."
+        },
+        {
+          "name": "Casey Brown",
+          "notes": "Example new player candidate."
+        }
+      ]
+    },
+    {
+      "teamId": "2026-brighton-GR-B1",
+      "districtId": "brighton",
+      "ageDivisionId": "GR",
+      "teamCode": "B1",
+      "draftOrder": 2,
+      "divisionTeamCount": 4,
+      "headCoach": {
+        "name": "Alex Martinez"
+      },
+      "assistantCoaches": [],
+      "players": [
+        {
+          "name": "Riley Wilson",
+          "notes": "Example opponent roster player."
+        }
+      ]
+    }
+  ]
+}
