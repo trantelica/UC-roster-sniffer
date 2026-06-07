@@ -1,0 +1,373 @@
+# Implementation Plan
+
+This document translates the product requirements, data model, derived logic, import workflow, UI workflow, and build roadmap into a coding-agent-ready implementation approach.
+
+## Bottom line
+
+Build this project in narrow, testable slices.
+
+The first coding pass should not attempt the full product. It should create a local static viewer that proves the sample data contract, navigation model, card layout, and basic summary display.
+
+## Guiding principles
+
+1. **Spec-first**: the coding agent should treat files in `docs/` as the source of truth.
+2. **Local-first**: no backend, authentication, cloud database, or paid service should be introduced in early phases.
+3. **Pure logic first**: derived rules should live in testable TypeScript functions, not inside React components.
+4. **No silent inference**: identity collisions and low-confidence matches must eventually be surfaced for review.
+5. **Small slices**: each phase should leave the app runnable and understandable.
+
+## Recommended initial stack
+
+```text
+Vite
+React
+TypeScript
+Vitest
+Local JSON sample data
+CSS modules or plain CSS
+```
+
+Do not add state-management libraries, routers, databases, authentication, or UI component frameworks until there is a clear need.
+
+## Proposed source structure
+
+```text
+src/
+  app/
+    App.tsx
+    App.css
+
+  data/
+    loadSampleData.ts
+    normalizeSampleData.ts
+
+  domain/
+    types.ts
+    constants.ts
+
+  engine/
+    teamClassification.ts
+    competitiveHierarchy.ts
+    rosterStatus.ts
+    identityMatching.ts
+    records.ts
+    summaries.ts
+
+  components/
+    FilterBar.tsx
+    SummaryPanel.tsx
+    TeamView.tsx
+    CoachCard.tsx
+    PlayerCard.tsx
+    DetailPanel.tsx
+    MyTeamPanel.tsx
+
+  design/
+    tokens.ts
+
+  test/
+    fixtures.ts
+```
+
+## Phase 1: Static local viewer
+
+### Goal
+
+Create a runnable local app that loads sample data and displays a selected team.
+
+### Build
+
+- Initialize Vite + React + TypeScript.
+- Add Vitest.
+- Load JSON sample files from `data-samples/` or copy them into `src/test/fixtures` if needed for bundling.
+- Add TypeScript domain types matching the current sample contracts.
+- Implement basic filter state:
+  - season
+  - district
+  - age division
+  - team
+- Render:
+  - selected team summary
+  - head coach card
+  - assistant coach cards
+  - player cards
+- Add system design tokens from `docs/design-system.md`.
+
+### Explicitly do not build yet
+
+- roster import workflow
+- identity collision workflow
+- editing
+- persistence
+- backend
+- authentication
+- advanced analytics
+- schedule update forms
+- coach lifetime calculations
+
+### Acceptance criteria
+
+```text
+App runs locally.
+User can select Season -> District -> Age Division -> Team.
+Selected team displays coaches and players.
+Basic team summary displays total player count and coach count.
+System colors are centralized as named tokens.
+No backend or cloud dependency exists.
+```
+
+## Phase 2: Core deterministic logic
+
+### Goal
+
+Move derived behavior into tested pure functions.
+
+### Build
+
+Create engine modules:
+
+```text
+teamClassification.ts
+competitiveHierarchy.ts
+rosterStatus.ts
+identityMatching.ts
+records.ts
+summaries.ts
+```
+
+### Tests
+
+Minimum tests:
+
+```text
+1 team -> A1
+2 teams -> A2, D2
+3 teams -> A3, C1, C2
+4 teams -> A4, B1, B2, B3
+5 teams -> A4, B1, B2, B3, B4
+B2 -> B1 = promoted
+B1 -> B2 = relegated
+C2 -> D2 = lateral
+B3/B4/B5 normalize to B3+
+District change = transfer
+No prior match = new
+Same-name in another district can produce low confidence
+Two same-name matches in same district can produce low confidence
+```
+
+### Acceptance criteria
+
+```text
+All engine functions are deterministic.
+All core logic has tests.
+React components consume function outputs rather than embedding classification logic.
+```
+
+## Phase 3: Prior-season roster comparison
+
+### Goal
+
+Show meaningful roster movement from current season versus prior season.
+
+### Build
+
+- Add prior-season sample data.
+- Match players by canonical name or normalized raw name.
+- Display derived player statuses:
+  - returning
+  - new
+  - transfer
+  - promoted
+  - relegated
+  - lateral
+- Add summary counts by status.
+
+### Acceptance criteria
+
+```text
+Team summary shows counts by derived player status.
+Player cards show status badges.
+Transfer is detected when prior district differs.
+Promotion/relegation uses competitive hierarchy.
+```
+
+## Phase 4: Cohort reclassification preservation
+
+### Goal
+
+Represent y-up/z-down as a cohort reclassification event that can persist across seasons.
+
+### Build
+
+- Add optional cohort offset fields to player records and player-season assignments.
+- Detect possible first-year y-up/z-down based on observed year-over-year division path.
+- Preserve y-up/z-down while the player follows the reclassified cohort path.
+- Flag review when the path breaks or becomes ambiguous.
+
+### Acceptance criteria
+
+```text
+First-year reclassification can be detected from year-over-year review.
+Preserved y-up/z-down status appears in later seasons when cohort path continues.
+Review is required when the preserved path breaks.
+Birthdate is not required for the basic version.
+```
+
+## Phase 5: Import preview and collision handling
+
+### Goal
+
+Prevent name-only matching from silently corrupting history.
+
+### Build
+
+- Create roster import preview state.
+- Generate proposed person matches.
+- Assign confidence and reason codes.
+- Surface low-confidence matches before commit.
+- Allow user decisions:
+  - accept proposed match
+  - reject proposed match
+  - manually link
+  - create new person
+
+### Acceptance criteria
+
+```text
+Low-confidence collisions are never silently committed.
+User decisions are captured.
+Import commit happens only after collision review.
+```
+
+## Phase 6: Schedule and results
+
+### Goal
+
+Derive team performance from game objects.
+
+### Build
+
+- Load schedule data.
+- Display schedule for selected team.
+- Add result update pathway for active seasons.
+- Calculate team record from games.
+- Support playoff and championship flags.
+
+### Acceptance criteria
+
+```text
+Team record derives from games.
+Playoff wins and losses derive from playoff-flagged games.
+Championship appearance and win derive from championship-flagged games.
+```
+
+## Phase 7: Coach analytics
+
+### Goal
+
+Calculate coach lifetime and continuous-cohort records.
+
+### Build
+
+- Derive coach record from team assignments and game records.
+- Calculate lifetime record.
+- Calculate continuous-cohort record.
+- Apply Scout-to-Scout exception.
+- Show coach history in side panel.
+
+### Acceptance criteria
+
+```text
+Lifetime record accumulates across all coach assignments.
+Continuous-cohort record continues through expected age progression.
+Continuous-cohort record resets on district change, skipped season, or broken progression.
+Scout-to-Scout exception works.
+```
+
+## Phase 8: My Team panel
+
+### Goal
+
+Support a season-specific favorite team workflow.
+
+### Build
+
+- Allow one My Team per season.
+- Add collapsible left-side My Team panel.
+- Show My Team schedule.
+- Link opponents to team profiles.
+
+### Acceptance criteria
+
+```text
+My Team designation is season-specific.
+Panel shows the selected My Team schedule.
+Opponent links navigate to opponent team profiles.
+```
+
+## Phase 9: Multi-year analytics and visual polish
+
+### Goal
+
+Add higher-level analytics and refine the interface.
+
+### Build
+
+- District-level summaries.
+- Coach leaderboards.
+- Retention, transfer, promotion, and relegation rates.
+- District branding integration.
+- Age division visual language.
+- Team-level visual language.
+
+### Acceptance criteria
+
+```text
+Filtered views show multi-year trends.
+Branding improves clarity without overwhelming roster-status badges.
+System colors remain centralized.
+```
+
+## Coding agent guardrails
+
+The coding agent should:
+
+- keep changes limited to the requested phase
+- avoid speculative architecture
+- avoid adding dependencies without justification
+- keep derived logic out of UI components
+- add tests for deterministic logic
+- update docs when behavior changes
+- preserve sample data contracts unless explicitly asked to change them
+
+The coding agent should not:
+
+- introduce a backend in early phases
+- add authentication
+- hard-code district data inside components
+- silently broaden scope
+- build import commit behavior before import preview behavior
+- treat y-up/z-down as birthdate-required logic
+
+## First coding prompt target
+
+The first coding prompt should target **Phase 1: Static local viewer** only.
+
+It should ask for:
+
+- Vite + React + TypeScript scaffold
+- centralized design tokens
+- local sample data loading
+- basic filters
+- team summary
+- coach cards
+- player cards
+
+It should explicitly forbid:
+
+- import workflows
+- editing
+- persistence
+- backend
+- authentication
+- advanced derived logic
