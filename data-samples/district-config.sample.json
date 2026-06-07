@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "0.1",
+  "districts": [
+    {
+      "districtId": "alta",
+      "name": "Alta",
+      "mascot": "Hawks",
+      "logoAssetPath": "assets/districts/alta/logo.png",
+      "helmetAssetPath": "assets/districts/alta/helmet.png",
+      "primaryColor": "#000000",
+      "secondaryColor": "#FFFFFF"
+    },
+    {
+      "districtId": "brighton",
+      "name": "Brighton",
+      "mascot": "Bengals",
+      "logoAssetPath": "assets/districts/brighton/logo.png",
+      "helmetAssetPath": "assets/districts/brighton/helmet.png",
+      "primaryColor": "#003366",
+      "secondaryColor": "#FF6600"
+    }
+  ],
+  "ageDivisions": [
+    {
+      "ageDivisionId": "SC",
+      "name": "Scout",
+      "leagueLabel": "SC League 8",
+      "ordinal": 1,
+      "typicalAges": [7, 8]
+    },
+    {
+      "ageDivisionId": "GR",
+      "name": "Gremlin",
+      "leagueLabel": "GR League 9",
+      "ordinal": 2,
+      "typicalAges": [9]
+    },
+    {
+      "ageDivisionId": "PW",
+      "name": "Peewee",
+      "leagueLabel": "PW League 10",
+      "ordinal": 3,
+      "typicalAges": [10]
+    },
+    {
+      "ageDivisionId": "MM",
+      "name": "Mity Mite",
+      "leagueLabel": "MM League 11",
+      "ordinal": 4,
+      "typicalAges": [11]
+    },
+    {
+      "ageDivisionId": "GI",
+      "name": "Gridiron",
+      "leagueLabel": "GI League 12",
+      "ordinal": 5,
+      "typicalAges": [12]
+    },
+    {
+      "ageDivisionId": "BA",
+      "name": "Bantam",
+      "leagueLabel": "BA League 13",
+      "ordinal": 6,
+      "typicalAges": [13, 14]
+    }
+  ]
+}
