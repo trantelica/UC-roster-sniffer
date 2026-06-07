@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.1",
+  "importType": "schedule",
+  "seasonId": "2026",
+  "games": [
+    {
+      "gameId": "2026-alta-GR-B1-week-01",
+      "teamId": "2026-alta-GR-B1",
+      "opponentTeamId": "2026-brighton-GR-B1",
+      "weekLabel": "Week 1",
+      "gameDate": "2026-08-22",
+      "homeAway": "home",
+      "teamScore": null,
+      "opponentScore": null,
+      "result": null,
+      "isPlayoff": false,
+      "isChampionship": false
+    },
+    {
+      "gameId": "2026-alta-GR-B1-championship",
+      "teamId": "2026-alta-GR-B1",
+      "opponentTeamId": "2026-brighton-GR-B1",
+      "weekLabel": "Championship",
+      "gameDate": "2026-10-31",
+      "homeAway": "neutral",
+      "teamScore": 20,
+      "opponentScore": 14,
+      "result": "win",
+      "isPlayoff": true,
+      "isChampionship": true
+    }
+  ]
+}
