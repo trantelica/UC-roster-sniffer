@@ -9,6 +9,7 @@ This document defines the initial import behavior for rosters, schedules, result
 - Active seasons may receive schedule and result updates.
 - Beginning in 2026, the app should support ongoing weekly maintenance.
 - Identity collisions must be surfaced before import decisions are committed.
+- Source import files may be flatter and less complete than the internal data model. Import adapters should preserve raw source values while producing normalized candidates for review.
 
 ## Import types
 
@@ -38,11 +39,65 @@ Roster import should not be responsible for:
 - playoff outcomes
 - championship outcomes
 
+### Real-world flat roster source shape
+
+A known real-world roster source may arrive as a flat JSON array with one player per row.
+
+Example row shape:
+
+```json
+{
+  "district": "Alta",
+  "age_group": "GI League 12",
+  "team": "GridIron A3",
+  "player_name": "Cary, Hudson"
+}
+```
+
+Observed source fields:
+
+```text
+district
+age_group
+team
+player_name
+```
+
+Known implications:
+
+- `season` may be absent from row data and may need to be inferred from filename or import metadata.
+- `age_group` may use source labels such as `GI League 12` and must map to canonical age division IDs such as `GI`.
+- `team` may embed team classification, such as `GridIron A3`, `GridIron C1`, or `GridIron D2`.
+- Coach data may be absent from roster player rows.
+- Player identity is name-only at source and must flow through identity confidence and collision review.
+- Raw player names should be preserved because source names may include suffixes, nicknames, inconsistent spacing, punctuation, and trailing source flags.
+- Trailing source flags, such as a final `O` in `player_name`, should not be discarded until their meaning is confirmed.
+
+This source shape is an import input contract, not the preferred internal storage shape.
+
 ## Roster import stages
 
 ### 1. Parse source data
 
 Read source rows into normalized import candidates.
+
+For flat roster sources, parsing should preserve:
+
+- raw district label
+- raw age group label
+- raw team label
+- raw player name
+- source filename or import metadata used to infer season
+
+Parsing may derive candidate values, but those derived values should remain reviewable before commit:
+
+- candidate season
+- canonical district ID
+- canonical age division ID
+- team label
+- team code or classification
+- normalized player name
+- source flags
 
 ### 2. Validate required fields
 
@@ -55,9 +110,13 @@ Required fields are likely:
 - player name for player rows
 - coach name and role for coach rows
 
+For flat roster player sources, season may be supplied through import metadata rather than row data, and coach fields may be absent.
+
 ### 3. Resolve teams
 
 Create or match team records for the season/district/age division/team code.
+
+If the source team label embeds a classification, such as `GridIron A3`, the import adapter should preserve the raw team label while extracting a candidate team code/classification for review.
 
 ### 4. Resolve people
 
