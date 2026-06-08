@@ -45,7 +45,7 @@ export default function FilterBar({
       ? getDistinctAgeDivisions(teams, selectedSeason, selectedDistrict)
       : [];
 
-  const sortedAgeDivisionIds = ageDivisionIds.sort((a, b) => {
+  const sortedAgeDivisionIds = [...ageDivisionIds].sort((a, b) => {
     const ai = AGE_DIVISION_ORDER.indexOf(a as typeof AGE_DIVISION_ORDER[number]);
     const bi = AGE_DIVISION_ORDER.indexOf(b as typeof AGE_DIVISION_ORDER[number]);
     return ai - bi;
