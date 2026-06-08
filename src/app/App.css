@@ -1,0 +1,157 @@
+:root {
+  --color-alabaster-grey: #EBE9E9;
+  --color-mint-cream: #F3F8F2;
+  --color-steel-blue: #3581B8;
+  --color-bronze-spice: #C75005;
+  --color-carbon-black: #202419;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background-color: var(--color-mint-cream);
+  color: var(--color-carbon-black);
+}
+
+#root {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  color: var(--color-steel-blue);
+  margin-bottom: 1rem;
+}
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background-color: var(--color-alabaster-grey);
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.filter-group label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--color-carbon-black);
+}
+
+.filter-group select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-carbon-black);
+  border-radius: 3px;
+  background-color: white;
+  font-size: 0.9rem;
+  min-width: 160px;
+}
+
+.filter-group select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Team View */
+.team-view {
+  background-color: white;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 4px;
+  padding: 1.5rem;
+}
+
+.team-name {
+  color: var(--color-steel-blue);
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.team-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-carbon-black);
+}
+
+.team-summary {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  background-color: var(--color-alabaster-grey);
+  padding: 0.5rem 0.75rem;
+  border-radius: 3px;
+  margin-bottom: 1.25rem;
+}
+
+.team-section {
+  margin-bottom: 1.25rem;
+}
+
+.team-section h3 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-bronze-spice);
+  margin-bottom: 0.5rem;
+}
+
+/* Cards */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 3px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background-color: var(--color-mint-cream);
+}
+
+.card-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--color-bronze-spice);
+  font-weight: bold;
+}
+
+.card-name {
+  font-size: 0.95rem;
+  color: var(--color-carbon-black);
+}
+
+.card-notes {
+  font-size: 0.8rem;
+  color: #555;
+  font-style: italic;
+}
+
+/* Empty state */
+.empty-state {
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
+  margin: 0;
+}
+
+/* No selection prompt */
+.no-selection {
+  font-size: 0.95rem;
+  color: #888;
+  font-style: italic;
+  padding: 1rem 0;
+}
