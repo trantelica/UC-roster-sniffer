@@ -17,6 +17,7 @@ This document defines the initial conceptual data model. Field names are draft-l
 
 - Prior seasons should be locked.
 - Active seasons may receive roster imports, schedule updates, and result updates.
+- Some source files may not include season in each row. In those cases, season may be supplied by import metadata or inferred from a reviewed filename convention.
 
 ## District
 
@@ -36,6 +37,7 @@ This document defines the initial conceptual data model. Field names are draft-l
 
 - Districts are standardized.
 - District branding is reusable across seasons.
+- Imports should preserve raw district labels before mapping them to standardized district IDs.
 
 ## Age Division
 
@@ -54,6 +56,10 @@ This document defines the initial conceptual data model. Field names are draft-l
 ```text
 SC -> GR -> PW -> MM -> GI -> BA
 ```
+
+### Notes
+
+- Source roster files may use labels such as `GI League 12`. Import logic should map these labels to canonical age division IDs, such as `GI`, while preserving the raw source label.
 
 ## Team
 
@@ -77,6 +83,7 @@ SC -> GR -> PW -> MM -> GI -> BA
 - `teamCode` follows conference team classification rules.
 - `divisionTeamCount` is the number of teams in that district-age-division for the season.
 - `isMyTeam` is season-specific.
+- Source team labels may embed classification values, such as `GridIron A3`, `GridIron C1`, or `GridIron D2`. Import logic should preserve the raw team label and derive a candidate `teamCode` for review.
 
 ## Player
 
@@ -97,6 +104,7 @@ SC -> GR -> PW -> MM -> GI -> BA
 - Collisions should be surfaced during import.
 - `cohortOffsetStatus` is optional and records a preserved y-up or z-down classification once identified.
 - Y-up/z-down is treated as a cohort reclassification event that can persist while the player continues with the reclassified cohort.
+- Source player names may contain suffixes, nicknames, inconsistent spacing, punctuation, capitalization differences, and trailing source flags. Raw names should be preserved on season assignments and import candidates.
 
 ### Cohort offset values
 
@@ -138,6 +146,7 @@ manualOverride
 - The assignment carries season-specific roster context.
 - `cohortOffsetStatusForSeason` allows the UI to show that a preserved y-up or z-down classification applies to the current assignment.
 - `cohortOffsetReviewRequired` should be true when the preserved cohort path appears broken or ambiguous.
+- `playerNameRaw` should preserve the import source name exactly enough to support audit/review, while separate normalization logic may produce a canonical matching name.
 
 ## Coach
 
@@ -246,3 +255,33 @@ schedule
 result
 branding
 ```
+
+## Import Candidate
+
+Import candidates are temporary, reviewable records created from source files before commit. They are not canonical season records until validation, identity review, and collision decisions are complete.
+
+A flat roster import candidate may carry fields like:
+
+```json
+{
+  "importId": "import-2025-rosters-001",
+  "sourceRowNumber": 1,
+  "sourceFileName": "UTE_Conference_GI_League_12_2025_Rosters.json",
+  "rawDistrict": "Alta",
+  "rawAgeGroup": "GI League 12",
+  "rawTeam": "GridIron A3",
+  "rawPlayerName": "Cary, Hudson",
+  "candidateSeasonId": "2025",
+  "candidateDistrictId": "alta",
+  "candidateAgeDivisionId": "GI",
+  "candidateTeamCode": "A3",
+  "candidatePlayerNameNormalized": "Cary, Hudson",
+  "sourceFlags": []
+}
+```
+
+### Notes
+
+- Import candidates should preserve raw source values separately from derived candidate values.
+- Candidate values are not final until the import is committed.
+- Unknown or unexplained source flags should be preserved for review rather than discarded.
