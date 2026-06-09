@@ -1,4 +1,8 @@
-import type { PriorSeasonRosterComparisonResult } from './priorSeasonRosterComparison';
+import {
+  comparePriorSeasonRoster,
+  type PriorSeasonRosterComparisonResult,
+  type PlayerIdentityInput,
+} from './priorSeasonRosterComparison';
 import type { RosterConfidenceValue } from './rosterStatus';
 
 /**
@@ -102,5 +106,43 @@ export function summarizePriorSeasonRosterComparison(
     unknownTotal,
     highConfidence,
     lowConfidence,
+  };
+}
+
+/**
+ * Result of attempting to summarize a selected team's current roster against the
+ * prior season's same-slot roster. When no prior-season roster is available, the
+ * summary is reported as unavailable rather than fabricated, so the UI can show a
+ * clear unavailable state instead of misleading zero counts.
+ */
+export type TeamPriorSeasonComparisonSummary =
+  | { available: false; reason: 'no-prior-season' }
+  | { available: true; summary: PriorSeasonRosterComparisonSummary };
+
+/**
+ * Team-level adapter that wires the selected team's current player list and its
+ * prior-season player list through the Phase 3 comparison pipeline:
+ *   comparePriorSeasonRoster -> summarizePriorSeasonRosterComparison
+ *
+ * Pure and read-only. It never alters, removes, suppresses, merges, nullifies,
+ * rewrites, reorders, or ignores any player record; the returned summary is
+ * derived count metadata only.
+ *
+ * When priorPlayers is null or undefined (no prior-season same-slot roster exists
+ * to compare against), the result is { available: false } so the caller can show
+ * an unavailable state.
+ */
+export function summarizeTeamPriorSeasonComparison(
+  currentPlayers: PlayerIdentityInput[],
+  priorPlayers: PlayerIdentityInput[] | null | undefined
+): TeamPriorSeasonComparisonSummary {
+  if (priorPlayers == null) {
+    return { available: false, reason: 'no-prior-season' };
+  }
+
+  const comparison = comparePriorSeasonRoster(currentPlayers, priorPlayers);
+  return {
+    available: true,
+    summary: summarizePriorSeasonRosterComparison(comparison),
   };
 }

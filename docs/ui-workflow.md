@@ -71,6 +71,36 @@ Initial metrics:
 - promoted count
 - relegated count
 
+### Prior-season comparison summary panel (Phase 3)
+
+The selected team view includes a read-only prior-season comparison summary panel
+derived from the Phase 3 comparison pipeline
+(`comparePriorSeasonRoster` -> `summarizePriorSeasonRosterComparison`).
+
+When a prior-season same-slot team exists, the panel shows these derived counts:
+
+- Returning
+- New to roster
+- Not returning
+- Unknown current
+- Unknown prior
+- Total current
+- Total prior
+- High confidence
+- Low confidence
+
+Rules:
+
+- The panel is read-only and non-interactive. It displays derived counts only and
+  never alters, removes, suppresses, merges, reorders, or hides any roster record.
+- Returning is counted once per current player, never double-counted across the
+  current and prior sides.
+- Not-returning is a prior-season summary count only; prior-only players are never
+  rendered as current player cards.
+- When no prior-season same-slot team is available, the panel shows a clear
+  unavailable state instead of fabricated zero counts.
+- This panel is additive and does not replace the existing roster-status summary.
+
 ## Team performance summary
 
 The team performance summary should show:
