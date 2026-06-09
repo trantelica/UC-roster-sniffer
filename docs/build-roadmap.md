@@ -8,6 +8,56 @@ Proceed spec-first.
 
 Avoid beginning with visual polish or broad feature sprawl. The first working version should prove the data model and derived classification logic.
 
+## Phase numbering note
+
+This roadmap and `docs/implementation-plan.md` use **different phase numbering**.
+The canonical numbering for active development is the one in
+`docs/implementation-plan.md` and `CLAUDE.md`:
+
+```text
+1 Static local viewer
+2 Core deterministic logic
+3 Prior-season roster comparison
+4 Cohort reclassification preservation
+5 Import preview and collision handling
+6 Schedule and results
+7 Coach analytics
+8 My Team panel
+9 Multi-year analytics and visual polish
+```
+
+In that canonical numbering, this roadmap's "Phase 2: Prior-season roster
+comparison" corresponds to canonical **Phase 3**, and the deterministic logic it
+relies on was built first as canonical **Phase 2**. Read the sections below as
+feature groupings; defer to `implementation-plan.md` for the current phase number
+and order.
+
+## Current status checkpoint
+
+As of the Phase 2 checkpoint (canonical numbering):
+
+- **Specification baseline — complete.** Governing docs and sample data contracts
+  exist in the repo.
+- **Static local viewer — complete.** Sample data loads; users can navigate
+  Season -> District -> Age Division -> Team and view coach and player cards.
+- **Core deterministic logic — substantially complete.** Tested pure helpers
+  exist for team classification and hierarchy ranking, age division ordinals,
+  season edit/lock, name normalization and identity keys, duplicate identity
+  detection, exact prior-season identity overlap, roster status derivation
+  (`returning`, `new`, `not-returning`, `unknown`), roster status confidence
+  (`high`, `low`), roster status summary/count helpers, and selected-team
+  perspective counts. Current player cards show Returning / New / Unknown plus a
+  separate low-confidence identity-review warning.
+
+Not yet built (deferred to later phases): transfer (district change), promotion /
+relegation / lateral movement, y-up / z-down cohort reclassification, fuzzy
+matching, and import-collision resolution. Roster comparison is exact-identity
+only and is the foundation the next phase extends — it is not replaced.
+
+Boundary rule carried forward: loaded roster records are authoritative; derived
+metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
+or ignores source roster records. Ambiguity affects derived metadata only.
+
 ## Phase 0: Specification baseline
 
 Goal: establish governing docs before coding.

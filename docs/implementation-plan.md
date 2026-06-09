@@ -116,6 +116,12 @@ System colors are centralized as named tokens.
 No backend or cloud dependency exists.
 ```
 
+### Status
+
+**Complete.** The static local viewer, Season -> District -> Age Division -> Team
+navigation, team summary, coach cards, player cards, and centralized design
+tokens are implemented. No backend, persistence, or cloud dependency exists.
+
 ## Phase 2: Core deterministic logic
 
 ### Goal
@@ -163,7 +169,54 @@ All core logic has tests.
 React components consume function outputs rather than embedding classification logic.
 ```
 
+### Status (Phase 2 checkpoint)
+
+**Substantially complete.** The deterministic engine foundation is built and
+tested, with narrow UI support wired into the existing card layout. Completed
+capabilities:
+
+- Team classification parsing and competitive-hierarchy ranking.
+- Age division ordinal helpers.
+- Season edit/lock helper logic.
+- Player name normalization and identity-key helpers.
+- Duplicate player identity detection.
+- Exact prior-season identity overlap helper.
+- Roster status derivation: `returning`, `new`, `not-returning`, `unknown`.
+- Roster status confidence: `high`, `low`.
+- Roster status summary/count helpers.
+- Selected-team perspective summary counts.
+- Multi-season sample fixture supporting roster-status testing.
+- Per-current-player roster status display: Returning, New, Unknown.
+- A separate low-confidence identity-review warning on the player card, distinct
+  from the roster status badge.
+
+Phase 2 rules that must continue to hold in later phases:
+
+- Loaded roster records are authoritative.
+- Derived metadata must not alter, remove, suppress, merge, nullify, rewrite,
+  reorder, or ignore source roster records. Ambiguity affects derived metadata
+  only.
+- `unknown` is the correct current-player status when identity cannot be safely
+  resolved (for example, duplicate-name ambiguity).
+- `not-returning` belongs to prior-season comparison/summary context and must not
+  appear as a current player-card status.
+- Transfer, promotion/relegation, y-up, z-down, and identity-collision resolution
+  are intentionally **not** part of Phase 2.
+
+The roster-status engine is exact-identity only: it matches on normalized name
+keys and never fuzzy-matches. This is the deliberate, reviewable foundation that
+Phase 3 builds on.
+
 ## Phase 3: Prior-season roster comparison
+
+### Phase 3 entry point
+
+Phase 3 begins from the exact-identity roster comparison foundation already built
+in Phase 2 (`comparePlayerIdentityOverlap` -> `deriveRosterStatusFromOverlap` ->
+per-current-player status). Phase 3 extends that foundation with district-aware
+movement (transfer) and competitive-tier movement (promotion / relegation /
+lateral); it does not replace or rewrite the exact-identity matching already in
+place. Phase 3 is **not** complete.
 
 ### Goal
 
