@@ -1,15 +1,34 @@
 import districtConfig from '../../data-samples/district-config.sample.json';
-import rosterImport from '../../data-samples/roster-import.sample.json';
+import rosterImport2026 from '../../data-samples/roster-import.sample.json';
+import rosterImport2025 from '../../data-samples/roster-import-2025.sample.json';
 import type { AppData, Team, Coach } from '../domain/types';
 
 function toCoach(raw: { name: string }): Coach {
   return { name: raw.name };
 }
 
-export function loadSampleData(): AppData {
-  const seasonId = rosterImport.seasonId;
+/**
+ * Shape of a single roster import sample file. Each file represents one season,
+ * matching the existing data-samples/roster-import.sample.json contract.
+ */
+type RosterImportFile = {
+  seasonId: string;
+  teams: Array<{
+    teamId: string;
+    districtId: string;
+    ageDivisionId: string;
+    teamCode: string;
+    draftOrder: number;
+    divisionTeamCount: number;
+    headCoach: { name: string } | null;
+    assistantCoaches: Array<{ name: string }>;
+    players: Array<{ name: string; notes?: string }>;
+  }>;
+};
 
-  const teams: Team[] = rosterImport.teams.map((t) => ({
+function teamsFromImport(rosterImport: RosterImportFile): Team[] {
+  const seasonId = rosterImport.seasonId;
+  return rosterImport.teams.map((t) => ({
     teamId: t.teamId,
     seasonId,
     districtId: t.districtId,
@@ -24,6 +43,16 @@ export function loadSampleData(): AppData {
       notes: p.notes ?? undefined,
     })),
   }));
+}
+
+export function loadSampleData(): AppData {
+  // Each roster import file represents one season. Loading more than one season
+  // lets the prior-season roster comparison render an available state for
+  // same-slot teams (same district, age division, and team code) across years.
+  const teams: Team[] = [
+    ...teamsFromImport(rosterImport2025 as RosterImportFile),
+    ...teamsFromImport(rosterImport2026 as RosterImportFile),
+  ];
 
   return {
     districts: districtConfig.districts,
