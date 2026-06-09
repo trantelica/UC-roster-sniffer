@@ -1,6 +1,7 @@
 import type { Team, District, AgeDivision, Player } from '../domain/types';
 import { countPlayers, countHeadCoaches, countAssistantCoaches } from '../engine/summaries';
 import { summarizeTeamRosterStatus } from '../engine/teamRosterStatusSummary';
+import { summarizeTeamPriorSeasonComparison } from '../engine/priorSeasonRosterComparisonSummary';
 import {
   deriveCurrentRosterPlayerStatuses,
   currentPlayerNeedsIdentityReview,
@@ -24,6 +25,7 @@ export default function TeamView({ team, districts, ageDivisions, priorPlayers }
   const teamName = `${districtName} ${ageDivisionName} ${team.teamCode}`;
 
   const rosterStatus = summarizeTeamRosterStatus(team.players, priorPlayers);
+  const priorComparison = summarizeTeamPriorSeasonComparison(team.players, priorPlayers);
   const playerStatuses = deriveCurrentRosterPlayerStatuses(team.players, priorPlayers);
 
   return (
@@ -68,6 +70,45 @@ export default function TeamView({ team, districts, ageDivisions, priorPlayers }
         ) : (
           <p className="empty-state">
             Prior-season roster comparison is not available for this team.
+          </p>
+        )}
+      </section>
+
+      <section className="team-section">
+        <h3>Prior-Season Comparison</h3>
+        {priorComparison.available ? (
+          <div className="roster-status-summary">
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.returning}</strong> Returning
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.newToRoster}</strong> New to roster
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.notReturning}</strong> Not returning
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.unknownCurrent}</strong> Unknown current
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.unknownPrior}</strong> Unknown prior
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.totalCurrent}</strong> Total current
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.totalPrior}</strong> Total prior
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.highConfidence}</strong> High confidence
+            </span>
+            <span className="roster-status-count">
+              <strong>{priorComparison.summary.lowConfidence}</strong> Low confidence
+            </span>
+          </div>
+        ) : (
+          <p className="empty-state">
+            No prior-season same-slot team is available to compare against.
           </p>
         )}
       </section>
