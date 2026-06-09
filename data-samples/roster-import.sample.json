@@ -24,15 +24,23 @@
       "players": [
         {
           "name": "Jordan Smith",
-          "notes": "Example returning player candidate."
+          "notes": "Returning: also rostered in this slot in 2025."
         },
         {
           "name": "Taylor Johnson",
-          "notes": "Example transfer candidate."
+          "notes": "Returning: also rostered in this slot in 2025."
         },
         {
           "name": "Casey Brown",
-          "notes": "Example new player candidate."
+          "notes": "New: first appears in 2026."
+        },
+        {
+          "name": "Jamie Park",
+          "notes": "Ambiguous: shares an identity key with another 2026 roster entry."
+        },
+        {
+          "name": "Jamie Park",
+          "notes": "Ambiguous: shares an identity key with another 2026 roster entry."
         }
       ]
     },

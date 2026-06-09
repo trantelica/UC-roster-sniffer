@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "0.1",
+  "importType": "roster",
+  "seasonId": "2025",
+  "teams": [
+    {
+      "teamId": "2025-alta-GR-B1",
+      "districtId": "alta",
+      "ageDivisionId": "GR",
+      "teamCode": "B1",
+      "draftOrder": 2,
+      "divisionTeamCount": 4,
+      "headCoach": {
+        "name": "Jane Smith"
+      },
+      "assistantCoaches": [
+        {
+          "name": "Sam Lee"
+        }
+      ],
+      "players": [
+        {
+          "name": "Jordan Smith",
+          "notes": "Returns to this slot in 2026."
+        },
+        {
+          "name": "Taylor Johnson",
+          "notes": "Returns to this slot in 2026."
+        },
+        {
+          "name": "Morgan Lee",
+          "notes": "Not returning: absent from the 2026 roster."
+        },
+        {
+          "name": "Pat Quinn",
+          "notes": "Not returning: absent from the 2026 roster."
+        }
+      ]
+    }
+  ]
+}

@@ -14,11 +14,12 @@ export default function App() {
   const [selectedAgeDivision, setSelectedAgeDivision] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
-  // Auto-select the first available season on load
+  // Auto-select the most recent available season on load, so a season that can
+  // show prior-season roster comparison is the default view.
   useEffect(() => {
     const seasons = getDistinctSeasons(appData.teams);
     if (seasons.length > 0 && selectedSeason === null) {
-      setSelectedSeason(seasons[0]);
+      setSelectedSeason(seasons[seasons.length - 1]);
     }
   }, [selectedSeason]);
 
