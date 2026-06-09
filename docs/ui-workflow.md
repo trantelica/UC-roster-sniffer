@@ -131,6 +131,31 @@ Rules:
 
 Derived status is display metadata only and never mutates the player object.
 
+### Roster status vs. identity-confidence warning (Phase 2)
+
+Roster status and identity confidence are two separate visual signals on a
+player card. They must not be merged into one overloaded badge.
+
+- The roster status badge answers: Returning / New / Unknown.
+- The identity-confidence warning answers: this identity match needs review
+  because derived confidence is low.
+
+A current player card may show both at once: the roster status badge plus, when
+derived confidence is low, a distinct identity-review warning (for example
+`Identity review`).
+
+Rules:
+
+- The low-confidence identity warning is a review indicator only. It does not
+  alter, hide, reorder, merge, or remove any roster record. Loaded roster
+  records remain authoritative; ambiguity affects derived metadata only.
+- High-confidence current players (exact returning matches, current-only new
+  players) show no identity-review warning.
+- When prior-season comparison is unavailable, no derived confidence exists, so
+  no identity-review warning appears and the full roster still renders.
+- Ambiguous (duplicate-name) current players each remain individually visible
+  and each may show the warning.
+
 ## Coach cards
 
 Coach cards should support summary signals such as:

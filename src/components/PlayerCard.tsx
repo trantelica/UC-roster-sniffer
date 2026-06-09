@@ -9,6 +9,14 @@ interface PlayerCardProps {
    * unknown; not-returning is a summary-only status and is never passed here.
    */
   status?: RosterStatusValue;
+  /**
+   * Distinct identity-review signal, separate from the roster status badge.
+   * When true, the card shows a low-confidence warning indicating the derived
+   * identity match needs review. This is display metadata only; it never alters
+   * or hides the player record. PlayerCard does not compute this — it is decided
+   * upstream from already-derived status confidence.
+   */
+  lowConfidence?: boolean;
 }
 
 const STATUS_LABELS: Record<RosterStatusValue, string> = {
@@ -18,7 +26,7 @@ const STATUS_LABELS: Record<RosterStatusValue, string> = {
   'not-returning': 'Not returning',
 };
 
-export default function PlayerCard({ player, status }: PlayerCardProps) {
+export default function PlayerCard({ player, status, lowConfidence }: PlayerCardProps) {
   return (
     <div className="card">
       <span className="card-name">{player.name}</span>
@@ -26,6 +34,9 @@ export default function PlayerCard({ player, status }: PlayerCardProps) {
         <span className={`player-status player-status-${status}`}>
           {STATUS_LABELS[status]}
         </span>
+      )}
+      {lowConfidence && (
+        <span className="player-identity-warning">Identity review</span>
       )}
       {player.notes && <span className="card-notes">{player.notes}</span>}
     </div>

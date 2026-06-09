@@ -86,3 +86,24 @@ export function deriveCurrentRosterPlayerStatuses(
 
   return { available: true, statuses };
 }
+
+/**
+ * Decides whether a current player's derived status warrants a distinct
+ * identity-review warning on the player card.
+ *
+ * This is a review indicator only: it answers "this identity match needs human
+ * review because confidence is low" and is deliberately separate from the
+ * Returning / New / Unknown roster-status badge. It never hides, rewrites, or
+ * removes the underlying player record; loaded roster records remain
+ * authoritative and ambiguity affects derived metadata only.
+ *
+ * The decision is purely a read of the already-derived confidence value. It does
+ * not run identity comparison, fuzzy matching, or any new derivation. When
+ * prior-season comparison is unavailable, no derived status exists for the
+ * player, so callers pass no status and no warning is shown.
+ */
+export function currentPlayerNeedsIdentityReview(
+  derived: DerivedRosterStatus
+): boolean {
+  return derived.confidence === 'low';
+}
