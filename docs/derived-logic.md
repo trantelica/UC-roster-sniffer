@@ -124,6 +124,29 @@ derived `status` / `confidence` / `reason` reusing the existing high/low
 metadata. This is a comparison contract only — `transfer`, promotion/relegation,
 `yUp`/`zDown`, fuzzy matching, and collision resolution remain out of scope.
 
+### Prior-season roster comparison summary (Phase 3 slice 2)
+
+The second Phase 3 slice reduces the comparison result above into display count
+totals (`summarizePriorSeasonRosterComparison`). It reads derived metadata only
+and never alters source records. Counting is perspective-aware:
+
+- `returning` counts each returning entry once, not once per side, so a returning
+  player is never double-counted.
+- Current-side counts (`newToRoster`, `unknownCurrent`) answer questions about
+  current roster records; prior-side counts (`notReturning`, `unknownPrior`)
+  answer questions about prior roster records. `unknownTotal` is their sum.
+- Record-accounting totals: `totalCurrent = returning + newToRoster +
+  unknownCurrent` and `totalPrior = returning + notReturning + unknownPrior`. A
+  returning player is represented on both sides, so it intentionally contributes
+  to both totals.
+- `highConfidence` / `lowConfidence` are tallied over the deduplicated,
+  perspective-aware summary set (each returning entry once, plus every
+  `newToRoster` / `notReturning` / `unknown` record) using each entry's own
+  derived confidence, so `highConfidence + lowConfidence === returning +
+  newToRoster + notReturning + unknownTotal`.
+
+No new movement taxonomy is introduced.
+
 ## Returning
 
 A player is returning when the matched prior-season assignment is the same team or functionally same continuing roster path.
