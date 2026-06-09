@@ -12,6 +12,13 @@ Season -> District -> Age Division -> Team
 
 Each selection narrows the analytical scope.
 
+## Default season selection
+
+When loaded data includes multiple seasons, the app should default to the most recent season.
+
+- This matches the normal expectation that the current/latest season is the first view.
+- Prior-season data remains available for derived comparison, but a prior season should not become the default landing state unless the user explicitly selects it.
+
 ## No-team-selected summary view
 
 When the user has selected season, district, and/or age division but has not selected a specific team, the app should show derived summaries based on the active filters.
