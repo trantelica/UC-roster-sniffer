@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import { loadSampleData } from '../data/loadSampleData';
 import { getDistinctSeasons } from '../engine/filters';
+import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
 
@@ -47,6 +48,10 @@ export default function App() {
     ? appData.teams.find((t) => t.teamId === selectedTeamId) ?? null
     : null;
 
+  const priorTeam = selectedTeam
+    ? findPriorSeasonTeam(appData.teams, selectedTeam)
+    : null;
+
   return (
     <div>
       <h1>UC Roster Sniffer</h1>
@@ -68,6 +73,7 @@ export default function App() {
           team={selectedTeam}
           districts={appData.districts}
           ageDivisions={appData.ageDivisions}
+          priorPlayers={priorTeam?.players ?? null}
         />
       ) : (
         <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
