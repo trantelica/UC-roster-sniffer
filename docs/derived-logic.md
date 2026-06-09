@@ -83,6 +83,27 @@ lowConfidence
 
 The UI may show the most important status as the primary visual badge and additional statuses as secondary details.
 
+### Implementation status (Phase 2 checkpoint)
+
+The Phase 2 deterministic engine implements only the exact-identity subset of the
+statuses above:
+
+- Implemented current-player statuses: `returning`, `new`, and `unknown`.
+- `not-returning` is also derived, but only in prior-season comparison/summary
+  context (a prior-season player absent from the current roster). It is never
+  shown as a current player-card status.
+- `unknown` is the derived status when identity cannot be safely resolved — for
+  example, two same-name (duplicate) current entries.
+
+Confidence is tracked as a separate dimension (`high` / `low`) rather than as a
+status value. A low-confidence derivation drives a distinct identity-review
+warning on the player card; it does not replace the roster status badge. This
+supersedes treating `lowConfidence` as a peer status in the list above.
+
+Not yet implemented (deferred to later phases): `transfer`, `yUp`, `zDown`,
+`promoted`, `relegated`, and `lateral`. Matching is exact normalized-name only;
+there is no fuzzy matching or import-collision resolution in Phase 2.
+
 ## Returning
 
 A player is returning when the matched prior-season assignment is the same team or functionally same continuing roster path.
