@@ -104,6 +104,26 @@ Not yet implemented (deferred to later phases): `transfer`, `yUp`, `zDown`,
 `promoted`, `relegated`, and `lateral`. Matching is exact normalized-name only;
 there is no fuzzy matching or import-collision resolution in Phase 2.
 
+### Prior-season roster comparison contract (Phase 3 slice 1)
+
+The first Phase 3 slice establishes a stable result shape for a current-vs-prior
+roster comparison, without adding any new movement taxonomy. Built on the
+existing exact-identity overlap pipeline, it organizes records into four buckets:
+
+- `returning`: a current player with exactly one prior identity match
+  (current/prior pair joined into a single entry).
+- `newToRoster`: a current player with no prior identity match.
+- `notReturning`: a prior player with no current identity match.
+- `unknown`: current and/or prior records whose identity key is ambiguous
+  (duplicate name) and cannot be safely resolved. Each ambiguous record stays
+  individually present; an ambiguous key never also appears in another bucket.
+
+Each entry carries its `identityKey`, the source player record (by reference,
+never mutated), the source `side` (`current` / `prior`) where relevant, and a
+derived `status` / `confidence` / `reason` reusing the existing high/low
+metadata. This is a comparison contract only — `transfer`, promotion/relegation,
+`yUp`/`zDown`, fuzzy matching, and collision resolution remain out of scope.
+
 ## Returning
 
 A player is returning when the matched prior-season assignment is the same team or functionally same continuing roster path.
