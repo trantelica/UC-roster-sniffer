@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { deriveCurrentRosterPlayerStatuses } from '../engine/currentRosterPlayerStatus';
+import {
+  deriveCurrentRosterPlayerStatuses,
+  currentPlayerNeedsIdentityReview,
+} from '../engine/currentRosterPlayerStatus';
 import type { Player } from '../domain/types';
 
 // ---------------------------------------------------------------------------
@@ -178,5 +181,101 @@ describe('deriveCurrentRosterPlayerStatuses - source preservation', () => {
     expect(prior).toEqual(priorSnapshot);
     expect(current).toHaveLength(2);
     expect(prior).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Identity-review warning (distinct from the roster status badge)
+// ---------------------------------------------------------------------------
+
+describe('currentPlayerNeedsIdentityReview - low-confidence warning', () => {
+  it('flags an ambiguous duplicate current player as needing identity review', () => {
+    const current = [p('Sam Rivera'), p('Sam Rivera')];
+    const result = deriveCurrentRosterPlayerStatuses(current, [p('Other Name')]);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+
+    // Both ambiguous records remain visible AND both raise the warning.
+    expect(result.statuses).toHaveLength(2);
+    expect(result.statuses[0].player).toBe(current[0]);
+    expect(result.statuses[1].player).toBe(current[1]);
+    for (const entry of result.statuses) {
+      expect(entry.derived.status).toBe('unknown');
+      expect(currentPlayerNeedsIdentityReview(entry.derived)).toBe(true);
+    }
+  });
+
+  it('does not flag a high-confidence returning player', () => {
+    const result = deriveCurrentRosterPlayerStatuses([p('Alex Kim')], [p('Alex Kim')]);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.statuses[0].derived.status).toBe('returning');
+    expect(currentPlayerNeedsIdentityReview(result.statuses[0].derived)).toBe(false);
+  });
+
+  it('does not flag a high-confidence new player', () => {
+    const result = deriveCurrentRosterPlayerStatuses([p('Blair Doe')], [p('Alex Kim')]);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.statuses[0].derived.status).toBe('new');
+    expect(currentPlayerNeedsIdentityReview(result.statuses[0].derived)).toBe(false);
+  });
+
+  it('reads only the derived confidence value, regardless of status', () => {
+    expect(
+      currentPlayerNeedsIdentityReview({
+        status: 'unknown',
+        confidence: 'low',
+        reason: 'ambiguous-identity',
+      })
+    ).toBe(true);
+    expect(
+      currentPlayerNeedsIdentityReview({
+        status: 'returning',
+        confidence: 'high',
+        reason: 'exact-identity-match',
+      })
+    ).toBe(false);
+    expect(
+      currentPlayerNeedsIdentityReview({
+        status: 'new',
+        confidence: 'high',
+        reason: 'current-only',
+      })
+    ).toBe(false);
+  });
+
+  it('produces no warning when prior-season comparison is unavailable', () => {
+    // With no prior season the result is unavailable, so there are no derived
+    // statuses to flag and the caller renders cards without a warning.
+    const result = deriveCurrentRosterPlayerStatuses([p('Alex Kim')], null);
+    expect(result).toEqual({ available: false, reason: 'no-prior-season' });
+    expect('statuses' in result).toBe(false);
+  });
+
+  it('keeps every current player rendered while flagging only the low-confidence ones', () => {
+    const current = [
+      p('Alex Kim'), // returning, high
+      p('Blair Doe'), // new, high
+      p('Sam Rivera'), // ambiguous, low
+      p('Sam Rivera'), // ambiguous, low
+    ];
+    const prior = [p('Alex Kim'), p('Casey Lee')];
+    const result = deriveCurrentRosterPlayerStatuses(current, prior);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+
+    // No record dropped: one entry per current player.
+    expect(result.statuses).toHaveLength(current.length);
+    const flags = result.statuses.map((s) => ({
+      name: s.player.name,
+      warn: currentPlayerNeedsIdentityReview(s.derived),
+    }));
+    expect(flags).toEqual([
+      { name: 'Alex Kim', warn: false },
+      { name: 'Blair Doe', warn: false },
+      { name: 'Sam Rivera', warn: true },
+      { name: 'Sam Rivera', warn: true },
+    ]);
   });
 });

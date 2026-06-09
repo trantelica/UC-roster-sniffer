@@ -184,6 +184,23 @@ h1 {
   color: #888;
 }
 
+/*
+ * Identity-review warning — a distinct signal from the roster status badge.
+ * Filled bronze-spice so it reads as a review flag, not another outlined
+ * status chip. Indicates low derived confidence; it never changes the record.
+ */
+.player-identity-warning {
+  align-self: flex-start;
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
 /* Empty state */
 .empty-state {
   font-size: 0.85rem;

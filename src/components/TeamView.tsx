@@ -1,7 +1,10 @@
 import type { Team, District, AgeDivision, Player } from '../domain/types';
 import { countPlayers, countHeadCoaches, countAssistantCoaches } from '../engine/summaries';
 import { summarizeTeamRosterStatus } from '../engine/teamRosterStatusSummary';
-import { deriveCurrentRosterPlayerStatuses } from '../engine/currentRosterPlayerStatus';
+import {
+  deriveCurrentRosterPlayerStatuses,
+  currentPlayerNeedsIdentityReview,
+} from '../engine/currentRosterPlayerStatus';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
 
@@ -94,7 +97,12 @@ export default function TeamView({ team, districts, ageDivisions, priorPlayers }
         {team.players.length > 0 ? (
           playerStatuses.available ? (
             playerStatuses.statuses.map((entry, i) => (
-              <PlayerCard key={i} player={entry.player} status={entry.derived.status} />
+              <PlayerCard
+                key={i}
+                player={entry.player}
+                status={entry.derived.status}
+                lowConfidence={currentPlayerNeedsIdentityReview(entry.derived)}
+              />
             ))
           ) : (
             team.players.map((player, i) => <PlayerCard key={i} player={player} />)
