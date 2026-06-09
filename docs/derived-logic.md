@@ -203,6 +203,14 @@ Example:
 C2 -> D2
 ```
 
+## Roster authority
+
+Loaded roster records are authoritative.
+
+- Duplicate or ambiguous player names must remain visible and preserved in the roster.
+- Ambiguity affects derived metadata only — such as identity confidence and roster status — never the source roster record.
+- Derived logic must not alter, remove, suppress, merge, nullify, rewrite, or ignore a rostered player record because of duplication or ambiguity.
+
 ## Identity confidence
 
 Initial matching is name-based.

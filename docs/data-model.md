@@ -285,3 +285,15 @@ A flat roster import candidate may carry fields like:
 - Import candidates should preserve raw source values separately from derived candidate values.
 - Candidate values are not final until the import is committed.
 - Unknown or unexplained source flags should be preserved for review rather than discarded.
+
+## Sample data fixtures
+
+Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
+
+### Notes
+
+- Sample data may include multiple seasons.
+- Multi-season sample data is used to exercise prior-season comparison behavior.
+- The current fixture intentionally includes a same-slot team that appears in both 2025 and 2026 — same district, age division, and team code — so the selected-team roster-status summary can render an available state for visual testing.
+- Each roster import sample file represents a single season, matching the existing roster import contract.
+- Sample fixtures should remain small, deliberate, and contract-preserving. They should not silently reshape the sample contract to make code easier.
