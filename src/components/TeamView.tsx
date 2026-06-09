@@ -1,6 +1,7 @@
 import type { Team, District, AgeDivision, Player } from '../domain/types';
 import { countPlayers, countHeadCoaches, countAssistantCoaches } from '../engine/summaries';
 import { summarizeTeamRosterStatus } from '../engine/teamRosterStatusSummary';
+import { deriveCurrentRosterPlayerStatuses } from '../engine/currentRosterPlayerStatus';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
 
@@ -20,6 +21,7 @@ export default function TeamView({ team, districts, ageDivisions, priorPlayers }
   const teamName = `${districtName} ${ageDivisionName} ${team.teamCode}`;
 
   const rosterStatus = summarizeTeamRosterStatus(team.players, priorPlayers);
+  const playerStatuses = deriveCurrentRosterPlayerStatuses(team.players, priorPlayers);
 
   return (
     <div className="team-view">
@@ -90,9 +92,13 @@ export default function TeamView({ team, districts, ageDivisions, priorPlayers }
       <section className="team-section">
         <h3>Players</h3>
         {team.players.length > 0 ? (
-          team.players.map((player, i) => (
-            <PlayerCard key={i} player={player} />
-          ))
+          playerStatuses.available ? (
+            playerStatuses.statuses.map((entry, i) => (
+              <PlayerCard key={i} player={entry.player} status={entry.derived.status} />
+            ))
+          ) : (
+            team.players.map((player, i) => <PlayerCard key={i} player={player} />)
+          )
         ) : (
           <p className="empty-state">No players</p>
         )}

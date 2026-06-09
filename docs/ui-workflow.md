@@ -107,6 +107,30 @@ Supported roster status indicators:
 
 The UI should distinguish between the roster status and identity-confidence warnings.
 
+### Current roster player-card status (Phase 2)
+
+Current selected-team player cards may show a small derived status badge based on
+exact prior-season identity comparison. Only these values appear on a current
+roster card:
+
+- Returning — an exact current/prior identity match.
+- New — a current-only player with no prior-season identity match.
+- Unknown — an ambiguous (duplicate-name) current player; identity confidence is
+  low, but the player record still displays.
+
+Rules:
+
+- `Not returning` belongs in summary/comparison context, not on current roster
+  player cards. Not-returning players are prior-season players absent from the
+  current roster, so they are never rendered as current player cards.
+- Ambiguous or duplicate current players remain individually visible and display
+  `Unknown`; ambiguity affects derived metadata only and never hides, merges, or
+  rewrites a rostered player record.
+- When prior-season comparison is unavailable, current player cards display no
+  per-player status badge and the full roster still renders.
+
+Derived status is display metadata only and never mutates the player object.
+
 ## Coach cards
 
 Coach cards should support summary signals such as:
