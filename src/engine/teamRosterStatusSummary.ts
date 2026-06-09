@@ -3,8 +3,8 @@ import {
   comparePlayerIdentityOverlap,
   type PlayerIdentityInput,
 } from './playerIdentityOverlap';
-import { deriveRosterStatusFromOverlap } from './rosterStatus';
-import { summarizeRosterStatuses, type RosterStatusSummary } from './rosterStatusSummary';
+import { deriveRosterStatusFromOverlap, type RosterStatusEntry } from './rosterStatus';
+import type { RosterStatusSummary } from './rosterStatusSummary';
 
 /**
  * Result of attempting to summarize a selected team's roster status against the
@@ -16,9 +16,82 @@ export type TeamRosterStatusSummary =
   | { available: true; summary: RosterStatusSummary };
 
 /**
+ * Perspective-aware roster status summary for the SELECTED current team view.
+ *
+ * The lower-level summarizeRosterStatuses counts one tally per source record, so
+ * an exact prior-season match contributes both its current-season record and its
+ * prior-season record (a single returning player would count as 2). That is
+ * correct for whole-comparison record accounting but wrong for a selected-team
+ * summary, which should count from the current team's perspective:
+ *
+ *   returning    = current-roster players with an exact prior-season identity match
+ *   new          = current-roster players with no prior-season identity match
+ *   unknown      = current-roster players whose current identity is ambiguous
+ *   notReturning = prior-season players absent from the current roster
+ *
+ * Confidence is counted against those same displayed records (their own derived
+ * confidence), not over all source entries:
+ *   highConfidence + lowConfidence === total === returning + new + unknown + notReturning
+ *
+ * Because comparePlayerIdentityOverlap partitions every current player into
+ * exactly one of exact-match / current-only / ambiguous-current, the invariant
+ * returning + new + unknown === currentPlayers.length always holds, and
+ * notReturning === prior-only players. No current player is double-counted.
+ *
+ * This reads derived metadata only. It never alters, removes, suppresses,
+ * merges, nullifies, rewrites, or ignores any source player record.
+ */
+export function summarizeSelectedTeamRosterStatus(
+  entries: RosterStatusEntry[]
+): RosterStatusSummary {
+  const summary: RosterStatusSummary = {
+    total: 0,
+    returning: 0,
+    new: 0,
+    notReturning: 0,
+    unknown: 0,
+    highConfidence: 0,
+    lowConfidence: 0,
+  };
+
+  for (const entry of entries) {
+    const { status, confidence } = entry.derived;
+    let counted = false;
+
+    if (entry.side === 'current') {
+      // Current-roster perspective: returning, new, and ambiguous players.
+      if (status === 'returning') {
+        summary.returning += 1;
+        counted = true;
+      } else if (status === 'new') {
+        summary.new += 1;
+        counted = true;
+      } else if (status === 'unknown') {
+        summary.unknown += 1;
+        counted = true;
+      }
+    } else if (status === 'not-returning') {
+      // Prior-season players absent from the current roster.
+      summary.notReturning += 1;
+      counted = true;
+    }
+
+    if (counted) {
+      if (confidence === 'high') summary.highConfidence += 1;
+      else summary.lowConfidence += 1;
+    }
+  }
+
+  summary.total =
+    summary.returning + summary.new + summary.unknown + summary.notReturning;
+  return summary;
+}
+
+/**
  * Adapter that connects a selected team's current player list and its
- * prior-season player list to the existing roster-status pipeline:
- *   comparePlayerIdentityOverlap -> deriveRosterStatusFromOverlap -> summarizeRosterStatuses
+ * prior-season player list to the roster-status pipeline:
+ *   comparePlayerIdentityOverlap -> deriveRosterStatusFromOverlap
+ *   -> summarizeSelectedTeamRosterStatus
  *
  * This helper only reads the supplied arrays. It never alters, removes,
  * suppresses, merges, nullifies, rewrites, or ignores any player record; derived
@@ -27,12 +100,6 @@ export type TeamRosterStatusSummary =
  * When priorPlayers is null or undefined (no prior-season roster exists to
  * compare against), the result is { available: false } so the UI can show a
  * clear unavailable state instead of misleading zero counts.
- *
- * Note on counts: summarizeRosterStatuses counts one entry per source record.
- * An exact prior-season match contributes both its current-season record and its
- * prior-season record, so a single returning player adds 2 to the returning
- * count. Counts therefore reflect records compared, not unique people. A future
- * slice can add a single-perspective (current-team-only) count if desired.
  */
 export function summarizeTeamRosterStatus(
   currentPlayers: PlayerIdentityInput[],
@@ -44,7 +111,7 @@ export function summarizeTeamRosterStatus(
 
   const overlap = comparePlayerIdentityOverlap(currentPlayers, priorPlayers);
   const entries = deriveRosterStatusFromOverlap(overlap);
-  return { available: true, summary: summarizeRosterStatuses(entries) };
+  return { available: true, summary: summarizeSelectedTeamRosterStatus(entries) };
 }
 
 /**

@@ -58,7 +58,7 @@ describe('summarizeTeamRosterStatus - unavailable state', () => {
 // ---------------------------------------------------------------------------
 
 describe('summarizeTeamRosterStatus - available summary', () => {
-  it('summarizes returning, new, and not-returning across both seasons', () => {
+  it('summarizes returning, new, and not-returning from the team perspective', () => {
     // Alex is in both seasons (returning), Blair is current-only (new),
     // Casey is prior-only (not returning).
     const current = [p('Alex Kim'), p('Blair Doe')];
@@ -69,13 +69,13 @@ describe('summarizeTeamRosterStatus - available summary', () => {
     if (!result.available) return;
 
     const { summary } = result;
-    // One returning player contributes both its current and prior record.
-    expect(summary.returning).toBe(2);
+    // Returning is counted once per current player, not per source record.
+    expect(summary.returning).toBe(1);
     expect(summary.new).toBe(1);
     expect(summary.notReturning).toBe(1);
     expect(summary.unknown).toBe(0);
-    expect(summary.total).toBe(4);
-    expect(summary.highConfidence).toBe(4);
+    expect(summary.total).toBe(3);
+    expect(summary.highConfidence).toBe(3);
     expect(summary.lowConfidence).toBe(0);
   });
 
@@ -130,16 +130,97 @@ describe('summarizeTeamRosterStatus - source preservation', () => {
     expect(prior).toHaveLength(2);
   });
 
-  it('accounts for every rostered record regardless of derived status', () => {
-    // Even fully ambiguous rosters keep all records represented in the totals.
+  it('accounts for every current rostered player regardless of derived status', () => {
+    // Every current player lands in exactly one of returning / new / unknown.
     const current = [p('Sam Rivera'), p('Sam Rivera'), p('Jordan Pat')];
     const prior = [p('Sam Rivera')];
 
     const result = summarizeTeamRosterStatus(current, prior);
     expect(result.available).toBe(true);
     if (!result.available) return;
-    // 3 current records + 1 prior record = 4 records counted, none dropped.
-    expect(result.summary.total).toBe(current.length + prior.length);
+    const { summary } = result;
+    expect(summary.returning + summary.new + summary.unknown).toBe(current.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Perspective-aware counts (no double counting)
+// ---------------------------------------------------------------------------
+
+describe('summarizeTeamRosterStatus - perspective-aware counts', () => {
+  it('counts a single exact current/prior match as Returning = 1 (not 2)', () => {
+    const result = summarizeTeamRosterStatus([p('Alex Kim')], [p('Alex Kim')]);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.summary.returning).toBe(1);
+    expect(result.summary.total).toBe(1);
+    expect(result.summary.highConfidence).toBe(1);
+    expect(result.summary.lowConfidence).toBe(0);
+  });
+
+  it('counts multiple exact matches once per current player', () => {
+    const current = [p('Alex Kim'), p('Blair Doe'), p('Casey Lee')];
+    const prior = [p('Alex Kim'), p('Blair Doe'), p('Casey Lee')];
+    const result = summarizeTeamRosterStatus(current, prior);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.summary.returning).toBe(3);
+    expect(result.summary.new).toBe(0);
+    expect(result.summary.notReturning).toBe(0);
+    expect(result.summary.total).toBe(3);
+  });
+
+  it('counts current-only players as New', () => {
+    const result = summarizeTeamRosterStatus(
+      [p('Alex Kim'), p('Blair Doe')],
+      [p('Alex Kim')]
+    );
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.summary.new).toBe(1);
+    expect(result.summary.returning).toBe(1);
+  });
+
+  it('counts ambiguous current players as Unknown (low confidence)', () => {
+    const result = summarizeTeamRosterStatus(
+      [p('Sam Rivera'), p('Sam Rivera')],
+      [p('Other Name')]
+    );
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.summary.unknown).toBe(2);
+    expect(result.summary.lowConfidence).toBe(2);
+    expect(result.summary.returning).toBe(0);
+    expect(result.summary.new).toBe(0);
+  });
+
+  it('counts prior-only players as Not returning', () => {
+    const result = summarizeTeamRosterStatus(
+      [p('Alex Kim')],
+      [p('Alex Kim'), p('Casey Lee')]
+    );
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.summary.notReturning).toBe(1);
+    expect(result.summary.returning).toBe(1);
+  });
+
+  it('produces intuitive counts for mixed current/prior data', () => {
+    // Returning: Alex. New: Blair. Unknown: duplicate Sam (x2). Not returning: Casey.
+    const current = [p('Alex Kim'), p('Blair Doe'), p('Sam Rivera'), p('Sam Rivera')];
+    const prior = [p('Alex Kim'), p('Casey Lee')];
+    const result = summarizeTeamRosterStatus(current, prior);
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    const { summary } = result;
+    expect(summary.returning).toBe(1);
+    expect(summary.new).toBe(1);
+    expect(summary.unknown).toBe(2);
+    expect(summary.notReturning).toBe(1);
+    expect(summary.total).toBe(5);
+    expect(summary.highConfidence).toBe(3); // returning + new + notReturning
+    expect(summary.lowConfidence).toBe(2); // unknown
+    expect(summary.highConfidence + summary.lowConfidence).toBe(summary.total);
   });
 });
 
