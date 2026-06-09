@@ -110,6 +110,26 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+/* Roster status summary */
+.roster-status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.85rem;
+  background-color: var(--color-alabaster-grey);
+  padding: 0.5rem 0.75rem;
+  border-radius: 3px;
+  color: var(--color-carbon-black);
+}
+
+.roster-status-count {
+  white-space: nowrap;
+}
+
+.roster-status-count strong {
+  color: var(--color-steel-blue);
+}
+
 /* Cards */
 .card {
   display: flex;
