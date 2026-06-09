@@ -8,10 +8,9 @@ Proceed spec-first.
 
 Avoid beginning with visual polish or broad feature sprawl. The first working version should prove the data model and derived classification logic.
 
-## Phase numbering note
+## Phase numbering
 
-This roadmap and `docs/implementation-plan.md` use **different phase numbering**.
-The canonical numbering for active development is the one in
+This roadmap uses the same canonical phase numbering as
 `docs/implementation-plan.md` and `CLAUDE.md`:
 
 ```text
@@ -19,37 +18,38 @@ The canonical numbering for active development is the one in
 2 Core deterministic logic
 3 Prior-season roster comparison
 4 Cohort reclassification preservation
-5 Import preview and collision handling
-6 Schedule and results
+5 Import preview and identity collision handling
+6 Schedule and result support
 7 Coach analytics
 8 My Team panel
 9 Multi-year analytics and visual polish
 ```
 
-In that canonical numbering, this roadmap's "Phase 2: Prior-season roster
-comparison" corresponds to canonical **Phase 3**, and the deterministic logic it
-relies on was built first as canonical **Phase 2**. Read the sections below as
-feature groupings; defer to `implementation-plan.md` for the current phase number
-and order.
+The sections below are feature groupings under this shared sequence. Where this
+roadmap and `docs/implementation-plan.md` describe the same phase, the phase
+number and meaning match. Phase 0 below is a pre-coding specification baseline and
+sits ahead of canonical Phase 1.
 
 ## Current status checkpoint
 
-As of the Phase 2 checkpoint (canonical numbering):
+As of the Phase 2 checkpoint:
 
 - **Specification baseline — complete.** Governing docs and sample data contracts
   exist in the repo.
-- **Static local viewer — complete.** Sample data loads; users can navigate
-  Season -> District -> Age Division -> Team and view coach and player cards.
-- **Core deterministic logic — substantially complete.** Tested pure helpers
-  exist for team classification and hierarchy ranking, age division ordinals,
-  season edit/lock, name normalization and identity keys, duplicate identity
-  detection, exact prior-season identity overlap, roster status derivation
-  (`returning`, `new`, `not-returning`, `unknown`), roster status confidence
-  (`high`, `low`), roster status summary/count helpers, and selected-team
-  perspective counts. Current player cards show Returning / New / Unknown plus a
-  separate low-confidence identity-review warning.
+- **Static local viewer (Phase 1) — complete.** Sample data loads; users can
+  navigate Season -> District -> Age Division -> Team and view coach and player
+  cards.
+- **Core deterministic logic (Phase 2) — substantially complete.** Tested pure
+  helpers exist for team classification and hierarchy ranking, age division
+  ordinals, season edit/lock, name normalization and identity keys, duplicate
+  identity detection, exact prior-season identity overlap, roster status
+  derivation (`returning`, `new`, `not-returning`, `unknown`), roster status
+  confidence (`high`, `low`), roster status summary/count helpers, and
+  selected-team perspective counts. Current player cards show Returning / New /
+  Unknown plus a separate low-confidence identity-review warning.
 
-Not yet built (deferred to later phases): transfer (district change), promotion /
+Phase 3 (Prior-season roster comparison) is **not** complete. Not yet built
+(deferred to Phase 3 and later phases): transfer (district change), promotion /
 relegation / lateral movement, y-up / z-down cohort reclassification, fuzzy
 matching, and import-collision resolution. Roster comparison is exact-identity
 only and is the foundation the next phase extends — it is not replaced.
@@ -77,7 +77,7 @@ Acceptance criteria:
 - unresolved questions are clearly marked as open items
 - sample JSON files reflect the current conceptual model
 
-## Phase 1: Local data contract and static viewer
+## Phase 1: Static local viewer
 
 Goal: prove that sample data can be loaded and displayed.
 
@@ -99,9 +99,30 @@ Acceptance criteria:
 - team view shows head coach, assistant coaches, and players
 - no derived roster logic required yet beyond basic display
 
-## Phase 2: Prior-season roster comparison
+## Phase 2: Core deterministic logic
 
-Goal: classify roster movement from one season to the next.
+Goal: move derived behavior into tested pure functions before any UI consumes it.
+
+Recommended features:
+
+- team classification parsing
+- competitive-hierarchy ranking
+- roster status derivation (returning / new / not-returning / unknown)
+- roster status confidence (high / low)
+- name normalization and identity-key helpers
+- duplicate-identity and exact prior-season overlap detection
+- summary/count helpers
+
+Acceptance criteria:
+
+- all engine functions are deterministic
+- core logic is covered by tests
+- React components consume function outputs rather than embedding classification logic
+
+## Phase 3: Prior-season roster comparison
+
+Goal: classify roster movement from one season to the next, including team-level
+movement intelligence.
 
 Recommended features:
 
@@ -109,19 +130,6 @@ Recommended features:
 - classify returning/new/transfer
 - display status on player cards
 - show team composition summary
-
-Acceptance criteria:
-
-- selected team displays counts by derived status
-- player cards show derived status
-- transfer is detected when prior district differs
-
-## Phase 3: Team hierarchy and promotion/relegation
-
-Goal: add team-level movement intelligence.
-
-Recommended features:
-
 - implement team classification rules
 - implement competitive hierarchy
 - classify promoted/relegated/lateral movement
@@ -129,12 +137,34 @@ Recommended features:
 
 Acceptance criteria:
 
+- selected team displays counts by derived status
+- player cards show derived status
+- transfer is detected when prior district differs
 - B2 -> B1 is promoted
 - B1 -> B2 is relegated
 - C2 -> D2 is lateral under current hierarchy
 - B3/B4/B5 are treated as B3+
 
-## Phase 4: Identity confidence and import collision flow
+## Phase 4: Cohort reclassification preservation
+
+Goal: represent y-up/z-down as a cohort reclassification event that can persist
+across seasons.
+
+Recommended features:
+
+- add optional cohort offset fields to player records and player-season assignments
+- detect possible first-year y-up/z-down from the observed year-over-year division path
+- preserve y-up/z-down while the player follows the reclassified cohort path
+- flag review when the path breaks or becomes ambiguous
+
+Acceptance criteria:
+
+- first-year reclassification can be detected from year-over-year review
+- preserved y-up/z-down status appears in later seasons when the cohort path continues
+- review is required when the preserved path breaks
+- birthdate is not required for the basic version
+
+## Phase 5: Import preview and identity collision handling
 
 Goal: prevent name-only matching from silently corrupting history.
 
@@ -152,7 +182,7 @@ Acceptance criteria:
 - user can accept, reject, manually link, or create new person
 - decisions are persisted
 
-## Phase 5: Schedule and result loading
+## Phase 6: Schedule and result support
 
 Goal: derive records from game objects.
 
@@ -171,7 +201,7 @@ Acceptance criteria:
 - playoff wins/losses derive from flagged games
 - championship appearance/win derive from championship games
 
-## Phase 6: Coach analytics
+## Phase 7: Coach analytics
 
 Goal: calculate lifetime and continuous-cohort records.
 
@@ -188,43 +218,7 @@ Acceptance criteria:
 - continuous-cohort record continues only when district and expected age progression continue
 - Scout-to-Scout exception is handled
 
-## Phase 7: Multi-year analytics
-
-Goal: add higher-level conference and district intelligence.
-
-Recommended features:
-
-- district win/loss summaries
-- championship history
-- coach leaderboards
-- roster retention rates
-- transfer rates
-- promotion/relegation rates
-
-Acceptance criteria:
-
-- filtered summary views display multi-year trends
-- analytics derive from canonical assignments and game records
-
-## Phase 8: Branding and visual language
-
-Goal: improve interpretability and product feel.
-
-Recommended features:
-
-- district logos
-- district helmets
-- primary/secondary colors
-- mascot display
-- age division visual language
-- team-level visual language
-
-Acceptance criteria:
-
-- selecting a district applies recognizable branding cues
-- player status remains visually clear and not overwhelmed by branding
-
-## Phase 9: My Team panel
+## Phase 8: My Team panel
 
 Goal: support season-specific favorite team workflows.
 
@@ -240,6 +234,33 @@ Acceptance criteria:
 - My Team persists for the season
 - panel shows schedule and results
 - opponent links navigate to team profiles
+
+## Phase 9: Multi-year analytics and visual polish
+
+Goal: add higher-level conference and district intelligence, and improve
+interpretability and product feel.
+
+Recommended features:
+
+- district win/loss summaries
+- championship history
+- coach leaderboards
+- roster retention rates
+- transfer rates
+- promotion/relegation rates
+- district logos
+- district helmets
+- primary/secondary colors
+- mascot display
+- age division visual language
+- team-level visual language
+
+Acceptance criteria:
+
+- filtered summary views display multi-year trends
+- analytics derive from canonical assignments and game records
+- selecting a district applies recognizable branding cues
+- player status remains visually clear and not overwhelmed by branding
 
 ## Early technical recommendation
 
