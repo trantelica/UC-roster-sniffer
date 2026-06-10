@@ -40,28 +40,38 @@ A-team designation caps at `A4`.
 Promotion and relegation calculations should use this hierarchy:
 
 ```text
-B1 > C1 > B2 > B3+ = C2 = D2
+A(x) > B1 > C1 = B2 > B3+ = C2 = D2
 ```
 
 Where:
 
-- `B3+` means B3, B4, B5, and any lower B-numbered team.
+- `A(x)` means any valid A-code (`A1`, `A2`, `A3`, `A4`) and is the **top**
+  competitive tier. All A-codes are hierarchy-equivalent — A-code to A-code
+  movement is lateral. (A-team designation caps at `A4`; see `## Team
+  classification`.)
+- `C1` and `B2` are equivalent competitive tiers.
+- `B3+` means B3, B4, B5, and any higher B-numbered team.
 - `B3+`, `C2`, and `D2` are equivalent competitive tiers.
 
-A first pass ranking map:
+A ranking map (higher number is the stronger tier):
 
 ```json
 {
+  "A": 500,
   "B1": 400,
   "C1": 300,
-  "B2": 200,
+  "B2": 300,
   "B3_PLUS": 100,
   "C2": 100,
   "D2": 100
 }
 ```
 
-Open item: determine how `A1`, `A2`, `A3`, and `A4` should participate in promotion/relegation logic, because A-codes describe first-drafted teams but also encode division size.
+A-codes encode division size (`A1`..`A4`) but, for competitive ranking, are
+treated as a single equivalent top tier. This resolves the earlier open item
+about A-code participation in promotion/relegation: a move up to any A-code is a
+promotion, a move down from any A-code is a relegation, and A-code to A-code
+movement is lateral.
 
 ## Player roster status
 
@@ -185,6 +195,58 @@ cohort reclassification. Those remain future work and are layered on top of this
 exact-identity foundation, not in place of it. Source roster records are
 preserved by reference and never mutated; ambiguity affects derived metadata only.
 
+### District-aware movement classification (Phase 3 slice 6)
+
+The sixth Phase 3 slice adds a pure deterministic engine helper
+(`classifyDistrictAwarePlayerMovement`) that interprets the exact team-slot
+movement **signal** from slice 4 into product-level movement statuses. It is
+engine-only: no UI, no player-card badges, and no import behavior change.
+
+This is a **classification layer over exact team-slot movement**, not a
+replacement for it. The helper calls `detectExactPriorSeasonPlayerMovement`
+read-only and never mutates it; each underlying movement entry yields exactly one
+classification entry (so the entry count equals the source record count). Source
+`player` and `team` references are preserved; classification is fresh derived
+metadata only.
+
+Classification rules:
+
+- Same team slot -> `same-team-returning`.
+- Different team slot, **same district, same age division** -> compare the
+  competitive hierarchy (`A(x) > B1 > C1 = B2 > B3+ = C2 = D2`, where `A(x)` is any
+  valid A-code treated as the top tier): current tier higher than prior ->
+  `promoted`; lower -> `relegated`; equivalent -> `lateral`.
+- Different team slot, **different district** -> `transfer`. Promotion / relegation
+  / lateral are intentionally **not** also claimed for a district change, and a
+  district change stays `transfer` regardless of age division.
+- Different team slot, **same district, different age division** -> the neutral
+  `age-division-change`. This is intentionally conservative: y-up / z-down cohort
+  reclassification is **not** implemented in this slice and is deferred to Phase 4.
+- Current-only exact identity -> `new-to-conference`.
+- Prior-only exact identity -> `not-returning`.
+- Ambiguous (duplicate-name) identity -> `unknown` only. An ambiguous key is never
+  classified as `transfer`, `promoted`, `relegated`, or `lateral`.
+
+Each classification entry carries `identityKey`, `side`, the source `player` and
+`record` (by reference), the resolved `currentTeam` / `priorTeam` slot context
+where applicable, and a `status` / `confidence` / `reason` verdict. Reasons map
+1:1 to the cases above (for example `same-team-slot`, `same-district-higher-team`,
+`different-district`, `same-district-different-age-division`, `new-current-identity`,
+`missing-current-identity`, `ambiguous-identity`).
+
+**Conservative tier fallback.** Promotion/relegation/lateral ranking uses the
+existing `compareTeamClassifications` helper, which ranks valid A-codes
+(`A1`..`A4`) as the top tier plus `B1`, `C1`, `B2`, `B3+`, `C2`, and `D2`. Valid
+A-codes are rankable and never hit this fallback. When a same-district, same-age
+move involves a team code that is genuinely unsupported/invalid and cannot be
+parsed (e.g. a malformed code, or an out-of-range code like `C3`), the helper does
+**not** throw and does **not** claim a direction: it reports a low-confidence
+`lateral` with reason `same-district-unrankable-team` for review.
+
+Y-up / z-down are **not** implemented in this slice. They are cohort
+reclassification events (see `## Y-Up / Z-Down`) layered later in Phase 4 on top
+of this classification foundation, not folded into it.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no
@@ -256,7 +318,7 @@ canonical term and one-line meaning so all specs agree.
   applies.
 - **Promotion, relegation, and lateral movement require team-hierarchy
   interpretation.** They are only meaningful after the competitive hierarchy
-  (`B1 > C1 > B2 > B3+ = C2 = D2`) is applied to the prior and current team
+  (`A(x) > B1 > C1 = B2 > B3+ = C2 = D2`) is applied to the prior and current team
   codes. The exact team-slot movement signal supplies the "moved" fact; the
   hierarchy supplies the direction.
 - **Transfer / move-in requires district/team context and future business
