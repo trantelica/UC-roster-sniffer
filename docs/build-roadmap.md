@@ -54,11 +54,16 @@ display-count summary (slice 2), a read-only summary panel (slice 3), and an
 engine-only exact-identity transfer/team-slot movement detector
 (`detectExactPriorSeasonPlayerMovement`, slice 4) that classifies same-team
 returning, transferred-in, transferred-out, new-to-conference, not-returning, and
-unknown across team slots. Not yet built (deferred to later Phase 3 work and
-beyond): the district-change `transfer` rule, promotion / relegation / lateral
-movement, y-up / z-down cohort reclassification, fuzzy matching, and
-import-collision resolution. Roster comparison is exact-identity only and is the
-foundation the richer taxonomy extends — it is not replaced.
+unknown across team slots. A spec-only movement-taxonomy alignment pass (slice 5)
+then fixed shared vocabulary in `docs/derived-logic.md`: it distinguishes the
+**same-slot roster comparison** (slices 1–2, which cannot detect transfers by
+design) from **exact identity team-slot movement** (slice 4), and frames the
+latter's transferred-in/out buckets as an **input signal**, not a final
+`transfer` / promotion / relegation / lateral verdict. Not yet built (deferred to
+later Phase 3 work and beyond): the district-change `transfer` rule, promotion /
+relegation / lateral movement, y-up / z-down cohort reclassification, fuzzy
+matching, and import-collision resolution. Roster comparison is exact-identity
+only and is the foundation the richer taxonomy extends — it is not replaced.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
