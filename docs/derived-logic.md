@@ -147,6 +147,44 @@ and never alters source records. Counting is perspective-aware:
 
 No new movement taxonomy is introduced.
 
+### Exact-identity transfer (team-slot) detection (Phase 3 slice 4)
+
+The fourth Phase 3 slice adds a pure deterministic engine helper
+(`detectExactPriorSeasonPlayerMovement`) that detects player movement BETWEEN
+team slots from the prior season to the current season. It is engine-only: no UI,
+no player-card badges, and no import behavior change.
+
+Matching is exact identity only, reusing the existing `getPlayerIdentityKey`
+pipeline. A **team slot** is identified across seasons by
+`districtId` + `ageDivisionId` + `teamCode`. `seasonId` is intentionally excluded
+from same-slot comparison, because the comparison is cross-season by definition.
+This is the same same-slot definition documented in `docs/data-model.md`.
+
+The helper returns one perspective-aware output entry per relevant source record,
+organized into six buckets:
+
+- `sameTeamReturning`: an exact prior match on the **same** team slot. The current
+  and prior source records each get an entry (distinguished by `side`).
+- `transferredIn`: current-side record of an exact prior match on a **different**
+  team slot (the player the prior team transferred away).
+- `transferredOut`: prior-side record of that same different-slot match.
+- `newToConference`: a current record whose identity appears nowhere in the prior
+  comparison set.
+- `notReturning`: a prior record whose identity appears nowhere in the current
+  comparison set.
+- `unknown`: every record whose identity key is ambiguous (a duplicate on either
+  side). Ambiguous keys are classified **only** as `unknown` / low-confidence and
+  never as a transfer, same-team, new, or not-returning. Each ambiguous record
+  stays individually present.
+
+Relationship to the richer taxonomy below: this slice defines "transfer" purely
+as an exact identity on a different team slot. It is a deterministic foundation
+and does **not** replace or implement the district-change `Transfer` rule,
+`promoted` / `relegated` / `lateral` competitive-tier movement, or `yUp` / `zDown`
+cohort reclassification. Those remain future work and are layered on top of this
+exact-identity foundation, not in place of it. Source roster records are
+preserved by reference and never mutated; ambiguity affects derived metadata only.
+
 ## Returning
 
 A player is returning when the matched prior-season assignment is the same team or functionally same continuing roster path.
