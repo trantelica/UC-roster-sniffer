@@ -48,11 +48,17 @@ As of the Phase 2 checkpoint:
   selected-team perspective counts. Current player cards show Returning / New /
   Unknown plus a separate low-confidence identity-review warning.
 
-Phase 3 (Prior-season roster comparison) is **not** complete. Not yet built
-(deferred to Phase 3 and later phases): transfer (district change), promotion /
-relegation / lateral movement, y-up / z-down cohort reclassification, fuzzy
-matching, and import-collision resolution. Roster comparison is exact-identity
-only and is the foundation the next phase extends — it is not replaced.
+Phase 3 (Prior-season roster comparison) is **in progress**. The exact-identity
+foundation now includes a current-vs-prior comparison contract (slice 1), a
+display-count summary (slice 2), a read-only summary panel (slice 3), and an
+engine-only exact-identity transfer/team-slot movement detector
+(`detectExactPriorSeasonPlayerMovement`, slice 4) that classifies same-team
+returning, transferred-in, transferred-out, new-to-conference, not-returning, and
+unknown across team slots. Not yet built (deferred to later Phase 3 work and
+beyond): the district-change `transfer` rule, promotion / relegation / lateral
+movement, y-up / z-down cohort reclassification, fuzzy matching, and
+import-collision resolution. Roster comparison is exact-identity only and is the
+foundation the richer taxonomy extends — it is not replaced.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
