@@ -133,10 +133,17 @@ For a selected current-season roster, each player should receive a derived statu
 - Returning
 - New
 - Transfer / Move-In
-- Y-Up
-- Z-Down
 - Promoted
 - Relegated
+- Lateral
+- Y-Up
+- Z-Down
+
+The canonical meaning of each term, and how it relates to the underlying exact-
+identity comparison signals, is fixed in `docs/derived-logic.md` ("Player
+movement taxonomy alignment"). Two additional comparison-context terms —
+`Not Returning` and `New to Conference` — also live there; they describe
+prior-vs-current comparison results and are not current player-card statuses.
 
 ## Team view requirements
 

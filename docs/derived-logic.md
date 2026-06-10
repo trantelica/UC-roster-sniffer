@@ -185,6 +185,109 @@ cohort reclassification. Those remain future work and are layered on top of this
 exact-identity foundation, not in place of it. Source roster records are
 preserved by reference and never mutated; ambiguity affects derived metadata only.
 
+### Player movement taxonomy alignment (Phase 3 slice 5)
+
+This slice is a **spec alignment pass only**. It introduces no engine logic, no
+UI, and no badges. Its purpose is to fix clear, non-conflicting vocabulary so the
+later movement-classification coding slices build on shared terms. The
+per-status definitions that follow this section (`## Returning`, `## New`,
+`## Transfer / Move-In`, `## Y-Up / Z-Down`, `## Promotion`, `## Relegation`,
+`## Lateral movement`) are the product-level target meanings; this section frames
+how they relate to the two comparison foundations already built.
+
+#### Two foundations, deliberately distinct
+
+There are two separate prior-season comparison engines already in the codebase.
+They answer different questions and must not be conflated:
+
+1. **Same-slot roster comparison** — `comparePriorSeasonRosterComparison` /
+   `summarizePriorSeasonRosterComparison` (slices 1–2). This compares a current
+   team to the prior-season team occupying the **same team slot** (same
+   `districtId` + `ageDivisionId` + `teamCode`). It answers: "for this one team
+   slot, who came back, who is new to the slot, who did not return, and who is
+   ambiguous?" Its supported buckets are `returning`, `newToRoster`,
+   `notReturning`, and `unknown`. By design it compares only within a single team
+   slot, so **it cannot detect transfers** — a player who left for a different
+   slot simply reads as `notReturning` here, and a player who arrived from a
+   different slot reads as `newToRoster`. That is correct for the same-slot
+   question and is not a defect.
+
+2. **Exact identity team-slot movement** — `detectExactPriorSeasonPlayerMovement`
+   (slice 4). This compares exact identity keys across **all** current-season and
+   prior-season team slots at once. It answers: "does this exact identity appear
+   on the same team slot, a different team slot, only the current season, or only
+   the prior season?" Its buckets are `sameTeamReturning`, `transferredIn`,
+   `transferredOut`, `newToConference`, `notReturning`, and `unknown`.
+
+This detector is a **deterministic foundation, not the final movement
+taxonomy.** Its `transferredIn` / `transferredOut` buckets mean only "exact
+identity on a different team slot." They are an **input signal**, not a final
+product `Transfer` verdict, and not a promotion / relegation / lateral verdict.
+The detector must not be described as if different-slot movement is always a
+final transfer.
+
+#### Product-level movement taxonomy
+
+These are the product-facing meanings the richer classifier (future slices) will
+produce. Several already have dedicated sections below; the table fixes the
+canonical term and one-line meaning so all specs agree.
+
+| Term | Canonical meaning | Status today |
+| --- | --- | --- |
+| same-team returning | Exact identity returns to the **same** team slot (same district + age division + team code). | Signal implemented (slice 4 `sameTeamReturning`); see `## Returning` for the fuller product rule. |
+| new to roster | A current player not present on the **prior-season same team slot**. | Implemented for the same-slot comparison (slice 1 `newToRoster`). Slot-scoped, not conference-scoped. |
+| new to conference | A current exact identity that appears on **no** prior-season team slot anywhere in the comparison set. | Signal implemented (slice 4 `newToConference`). |
+| not returning | A prior-season identity that is absent from the current comparison set (slot-scoped in slice 1, conference-scoped in slice 4). | Implemented (slice 1 + slice 4). Comparison/summary context only; never a current player-card status. |
+| exact team-slot movement | An exact identity whose prior match sits on a **different** team slot than its current slot. | Signal implemented (slice 4 `transferredIn` / `transferredOut`). Input signal only — see relationships below. |
+| transfer / move-in | A prior-season match exists and the prior-season **district differs** from the current-season district. | Future. Defined in `## Transfer / Move-In`. Requires district context; not equal to exact team-slot movement. |
+| promotion | Same district, expected age progression satisfied, current competitive tier **higher** than prior. | Future. Defined in `## Promotion`. Requires team-hierarchy interpretation. |
+| relegation | Same district, expected age progression satisfied, current competitive tier **lower** than prior. | Future. Defined in `## Relegation`. Requires team-hierarchy interpretation. |
+| lateral movement | Same district, expected age progression satisfied, current and prior competitive tiers **equivalent**. | Future. Defined in `## Lateral movement`. Requires team-hierarchy interpretation. |
+| y-up | Cohort reclassification: player moves into a cohort path one age division **above** expected progression. | Future. Defined in `## Y-Up / Z-Down`. A cohort reclassification event, not an ordinary transfer. |
+| z-down | Cohort reclassification: player moves into a cohort path one age division **below** expected progression. | Future. Defined in `## Y-Up / Z-Down`. A cohort reclassification event, not an ordinary transfer. |
+| unknown / ambiguous identity | Identity key cannot be safely resolved (e.g. duplicate name on either side). | Implemented across slices. Never classified into a movement bucket. |
+
+#### Relationship between terms
+
+- **Exact team-slot movement is an input signal, not a verdict.** Detecting that
+  an exact identity sits on a different team slot than last season is the raw
+  signal. It is upstream of `transfer`, `promotion`, `relegation`, and
+  `lateral movement`; it does not by itself decide which of those (if any)
+  applies.
+- **Promotion, relegation, and lateral movement require team-hierarchy
+  interpretation.** They are only meaningful after the competitive hierarchy
+  (`B1 > C1 > B2 > B3+ = C2 = D2`) is applied to the prior and current team
+  codes. The exact team-slot movement signal supplies the "moved" fact; the
+  hierarchy supplies the direction.
+- **Transfer / move-in requires district/team context and future business
+  rules.** The product `Transfer` rule keys on a **district change**, not merely
+  a different team code. Same-district different-slot movement is candidate
+  promotion / relegation / lateral movement, not a transfer. Cross-district
+  movement is candidate transfer. A single different-slot signal can therefore
+  feed different final classifications depending on district context.
+- **Y-up / z-down are cohort reclassification events, not ordinary team
+  transfers.** They describe a player traveling with a cohort one division off
+  the expected age progression, and (per `## Y-Up / Z-Down`) can persist across
+  seasons. They must not be folded into transfer or promotion/relegation buckets.
+- **Ambiguous identity keys stay `unknown` / review.** An ambiguous key (e.g. a
+  duplicate name on either side) must never be classified into any movement
+  bucket — not returning, not transfer, not promotion/relegation/lateral, not
+  y-up/z-down. Ambiguity is resolved (if ever) only through future
+  identity-collision review, which is out of scope here.
+
+#### Guardrails for this and the next slice
+
+- **No fuzzy matching yet.** All matching remains exact normalized-name identity
+  keys via `getPlayerIdentityKey`.
+- **No collision resolution yet.** Ambiguous identities remain `unknown`; no
+  accept/reject/link/create-new behavior is introduced.
+- **No UI labels or badges are implied by this spec pass.** Naming a product term
+  here does not authorize rendering it on a player card or summary.
+- **No mutation or suppression of roster records.** See `## Roster authority`.
+  Movement classification is derived metadata only.
+- **Prior seasons remain locked.** Aligning the taxonomy changes no season-lock
+  behavior.
+
 ## Returning
 
 A player is returning when the matched prior-season assignment is the same team or functionally same continuing roster path.

@@ -218,6 +218,23 @@ movement (transfer) and competitive-tier movement (promotion / relegation /
 lateral); it does not replace or rewrite the exact-identity matching already in
 place. Phase 3 is **not** complete.
 
+Movement vocabulary is fixed by the taxonomy-alignment pass in
+`docs/derived-logic.md` ("Player movement taxonomy alignment (Phase 3 slice 5)").
+Coding slices must use those terms and respect the two distinctions it draws:
+
+- **Same-slot roster comparison** (slices 1–2) compares one current team to its
+  prior-season same-slot team and supports `returning` / `newToRoster` /
+  `notReturning` / `unknown`. It cannot detect transfers and must not be extended
+  to claim it does.
+- **Exact identity team-slot movement** (slice 4) is a deterministic **input
+  signal** — exact identity on the same vs a different team slot. Its
+  transferred-in / transferred-out buckets are not a final `transfer`,
+  `promoted`, `relegated`, or `lateral` verdict. Those verdicts require team
+  hierarchy (promotion / relegation / lateral) or district context (transfer)
+  layered on top, and y-up / z-down remain cohort reclassification events handled
+  in Phase 4. Ambiguous identities stay `unknown` and are never bucketed into
+  movement.
+
 ### Goal
 
 Show meaningful roster movement from current season versus prior season.
