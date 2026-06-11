@@ -193,6 +193,18 @@ Slice status:
   offset, carry reclassification forward, use fuzzy matching / birthdate / grade /
   notes, or render any UI badge. Ambiguous identities stay `unknown` / review.
   Preservation, carry-forward, and review/reset remain later Phase 4 work.
+- **Slice 2 (done): first-year cohort reclassification record (engine only).** A
+  pure helper (`deriveFirstYearCohortReclassificationRecords`) consumes the slice
+  1 signal output and records the first-year y-up / z-down event for the
+  **high-confidence candidates only**, preferring the current-side entry and
+  emitting one record per identity event (`ageDivisionDelta` positive for y-up,
+  negative for z-down). See `docs/derived-logic.md` ("First-year cohort
+  reclassification record (Phase 4 slice 2)"). This is still derived metadata. It
+  records the first-year event only — it does not carry the status forward into
+  future seasons, persist a cohort offset, reset a preserved path, alter roster
+  records, use fuzzy matching / birthdate / grade / notes / manual review, or
+  render any UI badge. Preservation / carry-forward across later seasons remains
+  later Phase 4 work.
 
 ## Phase 5: Import preview and identity collision handling
 

@@ -295,6 +295,18 @@ Birthdate is not required for the basic version.
   `unknown` / review. See `docs/derived-logic.md` for the full contract.
   Remaining Phase 4 slices add cohort-offset preservation, carry-forward, and
   review/reset.
+- **Slice 2 (done): first-year cohort reclassification record (engine only).**
+  `deriveFirstYearCohortReclassificationRecords` consumes the slice 1 signal
+  output and records the **first-year** y-up / z-down cohort reclassification
+  event for high-confidence candidates only. It produces one record per identity
+  event (current-side entry preferred over the redundant prior-side perspective),
+  with `ageDivisionDelta` positive for y-up and negative for z-down, and skips
+  every non-candidate, low-confidence, ambiguous, or incomplete entry. It is
+  still derived metadata: no carry-forward into future seasons, no cohort-offset
+  persistence, no path reset, no roster mutation, no fuzzy matching /
+  birthdate / grade / notes / manual review, and no UI badge. See
+  `docs/derived-logic.md` for the full contract. Remaining Phase 4 slices add
+  cohort-offset preservation, carry-forward, and review/reset.
 
 ## Phase 5: Import preview and collision handling
 
