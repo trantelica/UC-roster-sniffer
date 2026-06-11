@@ -183,6 +183,17 @@ Acceptance criteria:
 - review is required when the preserved path breaks
 - birthdate is not required for the basic version
 
+Slice status:
+
+- **Slice 1 (done): cohort reclassification signal detection (engine only).** A
+  pure helper (`detectCohortReclassificationSignals`) flags y-up / z-down
+  **candidates** from exact-identity year-over-year age-division movement only.
+  See `docs/derived-logic.md` ("Cohort reclassification signal detection (Phase 4
+  slice 1)"). This slice detects candidates only — it does not persist a cohort
+  offset, carry reclassification forward, use fuzzy matching / birthdate / grade /
+  notes, or render any UI badge. Ambiguous identities stay `unknown` / review.
+  Preservation, carry-forward, and review/reset remain later Phase 4 work.
+
 ## Phase 5: Import preview and identity collision handling
 
 Goal: prevent name-only matching from silently corrupting history.
