@@ -59,11 +59,17 @@ then fixed shared vocabulary in `docs/derived-logic.md`: it distinguishes the
 **same-slot roster comparison** (slices 1–2, which cannot detect transfers by
 design) from **exact identity team-slot movement** (slice 4), and frames the
 latter's transferred-in/out buckets as an **input signal**, not a final
-`transfer` / promotion / relegation / lateral verdict. Not yet built (deferred to
-later Phase 3 work and beyond): the district-change `transfer` rule, promotion /
-relegation / lateral movement, y-up / z-down cohort reclassification, fuzzy
-matching, and import-collision resolution. Roster comparison is exact-identity
-only and is the foundation the richer taxonomy extends — it is not replaced.
+`transfer` / promotion / relegation / lateral verdict. An engine-only
+district-aware classification layer (`classifyDistrictAwarePlayerMovement`, slice
+6) then interprets that signal into product-level statuses: `same-team-returning`,
+`promoted` / `relegated` / `lateral` (same district + same age division, via the
+competitive hierarchy `A(x) > B1 > C1 = B2 > B3+ = C2 = D2`, where any valid
+A-code is the top tier), `transfer` (district change), the conservative
+`age-division-change` (same district + different age division), `new-to-conference`,
+`not-returning`, and `unknown`. Not yet built (deferred to Phase 4 and beyond):
+y-up / z-down cohort reclassification, fuzzy matching, and import-collision
+resolution. Roster comparison is exact-identity only and is the foundation the
+richer taxonomy extends — it is not replaced.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
@@ -155,6 +161,8 @@ Acceptance criteria:
 - B1 -> B2 is relegated
 - C2 -> D2 is lateral under current hierarchy
 - B3/B4/B5 are treated as B3+
+- any valid A-code (A1..A4) is the top tier: B1 -> A4 is promoted, A4 -> B1 is
+  relegated, and A-code to A-code (e.g. A2 -> A4) is lateral
 
 ## Phase 4: Cohort reclassification preservation
 

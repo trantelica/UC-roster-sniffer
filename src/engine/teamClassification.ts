@@ -1,4 +1,11 @@
-export type TeamClassificationCode = 'B1' | 'C1' | 'B2' | 'B3_PLUS' | 'C2' | 'D2';
+export type TeamClassificationCode =
+  | 'A'
+  | 'B1'
+  | 'C1'
+  | 'B2'
+  | 'B3_PLUS'
+  | 'C2'
+  | 'D2';
 
 export interface ParsedTeamClassification {
   raw: string;
@@ -6,10 +13,14 @@ export interface ParsedTeamClassification {
   code: TeamClassificationCode;
 }
 
+// Competitive hierarchy: A(x) > B1 > C1 = B2 > B3+ = C2 = D2.
+// Any valid A-code (A1..A4) is the top tier and A-codes are hierarchy-equivalent.
+// C1 and B2 are equivalent; B3+, C2, and D2 are equivalent.
 const RANK: Record<TeamClassificationCode, number> = {
+  A: 500,
   B1: 400,
   C1: 300,
-  B2: 200,
+  B2: 300,
   B3_PLUS: 100,
   C2: 100,
   D2: 100,
@@ -30,6 +41,11 @@ function normalizeInput(input: string): string {
 function resolveCode(normalized: string): TeamClassificationCode | null {
   if (normalized in SUPPORTED_EXACT) {
     return SUPPORTED_EXACT[normalized];
+  }
+  // A1, A2, A3, A4 -> A (top tier; A-team designation caps at A4). All A-codes
+  // are treated as a single hierarchy-equivalent tier.
+  if (/^A[1-4]$/.test(normalized)) {
+    return 'A';
   }
   // B3, B4, B5, ... -> B3_PLUS
   if (/^B([3-9]|\d{2,})$/.test(normalized)) {
