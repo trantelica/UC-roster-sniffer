@@ -296,6 +296,54 @@ Y-up / z-down here are **candidate signals only**, not a persisted cohort status
 and no UI badge is implied. Loaded roster records remain authoritative and are
 preserved by reference and never mutated; ambiguity affects derived metadata only.
 
+### First-year cohort reclassification record (Phase 4 slice 2)
+
+The second Phase 4 slice adds a pure deterministic engine helper
+(`deriveFirstYearCohortReclassificationRecords`) that consumes the slice 1 signal
+output and records the **first-year cohort reclassification event** for the
+high-confidence y-up / z-down candidates only. It is engine-only: no UI, no
+player-card badges, and no import behavior change.
+
+Slice 1 **detects** y-up / z-down candidates; this slice **records** the
+first-year event derived from those candidates. It adds no detection of its own:
+there is no fuzzy matching, no initial inference, and no consult of grade,
+birthdate, player age, roster notes, or manual review decisions. The records are
+still derived metadata.
+
+A record is created only for a slice 1 entry whose `signal.status` is
+`y-up-candidate` or `z-down-candidate` **and** whose `signal.confidence` is
+`high`, with usable current/prior team context, usable `seasonId`s on both sides,
+and valid age divisions on both sides. Each record carries:
+
+- `reclassificationType` (`y-up` / `z-down`) and `sourceStatus`
+  (`y-up-candidate` / `z-down-candidate`).
+- `firstDetectedSeasonId` (current team `seasonId`) and `priorSeasonId` (prior
+  team `seasonId`).
+- `priorAgeDivisionId` / `currentAgeDivisionId` (the raw source division ids).
+- `ageDivisionDelta`: age-division ordinal movement (current minus prior),
+  **positive** for `y-up`, **negative** for `z-down`.
+- `identityKey`, the source `player`, `currentTeam`, and `priorTeam` references.
+- `confidence` (`high`) and `reason` (`first-year-y-up-detected` /
+  `first-year-z-down-detected`).
+
+No record is created for `expected-age-progression`, `same-age-division`,
+`unknown`, any low-confidence entry, an ambiguous identity (never a candidate in
+slice 1), or an entry missing current/prior team context, a usable season id, or
+a valid age division. Skipped entries are returned alongside the records with a
+skip reason.
+
+Slice 1 emits one entry per source record, so an exact-identity event has both a
+current-side and a prior-side entry. This slice produces **one record per
+identity event**, preferring the current-side entry as the canonical source; the
+redundant prior-side perspective is skipped as `duplicate-perspective`.
+
+This is **first-year recording only**. It does **not** carry the cohort status
+forward into future seasons, persist a cohort offset to storage, reset a
+preserved path, or alter roster records. Loaded roster records remain
+authoritative and are preserved by reference and never mutated. A later Phase 4
+slice may preserve / carry the cohort reclassification across later seasons when
+the player travels with the reclassified cohort (see `## Y-Up / Z-Down`).
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no
