@@ -247,6 +247,55 @@ Y-up / z-down are **not** implemented in this slice. They are cohort
 reclassification events (see `## Y-Up / Z-Down`) layered later in Phase 4 on top
 of this classification foundation, not folded into it.
 
+### Cohort reclassification signal detection (Phase 4 slice 1)
+
+The first Phase 4 slice adds a pure deterministic engine helper
+(`detectCohortReclassificationSignals`) that flags possible y-up / z-down cohort
+reclassification **candidates** by comparing an exact-identity player's
+prior-season and current-season age divisions. It is engine-only: no UI, no
+player-card badges, and no import behavior change.
+
+This is a **signal layer only**. It detects candidates; it does **not** persist a
+cohort offset, carry reclassification forward across future seasons, or reset a
+preserved path. That preservation work (cohort offset fields, carry-forward, and
+review/reset conditions described under `## Y-Up / Z-Down`) is the rest of Phase 4
+and is layered on top of this signal, not folded into it.
+
+Matching is exact identity only, reusing `getPlayerIdentityKey` (no fuzzy
+matching, no initial inference). Classification uses age-division **ordinal**
+movement only (`SC < GR < PW < MM < GI < BA`); it deliberately does **not**
+consult grade, birthdate, player age, or roster notes.
+
+The helper returns one perspective-aware entry per relevant source record (entry
+count equals `currentRecords.length + priorRecords.length`). Classification per
+identity key:
+
+- Exact match, current ordinal exactly one above prior ->
+  `expected-age-progression` / high / `normal-one-division-progression`
+  (e.g. GR -> PW).
+- Exact match, unchanged division -> `same-age-division` / high /
+  `unchanged-age-division` (e.g. PW -> PW).
+- Exact match, current ordinal more than one above prior -> `y-up-candidate` /
+  high / `skipped-age-division` (e.g. GR -> MM).
+- Exact match, current ordinal one or more below prior -> `z-down-candidate` /
+  high / `moved-down-age-division` (e.g. MM -> PW).
+- Exact match where either side's age division is missing/unsupported ->
+  `unknown` / low / `invalid-age-division`. The raw division value is still
+  reported, not suppressed.
+- Current-only exact identity -> `unknown` / low / `missing-prior-record`.
+- Prior-only exact identity -> `unknown` / low / `missing-current-record`.
+- Ambiguous (duplicate-name) identity on either side -> `unknown` / low /
+  `ambiguous-identity` only. An ambiguous key is never given a candidate verdict.
+
+Each entry carries `identityKey`, `side`, the source `player` and `record` (by
+reference), the resolved `currentTeam` / `priorTeam` slot context and
+`currentAgeDivisionId` / `priorAgeDivisionId` where applicable (`null`
+otherwise), and a `signal` (`status` / `confidence` / `reason`) verdict.
+
+Y-up / z-down here are **candidate signals only**, not a persisted cohort status,
+and no UI badge is implied. Loaded roster records remain authoritative and are
+preserved by reference and never mutated; ambiguity affects derived metadata only.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

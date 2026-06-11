@@ -283,6 +283,19 @@ Review is required when the preserved path breaks.
 Birthdate is not required for the basic version.
 ```
 
+### Slice progress
+
+- **Slice 1 (done): cohort reclassification signal detection (engine only).**
+  `detectCohortReclassificationSignals` classifies exact-identity year-over-year
+  age-division movement into `expected-age-progression`, `same-age-division`,
+  `y-up-candidate`, `z-down-candidate`, or `unknown`, using age-division ordinal
+  movement only. It is a **signal layer** — y-up / z-down are candidate signals,
+  not a persisted cohort status. No preservation/carry-forward, no fuzzy matching,
+  no birthdate/grade/notes inference, no UI badges, and ambiguous identities stay
+  `unknown` / review. See `docs/derived-logic.md` for the full contract.
+  Remaining Phase 4 slices add cohort-offset preservation, carry-forward, and
+  review/reset.
+
 ## Phase 5: Import preview and collision handling
 
 ### Goal
