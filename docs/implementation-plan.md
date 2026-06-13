@@ -307,6 +307,23 @@ Birthdate is not required for the basic version.
   birthdate / grade / notes / manual review, and no UI badge. See
   `docs/derived-logic.md` for the full contract. Remaining Phase 4 slices add
   cohort-offset preservation, carry-forward, and review/reset.
+- **Slice 3 (done): cohort reclassification carry-forward (engine only).**
+  `carryForwardCohortReclassificationStatus` consumes the slice 2 first-year
+  records plus a later-season roster and `seasonOrder` (oldest to newest) and
+  decides, per record, whether the player is still on the reclassified offset
+  path. It computes an explicit `cohortOffset` relative to normal progression
+  (`firstDetectedRank - (priorRank + 1)`) and an expected division on the offset
+  path (`firstDetectedRank + seasonSteps`, capped at SC..BA). Verdicts:
+  `first-year`, `carried-forward` (incl. top/bottom cap), `path-broken`
+  (returned-to-normal or unexpected division), and the conservative
+  `insufficient-history` / `unknown` for missing records, unusable season
+  ordering, invalid divisions, or ambiguous identities. A summary helper
+  (`summarizeCohortReclassificationCarryForward`) counts by status, type, and
+  confidence. It is still derived metadata: no persistence, no UI badges, no
+  import change, no fuzzy matching / birthdate / grade / notes / manual review,
+  and no roster mutation; a broken path is a review signal, not data deletion.
+  See `docs/derived-logic.md` for the full contract. Remaining Phase 4 work adds
+  cohort-offset persistence and review/reset.
 
 ## Phase 5: Import preview and collision handling
 

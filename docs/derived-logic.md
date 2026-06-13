@@ -344,6 +344,103 @@ authoritative and are preserved by reference and never mutated. A later Phase 4
 slice may preserve / carry the cohort reclassification across later seasons when
 the player travels with the reclassified cohort (see `## Y-Up / Z-Down`).
 
+### Cohort reclassification carry-forward (Phase 4 slice 3)
+
+The third Phase 4 slice adds a pure deterministic engine helper
+(`carryForwardCohortReclassificationStatus`) that preserves a recorded y-up /
+z-down status while the player keeps traveling along the reclassified cohort path
+in a **later** season, and flags the path as broken when the player leaves it. It
+is engine-only: no UI, no player-card badges, no import behavior, and no
+persistence.
+
+To recap the slice sequence: slice 1 **detects** y-up / z-down candidate signals,
+slice 2 **records** the first-year cohort reclassification event, and this slice
+**carries** that recorded status forward across later seasons. Carry-forward is
+still **derived metadata** — it never mutates, removes, suppresses, or reorders a
+roster record. A broken path is a **review signal, not data deletion**.
+
+#### Inputs
+
+The helper accepts a narrow input model:
+
+- `firstYearRecords`: the slice 2 `CohortReclassificationRecord[]`.
+- `currentRecords`: later-season `RosterMovementRecord[]` (player + team slot
+  context), the roster being evaluated against the recorded events.
+- `seasonOrder`: season ids ordered **oldest to newest**, used to count how many
+  seasons elapsed between first detection and the evaluated season.
+
+#### Cohort offset and the reclassified path
+
+A first-year record establishes a cohort **offset** relative to normal age
+progression. Normal progression is **+1 age division per season**
+(`SC < GR < PW < MM < GI < BA`). The offset is computed relative to the normal
+expected division, **not** from the raw year-over-year delta:
+
+```text
+expectedCurrentRank = priorRank + 1
+cohortOffset        = firstDetectedRank - expectedCurrentRank
+```
+
+- `GR -> PW`: raw delta +1, cohortOffset 0 — no reclassification (never recorded).
+- `GR -> MM`: raw delta +2, cohortOffset +1 — y-up.
+- `MM -> PW`: raw delta -1, normal would be GI, cohortOffset -2 — z-down.
+
+`cohortOffset` is **positive for y-up** and **negative for z-down**, and is never
+zero for an actual recorded candidate. Because the offset is constant and the
+normal path advances +1 per season, the reclassified path also advances +1 per
+season from the first detected division:
+
+```text
+expectedAgeDivisionRank(evaluatedSeason) = firstDetectedRank + seasonSteps
+```
+
+clamped to the `SC..BA` bounds, where `seasonSteps` is the number of seasons the
+evaluated season is after the first detected season per `seasonOrder`.
+
+#### Classification
+
+Per first-year record (exactly one entry per record, in input order):
+
+- **Same season as first detection** (`seasonSteps == 0`) -> `first-year` /
+  `first-year-record`.
+- **On the reclassified offset path** (`actualRank == expectedRank`) ->
+  `carried-forward` / `expected-offset-path`. If the offset path would advance
+  past BA and the player remains BA, the reason is `capped-at-top-division`
+  (symmetric `capped-at-bottom-division` below SC); the status stays
+  `carried-forward`. The engine never invents divisions beyond `SC..BA`.
+- **Returned to the normal age path** (`actualRank == priorRank + 1 +
+  seasonSteps`) -> `path-broken` / `returned-to-normal-path`.
+- **Any other division** -> `path-broken` / `unexpected-age-division`.
+
+Conservative (non-carrying) outcomes:
+
+- **No single matching later-season record** -> `insufficient-history` /
+  `missing-current-record`.
+- **Duplicate / ambiguous later-season identity** -> `unknown` /
+  `ambiguous-identity` (never carried forward).
+- **Invalid age division** on either side -> `unknown` / `invalid-age-division`
+  (the raw division value is still surfaced).
+- **Unusable season ordering** -> `insufficient-history` with a reason that names
+  the ordering problem: `missing-season-order`, `first-season-not-in-order`,
+  `evaluated-season-not-in-order`, or `evaluated-season-before-first-detection`.
+
+`confidence` is `high` for the definitive verdicts (`first-year`,
+`carried-forward`, `path-broken`) and `low` for the conservative
+`insufficient-history` / `unknown` outcomes.
+
+Each entry carries `identityKey`, `reclassificationType`, the source `player`,
+`firstYearRecord`, and matched `currentRecord` references,
+`firstDetectedSeasonId` / `evaluatedSeasonId`, `priorAgeDivisionId` /
+`firstDetectedAgeDivisionId` / `expectedAgeDivisionId` / `actualAgeDivisionId`,
+the `cohortOffset`, and the `status` / `confidence` / `reason` verdict. A summary
+helper (`summarizeCohortReclassificationCarryForward`) counts entries by status,
+reclassification type, and confidence.
+
+This slice does **not** persist a cohort offset to storage, add UI badges, change
+import behavior, use fuzzy matching, or consult birthdate, grade, notes, or manual
+review decisions. Loaded roster records, players, teams, and first-year records
+remain authoritative and are preserved by reference and never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

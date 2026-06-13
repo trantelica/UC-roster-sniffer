@@ -205,6 +205,23 @@ Slice status:
   records, use fuzzy matching / birthdate / grade / notes / manual review, or
   render any UI badge. Preservation / carry-forward across later seasons remains
   later Phase 4 work.
+- **Slice 3 (done): cohort reclassification carry-forward (engine only).** A pure
+  helper (`carryForwardCohortReclassificationStatus`) takes the slice 2 first-year
+  records, a later-season roster, and a season order (oldest to newest), and
+  preserves the recorded y-up / z-down status while the player stays on the
+  reclassified offset path. It computes an explicit `cohortOffset` relative to
+  normal progression and an expected division on the offset path
+  (`firstDetectedRank + seasonSteps`, capped at SC..BA), yielding `first-year`,
+  `carried-forward` (incl. top/bottom cap), `path-broken` (returned-to-normal or
+  unexpected division), or the conservative `insufficient-history` / `unknown` for
+  missing records, unusable season ordering, invalid divisions, or ambiguous
+  identities. A summary helper (`summarizeCohortReclassificationCarryForward`)
+  counts by status, type, and confidence. See `docs/derived-logic.md` ("Cohort
+  reclassification carry-forward (Phase 4 slice 3)"). This is still derived
+  metadata: a broken path is a review signal, not data deletion. It does not
+  persist a cohort offset, alter roster records, use fuzzy matching / birthdate /
+  grade / notes / manual review, or render any UI badge. Cohort-offset persistence
+  and review/reset remain later Phase 4 work.
 
 ## Phase 5: Import preview and identity collision handling
 

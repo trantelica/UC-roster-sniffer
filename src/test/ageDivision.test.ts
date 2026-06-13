@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   parseAgeDivisionId,
   getAgeDivisionRank,
+  getAgeDivisionIdByRank,
   compareAgeDivisions,
+  AGE_DIVISION_IDS_IN_ORDER,
 } from '../engine/ageDivision';
 
 describe('parseAgeDivisionId - valid input', () => {
@@ -83,6 +85,31 @@ describe('getAgeDivisionRank - ordering', () => {
 
   it('BA ranks above GI', () => {
     expect(getAgeDivisionRank('BA')).toBeGreaterThan(getAgeDivisionRank('GI'));
+  });
+});
+
+describe('getAgeDivisionIdByRank - reverse lookup', () => {
+  it.each(AGE_DIVISION_IDS_IN_ORDER)(
+    'round-trips %s through its rank',
+    (id) => {
+      expect(getAgeDivisionIdByRank(getAgeDivisionRank(id))).toBe(id);
+    }
+  );
+
+  it('returns SC for rank 1 and BA for rank 6', () => {
+    expect(getAgeDivisionIdByRank(1)).toBe('SC');
+    expect(getAgeDivisionIdByRank(6)).toBe('BA');
+  });
+
+  it('returns null for out-of-range ranks', () => {
+    expect(getAgeDivisionIdByRank(0)).toBeNull();
+    expect(getAgeDivisionIdByRank(7)).toBeNull();
+    expect(getAgeDivisionIdByRank(-1)).toBeNull();
+  });
+
+  it('returns null for non-integer ranks', () => {
+    expect(getAgeDivisionIdByRank(2.5)).toBeNull();
+    expect(getAgeDivisionIdByRank(NaN)).toBeNull();
   });
 });
 
