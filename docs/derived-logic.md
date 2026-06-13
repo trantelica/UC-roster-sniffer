@@ -696,6 +696,67 @@ Future slices may add local storage integration and a manual review screen on to
 this contract. Source roster records, players, teams, first-year records, and every
 upstream derived object remain authoritative and are never mutated.
 
+### Cohort review decision application (Phase 4 slice 8)
+
+The eighth Phase 4 slice adds a pure deterministic engine helper
+(`applyCohortReviewDecisionsToAssignments`) that resolves derived cohort
+assignments (slice 5 — what the engine thinks) against append-only cohort review
+decisions (slice 7 — what a reviewer decided), computing the **effective** state
+per assignment **in memory**.
+
+This is **not storage**. It does not write to localStorage / IndexedDB / files /
+sample data / app state — it only reads the provided decision records. It never
+mutates assignments, decisions, first-year records, players, teams, or roster
+records. A `reset` decision changes only the EFFECTIVE derived state; it never
+deletes the first-year reclassification event record.
+
+#### Matching
+
+A decision matches an assignment on `identityKey` + `evaluatedSeasonId` +
+`reclassificationType`. A decision missing a usable key (empty `identityKey` or
+`evaluatedSeasonId`) is ignored; a decision whose `reclassificationType` differs
+(or is null) simply does not match any assignment.
+
+#### Per-assignment resolution
+
+One entry per assignment, in input order:
+
+| Situation | decisionApplied | effectiveActiveStatus | effectiveReviewState | reason |
+| --- | --- | --- | --- | --- |
+| No matching decision | false | engine value | `engine-derived` | `no-decision-engine-derived` |
+| `confirm` | true | decision `resultingActiveStatus` | `confirmed` | `confirmed-decision-applied` |
+| `reset` | true | `inactive` | `reset` | `reset-decision-applied` |
+| `defer` | true | `review` | `deferred` | `deferred-decision-applied` |
+| `mark-insufficient-data` | true | `insufficient-data` | `insufficient-data` | `insufficient-data-decision-applied` |
+| Multiple current matches | false | engine value | `unresolved-review` | `multiple-current-decisions` |
+
+`confidence` is `high` for applied `confirm` / `reset`, `low` for applied `defer` /
+`mark-insufficient-data` and for a conflict, and mirrors the assignment's own
+confidence for the engine-derived (no-decision) case.
+
+#### Ignored decisions
+
+Decisions that are not applied are reported separately (in input order) with a
+reason: `missing-decision-key`, `invalid-decision-ignored` (per
+`validateCohortReviewDecision`), `superseded-decision-ignored`,
+`no-matching-assignment`, or `multiple-current-decisions`.
+
+- **Supersession is by reference.** Any decision whose `decisionId` appears as
+  another decision's `audit.supersedesDecisionId` is ignored; the latest
+  non-superseded matching decision applies.
+- **Conflicts are not guessed.** If two or more valid, non-superseded decisions
+  match the same assignment and none supersedes the others, none is applied and the
+  effective active status stays engine-derived. Array order is never used to pick a
+  winner.
+
+A summary helper (`summarizeAppliedCohortReviewDecisions`) counts entries by
+effective state, decision application, and confidence, and ignored decisions by
+reason.
+
+Future slices may add actual local storage and a manual review UI on top of this
+resolution. Source roster records and every upstream object remain authoritative
+and are never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

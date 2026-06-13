@@ -386,6 +386,22 @@ Birthdate is not required for the basic version.
   the contract only: no storage write, no UI, no reset side effect. See
   `docs/derived-logic.md` for the full contract. Remaining Phase 4 work adds local
   storage integration and the manual review screen.
+- **Slice 8 (done): cohort review decision application (engine only).**
+  `applyCohortReviewDecisionsToAssignments(assignments, decisions)` resolves slice 5
+  assignments against slice 7 decisions in memory and returns one effective-state
+  entry per assignment (engine-derived / confirmed / reset / deferred /
+  insufficient-data / unresolved-review) plus a list of ignored decisions. Decisions
+  match on identityKey + evaluatedSeasonId + reclassificationType and are validated
+  via `validateCohortReviewDecision`; supersession is by reference
+  (`audit.supersedesDecisionId`); multiple current matches are a conservative
+  conflict (none applied, stays engine-derived, never resolved by array order);
+  invalid / unmatched / key-less decisions are ignored with explicit reasons. A
+  summary helper (`summarizeAppliedCohortReviewDecisions`) counts by effective
+  state, application, and ignored reason. It is pure and in-memory: no storage
+  write, no UI, no roster mutation, and a reset only changes effective state without
+  deleting the first-year event record. See `docs/derived-logic.md` for the full
+  contract. Remaining Phase 4 work adds local storage integration and the manual
+  review screen.
 
 ## Phase 5: Import preview and collision handling
 
