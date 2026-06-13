@@ -352,6 +352,28 @@ Acceptance criteria:
 - user can accept, reject, manually link, or create new person
 - decisions are persisted
 
+Slice status:
+
+- **Slice 1 (done): roster import preview state/contract (engine only).** A pure
+  helper (`createRosterImportPreview`) stages candidate roster rows into a
+  non-destructive preview: each input row becomes a preview row in input order with
+  a deterministic `rowIndex`, the original `playerName`, a `normalizedIdentityKey`
+  (reusing the Phase 2 `getPlayerIdentityKey` helper), preserved passthrough
+  `fields`, per-row `issues`, and a `status` (`ready` / `needs-review` /
+  `invalid`). Missing player name and missing source row id mark a row `invalid`;
+  duplicate source row id and duplicate normalized name within the import mark
+  affected rows `needs-review` — never discarded. The target context
+  (`seasonId` / `districtId` / `ageDivisionId` / `teamId`) is validated and an
+  invalid context is reported without mutating rows. Helpers
+  `summarizeRosterImportPreviewRows`, `getRosterImportPreviewRowsNeedingReview`, and
+  `getValidRosterImportPreviewRows` round out the contract. `ok` is true only when
+  the target is valid, there are no error issues, and there are no invalid rows. See
+  `docs/import-workflow.md` ("Roster import preview (Phase 5 slice 1)") and
+  `docs/data-model.md` ("Roster Import Preview"). This slice does **not** compare
+  against existing rosters, classify movement, resolve identity collisions, apply
+  imports, parse files, persist, or render UI. Roster comparison, collision review,
+  and commit remain later Phase 5 work.
+
 ## Phase 6: Schedule and result support
 
 Goal: derive records from game objects.

@@ -92,6 +92,44 @@ Known implications:
 
 This source shape is an import input contract, not the preferred internal storage shape.
 
+## Roster import preview (Phase 5 slice 1)
+
+Phase 5 begins with a pure, deterministic **import preview state/contract**
+(`src/engine/rosterImportPreview.ts`, `createRosterImportPreview`). The preview is
+a **non-destructive staging layer** that sits ahead of the stages below. It is not
+real parsing, not identity collision resolution, not commit/apply, not persistence,
+and not UI.
+
+What this slice does:
+
+- Represents each candidate roster row as a preview row with a deterministic
+  `rowIndex`, the original `playerName`, a `normalizedIdentityKey` (derived from
+  the existing Phase 2 `getPlayerIdentityKey` helper), preserved passthrough
+  `fields` (jersey number, grade, notes, raw), per-row `issues`, and a `status`.
+- Preserves **every** input row in input order, even when it is invalid,
+  duplicate, ambiguous, or low confidence. Rows are never dropped, merged,
+  reordered, or rewritten — ambiguity affects preview metadata only.
+- Validates the target context (`seasonId`, `districtId`, `ageDivisionId`,
+  `teamId`) for presence and reports `invalid-target-context` as a preview-level
+  error without mutating or dropping rows.
+- Summarizes the preview (total / ready / needs-review / invalid rows, duplicate
+  name groups, duplicate source-row-id groups, and error/warning/info counts).
+
+Chosen row contract (documented and tested):
+
+| Condition | Status | Issue (severity) |
+| --- | --- | --- |
+| Missing player name | `invalid` | `missing-player-name` (error) |
+| Missing source row id (no stable identity) | `invalid` | `missing-source-row-id` (error) |
+| Duplicate source row id | `needs-review` | `duplicate-source-row-id` (warning) |
+| Duplicate normalized name within the import | `needs-review` | `duplicate-name-in-import` (warning) |
+
+`ok` is true only when the target context is valid, there are no error issues, and
+there are no invalid rows. Warnings / review items never remove rows. This slice
+**does not** compare against existing roster data, classify new / returning /
+transferred players, resolve identity collisions, or apply the import — those are
+later Phase 5 / Phase 6 stages below.
+
 ## Roster import stages
 
 ### 1. Parse source data
