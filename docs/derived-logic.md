@@ -801,6 +801,147 @@ decisions as read-only. Future slices may wire this repository to actual local
 storage and a manual review UI. Roster records, assignments, first-year records,
 players, and teams are never mutated.
 
+### Phase 4 checkpoint: cohort reclassification preservation pipeline (Phase 4 slice 10)
+
+Phase 4 is **checkpointed / complete**. Slices 1–9 build one engine-only,
+pure-and-deterministic pipeline that detects a y-up / z-down cohort
+reclassification, preserves it while the player travels with the reclassified
+cohort, classifies it for review, models a manual review action, captures an
+accepted decision as an append-only record, applies decisions to derived
+assignments in memory, and models a local storage-boundary repository for those
+decisions. This slice adds no product logic; it confirms the contracts before
+Phase 5 (import preview and identity collision handling).
+
+#### End-to-end pipeline
+
+The data flows in one direction, each stage layered on top of the previous one
+(never folded into it). Every stage lives in `src/engine/` and is covered by a
+matching `src/test/` suite.
+
+1. **Signal detection** — `detectCohortReclassificationSignals`
+   (`cohortReclassificationSignal.ts`). Classifies exact-identity year-over-year
+   age-division movement into `expected-age-progression`, `same-age-division`,
+   `y-up-candidate`, `z-down-candidate`, or `unknown`, using age-division ordinal
+   movement only. Candidate signal only — no persisted cohort status.
+2. **First-year record derivation** — `deriveFirstYearCohortReclassificationRecords`
+   (`cohortReclassificationRecord.ts`). Consumes the signal output and records the
+   **first-year** y-up / z-down event for high-confidence candidates only, one
+   record per identity event, with `ageDivisionDelta` positive for y-up and
+   negative for z-down.
+3. **Carry-forward and path-break detection** —
+   `carryForwardCohortReclassificationStatus`
+   (`cohortReclassificationCarryForward.ts`). Takes first-year records plus a
+   later-season roster and `seasonOrder` (oldest to newest) and decides whether the
+   player is still on the reclassified offset path. Computes `cohortOffset`
+   (`firstDetectedRank - (priorRank + 1)`) and the expected division on the offset
+   path (`firstDetectedRank + seasonSteps`, capped at SC..BA). Verdicts:
+   `first-year`, `carried-forward`, `path-broken`, and the conservative
+   `insufficient-history` / `unknown`. A broken path is a review signal, not data
+   deletion.
+4. **Review classification** — `classifyCohortReclassificationReview`
+   (`cohortReclassificationReview.ts`). Maps each carry-forward verdict into a
+   review outcome: `clean`, `reset-recommended`, `needs-review`, or
+   `insufficient-data`. Reset is recommended, never performed.
+5. **Derived assignment model** — `deriveCohortReclassificationAssignments`
+   (`cohortReclassificationAssignment.ts`). Folds the review result into one flat
+   per-player-season cohort assignment with an `activeStatus` (`first-year`,
+   `active`, `inactive` + `resetRecommended`, `review`, `insufficient-data`,
+   `unknown`), surfacing the applied `cohortOffset` and upstream statuses/reasons.
+   This is in-memory derived state, **not** a roster mutation.
+6. **Manual review action validation** — `applyCohortReclassificationReviewAction`
+   (`cohortReclassificationReviewAction.ts`). Takes one assignment plus a requested
+   action (`confirm`, `reset`, `defer`, `mark-insufficient-data`) and returns a
+   validated accepted/rejected result with a `resultingReviewState`. An accepted
+   `reset` only records that the recommendation was accepted; nothing is committed.
+7. **Persisted-style review decision creation** — `createCohortReviewDecision`
+   (`cohortReviewDecision.ts`). Builds the separate, append-only
+   `Cohort Review Decision` record (see `docs/data-model.md`) from an **accepted**
+   action result only. Ids and timestamps are caller-provided (no `Date.now()`);
+   `validateCohortReviewDecision` and `summarizeCohortReviewDecisions` round out the
+   contract.
+8. **Decision application to assignments** —
+   `applyCohortReviewDecisionsToAssignments` (`cohortReviewDecisionApplication.ts`).
+   Resolves assignments against decisions in memory, computing an effective state
+   per assignment (engine-derived / confirmed / reset / deferred /
+   insufficient-data / unresolved-review). Conflicting current decisions are never
+   resolved by array order; a reset changes effective state only.
+9. **Local repository / storage-boundary contract** —
+   `cohortReviewDecisionRepository.ts`. Models the local data boundary
+   (`{ version, decisions }`) with pure append / load / active-view / export /
+   import helpers. An in-memory adapter plus a JSON-compatible export/import
+   contract — not a real storage implementation.
+
+#### Phase 4 is pure and deterministic
+
+Every Phase 4 stage is a pure function (or a pure module returning new state) with
+no side effects. Across the whole pipeline there is:
+
+- no browser persistence;
+- no `localStorage`;
+- no `IndexedDB`;
+- no file writes;
+- no React state wiring;
+- no UI (no player-card badges, no review screen);
+- no sample-data mutation;
+- no roster mutation;
+- no reset side effect (`resetRecommended` and an accepted `reset` are advisory /
+  recorded only).
+
+Ids and timestamps are always caller-provided, so output is fully reproducible.
+
+#### Append-only decision history
+
+- Decisions may affect derived **assignment state in memory** (via slice 8
+  application), but they never rewrite source data.
+- Decisions do **not** delete or rewrite roster records.
+- Decisions do **not** delete first-year cohort reclassification event records — a
+  `reset` ends the active status from the evaluated-season perspective only.
+- Superseded decisions remain in repository history (referenced by
+  `audit.supersedesDecisionId`) and are excluded from the active view only; they
+  are never overwritten or removed.
+
+#### Roster authority rule (carried forward, unchanged)
+
+- Loaded roster records remain authoritative (see `## Roster authority`).
+- Duplicates, ambiguity, and low confidence may affect derived metadata / review
+  state only.
+- Rostered names must never be altered, removed, suppressed, merged, nullified,
+  reordered, or ignored. Source objects are preserved by reference throughout the
+  pipeline; all cohort metadata is fresh and attached alongside.
+
+#### Import boundary
+
+- Roster imports do **not** write review decisions.
+- Review decisions are separate records, kept out of roster import payloads (see
+  `docs/import-workflow.md`).
+- Import preview and identity collision handling are **future Phase 5 work**, not
+  part of Phase 4.
+
+#### Prior-season boundary
+
+- Prior seasons remain locked.
+- Phase 4 does not unlock or mutate prior-season roster data;
+  `audit.lockedSourceSeasonIds` records the prior seasons that stay locked.
+
+#### Terminology confirmed
+
+- **y-up** and **z-down** are cohort reclassification events, not ordinary team
+  transfers.
+- A y-up / z-down can persist while the player travels with the reclassified cohort
+  (the preservation rule — see `## Y-Up / Z-Down`).
+- **reset** is advisory unless a future approved workflow applies it. Through Phase
+  4, a reset is only recommended (slice 4) or recorded as accepted (slices 6–8);
+  nothing is actually reset.
+- An **"active assignment"** is derived state (slice 5 `activeStatus` / slice 8
+  effective state), not a roster mutation.
+
+#### Transition to Phase 5
+
+- Phase 5 should focus on **import preview and identity collision handling**.
+- Phase 5 must preserve loaded roster authority.
+- Phase 5 must not discard duplicate or ambiguous roster entries; ambiguity stays
+  `unknown` and is surfaced for review rather than dropped.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no
