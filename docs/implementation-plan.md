@@ -418,6 +418,27 @@ Birthdate is not required for the basic version.
   `docs/derived-logic.md` and `docs/data-model.md` for the full contract. Remaining
   Phase 4 work wires this repository to actual local storage and the manual review
   screen.
+- **Slice 10 (done): Phase 4 checkpoint and integration summary (docs only).** A
+  documentation / spec-alignment slice that adds no product logic. It documents the
+  full Phase 4 pipeline end-to-end and confirms the standing contracts: Phase 4 is
+  pure and deterministic (no browser persistence, no `localStorage` / `IndexedDB`,
+  no file writes, no React/UI wiring, no sample-data mutation, no roster mutation, no
+  reset side effect); decision history is append-only (a decision may affect derived
+  assignment state in memory but never deletes roster records or first-year events;
+  superseded decisions remain in repository history); loaded roster records stay
+  authoritative (ambiguity affects metadata/review state only); imports never write
+  review decisions; prior seasons stay locked; and the y-up/z-down /
+  advisory-reset / derived "active assignment" terminology is unchanged. See
+  `docs/derived-logic.md` ("Phase 4 checkpoint"), `docs/data-model.md`,
+  `docs/import-workflow.md`, `docs/ui-workflow.md`, and `docs/build-roadmap.md`.
+
+### Phase 4 checkpoint
+
+Phase 4 (cohort reclassification preservation) is **complete / checkpointed**. The
+acceptance criteria above are met by the engine pipeline (slices 1–9), and slice 10
+documents and confirms the contracts. The next narrow work is **Phase 5: import
+preview and identity collision handling**, which must preserve loaded roster
+authority and must not discard duplicate or ambiguous roster entries.
 
 ## Phase 5: Import preview and collision handling
 

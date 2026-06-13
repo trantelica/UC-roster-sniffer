@@ -352,6 +352,31 @@ ordered list of `Cohort Review Decision` records.
   is no browser-storage (localStorage / IndexedDB / file) write yet, and no UI.
   Repository operations never mutate roster records.
 
+### Phase 4 checkpoint: four distinct layers
+
+Phase 4 is checkpointed (see `docs/derived-logic.md`, "Phase 4 checkpoint"). The
+cohort reclassification pipeline keeps four layers strictly distinct, and the data
+model must not collapse them:
+
+1. **Roster data** — `Player`, `Player Season Assignment`, `Team`, etc. Loaded and
+   authoritative. Never altered, removed, suppressed, merged, nullified, reordered,
+   or ignored by any cohort logic.
+2. **Derived cohort assignment** — the in-memory per-player-season cohort
+   `activeStatus` and applied `cohortOffset` (engine `deriveCohortReclassificationAssignments`).
+   This is derived state, **not** a stored record and **not** a roster mutation.
+3. **Cohort Review Decision** — the separate, append-only record above, built only
+   from an accepted manual review action. It can affect derived assignment state in
+   memory but never rewrites roster data and never deletes a first-year
+   reclassification event.
+4. **Cohort Review Decision Repository** — the local storage-boundary envelope
+   above. In-memory model and JSON export/import contract only; no browser-storage
+   write yet.
+
+The optional `Player` cohort offset fields (see the `Player` section, "Cohort
+offset values" / "Cohort offset source values") remain the eventual persistence
+target for a preserved offset, but Phase 4 does not write them — the offset lives
+as derived state through the checkpoint.
+
 ## Import Batch
 
 ```json

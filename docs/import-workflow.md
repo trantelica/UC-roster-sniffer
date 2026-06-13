@@ -12,6 +12,22 @@ This document defines the initial import behavior for rosters, schedules, result
 - Source import files may be flatter and less complete than the internal data model. Import adapters should preserve raw source values while producing normalized candidates for review.
 - Imports never write cohort review decisions. A `Cohort Review Decision` (see `docs/data-model.md`) is a separate, append-only record produced only from an accepted manual review action, not from importing rosters, schedules, results, or branding.
 
+### Phase 4 / Phase 5 boundary
+
+Phase 4 (cohort reclassification preservation) is checkpointed and is engine-only
+— it builds no import behavior (see `docs/derived-logic.md`, "Phase 4
+checkpoint"). The import preview and identity collision handling described in this
+document are **Phase 5 work** and are not yet implemented.
+
+When Phase 5 is built, it must:
+
+- preserve loaded roster authority — duplicate and ambiguous roster entries are
+  surfaced for review, never discarded, suppressed, merged, or silently resolved;
+- keep cohort review decisions out of roster import payloads (the import boundary
+  above is unchanged);
+- surface low-confidence identity collisions before any commit, per the stages
+  below.
+
 ## Import types
 
 ```text

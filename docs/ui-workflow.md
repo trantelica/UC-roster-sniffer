@@ -283,9 +283,28 @@ Panel content:
 
 Opponent entries should navigate to the corresponding opponent team profile.
 
+## Cohort reclassification UI (Phase 4 checkpoint)
+
+Phase 4 (cohort reclassification preservation) is checkpointed and is **engine-only
+— it adds no UI** (see `docs/derived-logic.md`, "Phase 4 checkpoint"). Through
+Phase 4 there are:
+
+- no y-up / z-down player-card badges;
+- no manual cohort review screen;
+- no wiring of derived cohort assignments, review actions, decisions, or the
+  decision repository into React state.
+
+`resetRecommended` and an accepted `reset` are advisory / recorded only; nothing in
+the UI performs a reset. Rendering cohort status and a manual review screen are
+future work, layered on top of the existing engine when approved.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.
+
+> Phase positioning: import preview and the collision UI below are **Phase 5 work**
+> and are not yet implemented. Phase 5 must preserve loaded roster authority and
+> must not discard duplicate or ambiguous roster entries.
 
 The collision UI should show:
 

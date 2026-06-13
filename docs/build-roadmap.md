@@ -32,7 +32,7 @@ sits ahead of canonical Phase 1.
 
 ## Current status checkpoint
 
-As of the Phase 2 checkpoint:
+As of the Phase 4 checkpoint:
 
 - **Specification baseline — complete.** Governing docs and sample data contracts
   exist in the repo.
@@ -47,33 +47,39 @@ As of the Phase 2 checkpoint:
   confidence (`high`, `low`), roster status summary/count helpers, and
   selected-team perspective counts. Current player cards show Returning / New /
   Unknown plus a separate low-confidence identity-review warning.
-
-Phase 3 (Prior-season roster comparison) is **in progress**. The exact-identity
-foundation now includes a current-vs-prior comparison contract (slice 1), a
-display-count summary (slice 2), a read-only summary panel (slice 3), and an
-engine-only exact-identity transfer/team-slot movement detector
-(`detectExactPriorSeasonPlayerMovement`, slice 4) that classifies same-team
-returning, transferred-in, transferred-out, new-to-conference, not-returning, and
-unknown across team slots. A spec-only movement-taxonomy alignment pass (slice 5)
-then fixed shared vocabulary in `docs/derived-logic.md`: it distinguishes the
-**same-slot roster comparison** (slices 1–2, which cannot detect transfers by
-design) from **exact identity team-slot movement** (slice 4), and frames the
-latter's transferred-in/out buckets as an **input signal**, not a final
-`transfer` / promotion / relegation / lateral verdict. An engine-only
-district-aware classification layer (`classifyDistrictAwarePlayerMovement`, slice
-6) then interprets that signal into product-level statuses: `same-team-returning`,
-`promoted` / `relegated` / `lateral` (same district + same age division, via the
-competitive hierarchy `A(x) > B1 > C1 = B2 > B3+ = C2 = D2`, where any valid
-A-code is the top tier), `transfer` (district change), the conservative
-`age-division-change` (same district + different age division), `new-to-conference`,
-`not-returning`, and `unknown`. Not yet built (deferred to Phase 4 and beyond):
-y-up / z-down cohort reclassification, fuzzy matching, and import-collision
-resolution. Roster comparison is exact-identity only and is the foundation the
-richer taxonomy extends — it is not replaced.
+- **Prior-season roster comparison (Phase 3) — complete.** The exact-identity
+  foundation includes a current-vs-prior comparison contract (slice 1), a
+  display-count summary (slice 2), a read-only summary panel (slice 3), an
+  engine-only exact-identity transfer/team-slot movement detector
+  (`detectExactPriorSeasonPlayerMovement`, slice 4), a spec-only movement-taxonomy
+  alignment pass (slice 5), and a district-aware classification layer
+  (`classifyDistrictAwarePlayerMovement`, slice 6) that interprets the movement
+  signal into product-level statuses (`same-team-returning`, `promoted` /
+  `relegated` / `lateral` via the competitive hierarchy
+  `A(x) > B1 > C1 = B2 > B3+ = C2 = D2`, `transfer`, the conservative
+  `age-division-change`, `new-to-conference`, `not-returning`, `unknown`). Roster
+  comparison is exact-identity only and is the foundation the richer taxonomy
+  extends — it is not replaced.
+- **Cohort reclassification preservation (Phase 4) — complete / checkpointed.** A
+  single engine-only, pure-and-deterministic pipeline detects a y-up / z-down
+  signal (slice 1), records the first-year event (slice 2), carries the status
+  forward and flags broken paths (slice 3), classifies a review outcome (slice 4),
+  derives a per-player-season cohort assignment (slice 5), validates a manual
+  review action (slice 6), defines an append-only `Cohort Review Decision` record
+  (slice 7), applies decisions to assignments in memory (slice 8), and models a
+  local decision repository / storage-boundary (slice 9). Slice 10 (this slice) is
+  the documentation/spec-alignment checkpoint; see `docs/derived-logic.md`
+  ("Phase 4 checkpoint"). Phase 4 has no persistence, no browser storage, no
+  `localStorage` / `IndexedDB`, no file writes, no React/UI wiring, no sample-data
+  mutation, no roster mutation, and no reset side effect.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
 or ignores source roster records. Ambiguity affects derived metadata only.
+
+Next: Phase 5 (import preview and identity collision handling). Phase 5 must
+preserve loaded roster authority and must not discard duplicate or ambiguous
+roster entries.
 
 ## Phase 0: Specification baseline
 
@@ -310,6 +316,23 @@ Slice status:
   ("Cohort Review Decision Repository"). This is the **storage-boundary model only**:
   no browser-storage write (localStorage / IndexedDB / file), no UI, no roster
   mutation. Wiring to actual local storage and a manual review UI remains later work.
+- **Slice 10 (done): Phase 4 checkpoint and integration summary (docs only).** A
+  documentation / spec-alignment slice that adds no product logic. It records the
+  full Phase 4 pipeline end-to-end (signal -> first-year record -> carry-forward /
+  path-break -> review classification -> derived assignment -> review action ->
+  append-only decision -> decision application -> repository / storage boundary) and
+  confirms the standing contracts: Phase 4 is pure and deterministic (no browser
+  persistence, no `localStorage` / `IndexedDB`, no file writes, no React/UI wiring,
+  no sample-data mutation, no roster mutation, no reset side effect); decision
+  history is append-only (decisions may affect derived assignment state in memory
+  but never delete roster records or first-year events; superseded decisions stay in
+  history); roster authority holds (loaded records are authoritative, ambiguity
+  affects metadata/review state only); imports never write review decisions; prior
+  seasons stay locked; and y-up/z-down terminology, advisory reset, and derived
+  "active assignment" are unchanged. See `docs/derived-logic.md` ("Phase 4
+  checkpoint"), `docs/data-model.md` ("Phase 4 checkpoint: four distinct layers"),
+  `docs/import-workflow.md`, and `docs/ui-workflow.md`. Phase 4 is **complete /
+  checkpointed**; import preview and identity collision handling are Phase 5.
 
 ## Phase 5: Import preview and identity collision handling
 
