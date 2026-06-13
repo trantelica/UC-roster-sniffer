@@ -502,6 +502,67 @@ notes, or manual review/override. Loaded roster records, players, teams, first-y
 records, and carry-forward entries remain authoritative and are preserved by
 reference and never mutated.
 
+### Cohort reclassification derived assignment (Phase 4 slice 5)
+
+The fifth Phase 4 slice adds a pure deterministic engine helper
+(`deriveCohortReclassificationAssignments`) that folds the slice 4 review result
+(which already carries its slice 3 carry-forward entry) into a single, flat
+per-player-season **cohort assignment** a caller can read directly. It accepts
+either the slice 4 result object (`{ entries, summary }`) or a bare review entry
+array.
+
+This is an **in-memory derived assignment model** that **combines** the
+carry-forward and review results. It does **not** persist to storage, mutate roster
+records, add UI badges, or perform a reset. `resetRecommended` is **advisory only**.
+Future slices may wire these assignments into persistence, manual review, or UI.
+
+#### Active statuses
+
+- `active` — a carried-forward y-up / z-down is currently in effect.
+- `first-year` — the reclassification is in its first detected season.
+- `inactive` — the player has returned to the normal age path; the preserved status
+  is no longer in effect and a reset is recommended (but not performed).
+- `review` — a human should look before trusting the status.
+- `insufficient-data` — not enough information to judge (no current record, or an
+  unusable season ordering).
+- `unknown` — an unmapped review / carry-forward combination.
+
+#### Mapping
+
+Per review entry (exactly one assignment per review entry, in input order):
+
+| reviewStatus | carryForwardStatus | activeStatus | resetRecommended | confidence | assignment reason |
+| --- | --- | --- | --- | --- | --- |
+| `clean` | `first-year` | `first-year` | false | high | `first-year-active` |
+| `clean` | `carried-forward` | `active` | false | high | `carried-forward-active` |
+| `reset-recommended` | (any) | `inactive` | true | high | `reset-recommended` |
+| `needs-review` | (any) | `review` | false | low | `review-required` |
+| `insufficient-data` | (any) | `insufficient-data` | false | low | `insufficient-data` |
+| (any other combination) | (any) | `unknown` | false | low | `unknown-status` |
+
+A `clean` review status is only emitted by slice 4 for a `first-year` or
+`carried-forward` carry-forward status, so a `clean` review paired with any other
+carry-forward status falls through to `unknown` / `unknown-status`. `confidence` is
+`high` only for the active / first-year / inactive (reset-recommended) outcomes;
+`review`, `insufficient-data`, and `unknown` are `low`.
+
+Each assignment preserves the source `reviewEntry`, `carryForwardEntry`, `player`,
+`firstYearRecord`, and `currentRecord` references (by reference, never copied),
+mirrors the carry-forward entry's derived facts (`identityKey`,
+`reclassificationType`, `firstDetectedSeasonId`, `evaluatedSeasonId`,
+`priorAgeDivisionId`, `firstDetectedAgeDivisionId`, `expectedAgeDivisionId`,
+`actualAgeDivisionId`, `cohortOffset`), and records the upstream
+`carryForwardStatus` / `carryForwardReason` / `reviewStatus` / `reviewReason`
+alongside the derived `activeStatus` / `resetRecommended` / `confidence` / `reason`.
+A summary helper (`summarizeCohortReclassificationAssignments`) counts assignments
+by active status, reset recommendation, reclassification type, and confidence.
+
+This slice does **not** persist assignments, reset cohort status, add UI badges,
+change import behavior, use fuzzy matching, or consult birthdate, grade, notes, or
+manual review/override. Loaded roster records, players, teams, first-year records,
+carry-forward entries, and review entries remain authoritative and are preserved by
+reference and never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no
