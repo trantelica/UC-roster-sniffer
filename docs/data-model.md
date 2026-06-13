@@ -428,6 +428,96 @@ A flat roster import candidate may carry fields like:
 - Candidate values are not final until the import is committed.
 - Unknown or unexplained source flags should be preserved for review rather than discarded.
 
+## Roster Import Preview
+
+A roster import preview (Phase 5 slice 1) is a **pure, in-memory, non-destructive
+staging structure** produced by `createRosterImportPreview`
+(`src/engine/rosterImportPreview.ts`). It is not a persisted record, not a commit,
+and not compared against existing rosters yet — it only stages candidate rows for
+later collision review.
+
+```json
+{
+  "ok": false,
+  "target": {
+    "seasonId": "2026",
+    "districtId": "alta",
+    "ageDivisionId": "GI",
+    "teamId": "alta-GI-A1"
+  },
+  "targetValid": true,
+  "rows": [
+    {
+      "sourceRowId": "r1",
+      "rowIndex": 0,
+      "playerName": "Cary, Hudson",
+      "normalizedIdentityKey": "cary hudson",
+      "fields": { "jerseyNumber": null, "grade": null, "notes": null, "raw": null },
+      "issues": [],
+      "status": "ready"
+    }
+  ],
+  "summary": {
+    "totalRows": 1,
+    "readyRows": 1,
+    "needsReviewRows": 0,
+    "invalidRows": 0,
+    "duplicateNameGroups": 0,
+    "duplicateSourceRowIdGroups": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0
+  },
+  "issues": []
+}
+```
+
+### Row status values
+
+```text
+ready
+needs-review
+invalid
+```
+
+### Issue severity values
+
+```text
+info
+warning
+error
+```
+
+### Issue codes
+
+```text
+missing-source-row-id
+duplicate-source-row-id
+missing-player-name
+duplicate-name-in-import
+invalid-target-context
+```
+
+### Notes
+
+- **Non-destructive.** Every input row is preserved as a preview row, in input
+  order, even when invalid, duplicate, ambiguous, or low confidence. Rows are never
+  dropped, merged, reordered, or rewritten; ambiguity affects preview metadata only.
+- **Roster authority.** Loaded roster records remain authoritative; the preview
+  never touches existing rosters or prior seasons.
+- `normalizedIdentityKey` reuses the Phase 2 `getPlayerIdentityKey` helper; no new
+  name-normalization rules are introduced.
+- Row-status contract: missing player name -> `invalid`; missing source row id ->
+  `invalid` (no stable identity); duplicate source row id -> `needs-review`;
+  duplicate normalized name within the import -> `needs-review`.
+- `ok` is true only when the target context is valid, there are no error issues,
+  and there are no invalid rows. Warnings / review items never remove rows.
+- `summary` severity counts reflect row-level issues; preview-level issues (e.g.
+  `invalid-target-context`) live in the top-level `issues` array and affect `ok`
+  via `targetValid`.
+- This slice is **contract only**: no file/CSV parsing, no identity collision
+  resolution, no import commit/apply, no persistence, and no UI.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

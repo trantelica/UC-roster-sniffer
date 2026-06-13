@@ -466,6 +466,27 @@ User decisions are captured.
 Import commit happens only after collision review.
 ```
 
+### Slice progress
+
+- **Slice 1 (done): roster import preview state/contract (engine only).**
+  `createRosterImportPreview(input)` produces a pure, deterministic, non-destructive
+  preview (`src/engine/rosterImportPreview.ts`). Every input row is preserved as a
+  preview row in input order with a deterministic `rowIndex`, the original
+  `playerName`, a `normalizedIdentityKey` (reusing Phase 2 `getPlayerIdentityKey`),
+  preserved passthrough `fields`, per-row `issues`, and a `status`. Chosen contract:
+  missing player name -> `invalid`; missing source row id -> `invalid`; duplicate
+  source row id -> `needs-review`; duplicate normalized name within the import ->
+  `needs-review`. The target context (`seasonId` / `districtId` / `ageDivisionId` /
+  `teamId`) is validated and an invalid context is reported without mutating rows.
+  `summarizeRosterImportPreviewRows`, `getRosterImportPreviewRowsNeedingReview`, and
+  `getValidRosterImportPreviewRows` round out the contract; `ok` is true only when
+  the target is valid and there are no error issues or invalid rows. It does **not**
+  compare against existing rosters, classify movement, resolve identity collisions,
+  apply imports, parse files, persist, or render UI. See `docs/import-workflow.md`
+  ("Roster import preview (Phase 5 slice 1)") and `docs/data-model.md` ("Roster
+  Import Preview"). Remaining Phase 5 work adds proposed matches, collision review,
+  user decisions, and commit.
+
 ## Phase 6: Schedule and results
 
 ### Goal
