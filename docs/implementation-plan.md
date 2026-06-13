@@ -402,6 +402,22 @@ Birthdate is not required for the basic version.
   deleting the first-year event record. See `docs/derived-logic.md` for the full
   contract. Remaining Phase 4 work adds local storage integration and the manual
   review screen.
+- **Slice 9 (done): cohort review decision repository (storage boundary only).**
+  `cohortReviewDecisionRepository` models the local data boundary with pure helpers:
+  `createEmptyCohortReviewDecisionRepositoryState`, `appendCohortReviewDecision(s)`,
+  `getCohortReviewDecisions`, `getActiveCohortReviewDecisions`, and JSON-compatible
+  `exportCohortReviewDecisionRepository` / `importCohortReviewDecisionRepository`.
+  State is `{ version: 'cohort-review-decisions.v1', decisions }`; it is append-only,
+  validates each decision via `validateCohortReviewDecision`, rejects invalid and
+  duplicate-decisionId records (in-batch duplicates included), keeps superseded
+  decisions in history while excluding them from the active view, and imports
+  partially after validating the envelope (`invalid-repository-payload` /
+  `unsupported-repository-version` / `missing-decision-list`). Every operation
+  returns a new state and never mutates inputs or roster data. It is the
+  storage-boundary model only: no browser-storage write, no UI. See
+  `docs/derived-logic.md` and `docs/data-model.md` for the full contract. Remaining
+  Phase 4 work wires this repository to actual local storage and the manual review
+  screen.
 
 ## Phase 5: Import preview and collision handling
 

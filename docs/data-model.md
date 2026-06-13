@@ -322,6 +322,36 @@ insufficient-data
 - This slice defines the **contract only**. No storage write, no UI. Future slices
   may add local storage integration and a manual review screen.
 
+## Cohort Review Decision Repository
+
+The local repository / storage-boundary payload for cohort review decisions
+(Phase 4 slice 9). It is a plain, JSON-compatible envelope around an append-only,
+ordered list of `Cohort Review Decision` records.
+
+```json
+{
+  "version": "cohort-review-decisions.v1",
+  "decisions": [
+    { "decisionId": "cohort-decision-2027-jordan-smith-001", "decisionType": "confirm" }
+  ]
+}
+```
+
+### Notes
+
+- `version` is an explicit schema tag (`cohort-review-decisions.v1`). Import rejects
+  any unsupported version.
+- `decisions` preserves append order. The repository is **append-only**: superseded
+  decisions stay in the list (excluded only from the active view); decisions are
+  never overwritten or deleted.
+- Append/import validate every decision and reject invalid (`invalid-decision`) and
+  duplicate (`duplicate-decision-id`) records; import additionally guards the
+  envelope (`invalid-repository-payload`, `unsupported-repository-version`,
+  `missing-decision-list`).
+- This is an **in-memory repository model and export/import contract only** — there
+  is no browser-storage (localStorage / IndexedDB / file) write yet, and no UI.
+  Repository operations never mutate roster records.
+
 ## Import Batch
 
 ```json

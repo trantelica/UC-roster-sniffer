@@ -295,6 +295,21 @@ Slice status:
   no roster mutation; a reset only changes effective state and never deletes the
   first-year event record. Actual local storage and the manual review UI remain
   later work.
+- **Slice 9 (done): cohort review decision repository (storage boundary only).** A
+  small pure module (`cohortReviewDecisionRepository`) models the local data
+  boundary for decisions: `createEmptyCohortReviewDecisionRepositoryState`,
+  `appendCohortReviewDecision(s)`, `getCohortReviewDecisions`,
+  `getActiveCohortReviewDecisions`, and JSON-compatible
+  `exportCohortReviewDecisionRepository` / `importCohortReviewDecisionRepository`.
+  State is `{ version, decisions }`; appends validate via
+  `validateCohortReviewDecision` and reject invalid / duplicate-decisionId records;
+  active excludes superseded decisions while history keeps them; import validates
+  the envelope (version / decisions list) and partially imports valid records. Every
+  operation returns a new state and never mutates inputs. See `docs/derived-logic.md`
+  ("Cohort review decision repository (Phase 4 slice 9)") and `docs/data-model.md`
+  ("Cohort Review Decision Repository"). This is the **storage-boundary model only**:
+  no browser-storage write (localStorage / IndexedDB / file), no UI, no roster
+  mutation. Wiring to actual local storage and a manual review UI remains later work.
 
 ## Phase 5: Import preview and identity collision handling
 

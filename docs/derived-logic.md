@@ -757,6 +757,50 @@ Future slices may add actual local storage and a manual review UI on top of this
 resolution. Source roster records and every upstream object remain authoritative
 and are never mutated.
 
+### Cohort review decision repository (Phase 4 slice 9)
+
+The ninth Phase 4 slice adds the narrow **repository / storage-boundary** layer for
+cohort review decisions: how decisions are appended, loaded, validated, and
+exported / imported at the local data boundary
+(`src/engine/cohortReviewDecisionRepository.ts`). The repository state shape is
+`{ version, decisions }` and the persisted/export payload is documented in
+`docs/data-model.md` ("Cohort Review Decision Repository").
+
+The app has no browser-storage persistence layer yet (only static JSON sample
+loading). So this is an **in-memory repository adapter** plus a documented,
+JSON-compatible export/import contract — **not** a real storage implementation. It
+does **not** write to localStorage / IndexedDB / files / sample data / app state,
+add UI, or mutate roster records.
+
+#### Behavior
+
+- **Append-only.** `appendCohortReviewDecision` / `appendCohortReviewDecisions`
+  validate each decision via `validateCohortReviewDecision`, accept valid ones, and
+  reject invalid (`invalid-decision`) and duplicate-`decisionId`
+  (`duplicate-decision-id`) decisions. Duplicates are detected against both existing
+  state and earlier decisions in the same batch, and an existing decision is never
+  overwritten. Every operation returns a NEW state; the prior state and the decision
+  objects are never mutated. Append results are
+  `{ ok, state, accepted, rejected, messages }`, where `ok` is true only when
+  nothing was rejected.
+- **Load.** `getCohortReviewDecisions` returns all decisions in append order (as a
+  fresh array). `getActiveCohortReviewDecisions` returns only the decisions not
+  superseded by another decision's `audit.supersedesDecisionId`; superseded
+  decisions remain in history and are excluded from the active view only.
+- **Export / import.** `exportCohortReviewDecisionRepository` returns a plain
+  JSON-compatible `{ version, decisions }` payload (no functions).
+  `importCohortReviewDecisionRepository` validates the envelope
+  (`invalid-repository-payload`, `unsupported-repository-version`,
+  `missing-decision-list`) and then validates each decision, performing a **partial
+  import** that clearly reports accepted and rejected decisions and returns a new
+  state.
+
+Decision objects are stored and returned by reference (not cloned); the repository
+never mutates them, so this is safe by convention and callers must treat returned
+decisions as read-only. Future slices may wire this repository to actual local
+storage and a manual review UI. Roster records, assignments, first-year records,
+players, and teams are never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no
