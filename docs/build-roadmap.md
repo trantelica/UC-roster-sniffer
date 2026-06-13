@@ -281,6 +281,20 @@ Slice status:
   slice 7)"). This is the **contract only**: no storage write, no UI, no roster
   mutation, no prior-season unlocking, no reset side effect. Local storage
   integration and the manual review screen remain later work.
+- **Slice 8 (done): cohort review decision application (engine only).** A pure
+  helper (`applyCohortReviewDecisionsToAssignments`) resolves slice 5 assignments
+  against slice 7 decisions in memory, computing an effective state per assignment
+  (engine-derived / confirmed / reset / deferred / insufficient-data /
+  unresolved-review). Decisions match on identityKey + evaluatedSeasonId +
+  reclassificationType; invalid, superseded (by reference), unmatched, key-less, and
+  conflicting decisions are ignored with explicit reasons; conflicting current
+  decisions are never guessed by array order. A summary helper
+  (`summarizeAppliedCohortReviewDecisions`) counts by effective state, application,
+  and ignored reason. See `docs/derived-logic.md` ("Cohort review decision
+  application (Phase 4 slice 8)"). This is in-memory only: no storage write, no UI,
+  no roster mutation; a reset only changes effective state and never deletes the
+  first-year event record. Actual local storage and the manual review UI remain
+  later work.
 
 ## Phase 5: Import preview and identity collision handling
 
