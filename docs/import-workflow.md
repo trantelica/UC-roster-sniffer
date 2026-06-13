@@ -10,6 +10,7 @@ This document defines the initial import behavior for rosters, schedules, result
 - Beginning in 2026, the app should support ongoing weekly maintenance.
 - Identity collisions must be surfaced before import decisions are committed.
 - Source import files may be flatter and less complete than the internal data model. Import adapters should preserve raw source values while producing normalized candidates for review.
+- Imports never write cohort review decisions. A `Cohort Review Decision` (see `docs/data-model.md`) is a separate, append-only record produced only from an accepted manual review action, not from importing rosters, schedules, results, or branding.
 
 ## Import types
 

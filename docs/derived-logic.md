@@ -626,6 +626,76 @@ add UI, change import behavior, use fuzzy matching, or consult birthdate, grade,
 notes, or manual review storage. The source assignment and every upstream object
 remain authoritative and are preserved by reference and never mutated.
 
+### Cohort review decision persistence contract (Phase 4 slice 7)
+
+The seventh Phase 4 slice defines the **persistence contract** for an accepted
+cohort review decision and adds small pure helpers to build, validate, and
+summarize those decisions (`createCohortReviewDecision`,
+`validateCohortReviewDecision`, `summarizeCohortReviewDecisions`). The persistable
+shape is documented in `docs/data-model.md` ("Cohort Review Decision").
+
+This slice defines the **contract only**. It does **not** write to storage (no
+localStorage / IndexedDB / file), add UI, mutate roster records, unlock prior
+seasons, or perform any reset side effect. A persisted decision is a SEPARATE,
+append-only record from any roster row.
+
+#### Contract rules
+
+1. Only an **accepted** slice 6 action result may become a decision; a rejected
+   result is skipped with `action-not-accepted`.
+2. Decisions are **append-only**: a later decision may reference an earlier one via
+   `audit.supersedesDecisionId`, but the helper never mutates an earlier decision or
+   any source object.
+3. Decisions never mutate roster records and never unlock or edit prior seasons.
+4. A `reset` decision ends the active cohort status from the evaluated-season
+   perspective (`resultingActiveStatus` is not active) but does **not** delete the
+   first-year reclassification event record.
+5. `confirm` decisions preserve active cohort status; `defer` and
+   `insufficient-data` decisions preserve the review state without forcing an
+   active/inactive status.
+6. Each decision carries a `source` block (assignment / review / carry-forward
+   status + reason and a `logicVersion`) so the decision can be re-audited.
+
+#### Build (`createCohortReviewDecision(actionResult, options)`)
+
+Pure and deterministic: ids and timestamps are **caller-provided** (the helper
+never calls `Date.now()` or generates ids), and it returns a result object instead
+of throwing on normal validation failures. It refuses to build a decision (returns
+`created: false` with an explaining `reason`) when:
+
+- the action result is not accepted -> `action-not-accepted`;
+- there is no source assignment -> `missing-assignment`;
+- the identity key is empty -> `missing-identity-key`;
+- the evaluated season is missing -> `missing-evaluated-season` (e.g. an
+  insufficient-data assignment from a missing current record has no evaluated
+  season, so it cannot become a decision);
+- the caller omits `decisionId` -> `missing-decision-id`;
+- the caller omits `createdAt` -> `missing-created-at`.
+
+Optional `reviewerNote` / `reviewedAt` / `reviewerId` (from the action result) and
+`createdBy` / `supersedesDecisionId` (from options) are attached only when supplied
+as non-empty strings; `lockedSourceSeasonIds` is stored as a fresh copy of the
+caller's array.
+
+#### Validate (`validateCohortReviewDecision(decision)`)
+
+Returns `{ valid, errors }`. It checks the required identity / season / id /
+timestamp fields, valid `decisionType` and `reviewActionState`, their coherence, and
+the two contract guards — a `reset` decision must not claim an `active` /
+`first-year` status (`reset-decision-claims-active-status`) and a `confirm` decision
+must not claim a `reset` state (`confirm-decision-claims-reset-state`).
+
+#### Summarize (`summarizeCohortReviewDecisions(decisions)`)
+
+Counts decisions by type (`confirm` / `reset` / `defer` / `markInsufficientData`),
+reclassification type (`yUp` / `zDown`), reviewer-note presence, supersession, and
+validity (`invalid`). Pure; validity is computed via
+`validateCohortReviewDecision` and nothing is mutated.
+
+Future slices may add local storage integration and a manual review screen on top of
+this contract. Source roster records, players, teams, first-year records, and every
+upstream derived object remain authoritative and are never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

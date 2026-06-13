@@ -371,6 +371,21 @@ Birthdate is not required for the basic version.
   no UI, no roster mutation, no fuzzy matching / birthdate / grade / notes. See
   `docs/derived-logic.md` for the full contract. Remaining Phase 4 work persists
   accepted actions and wires the manual review screen.
+- **Slice 7 (done): cohort review decision persistence contract (specs + small
+  engine helper).** Specs define a separate, append-only `Cohort Review Decision`
+  record (`docs/data-model.md`) built only from an accepted slice 6 action result.
+  `createCohortReviewDecision(actionResult, options)` is pure and deterministic:
+  caller-provided `decisionId` / `createdAt` (no `Date.now()`), returns a result
+  object (not a throw), and refuses creation for rejected actions, empty identity
+  keys, missing evaluated seasons, or missing id / timestamp.
+  `validateCohortReviewDecision` checks required fields, type/state coherence, and
+  the reset-not-active / confirm-not-reset guards; `summarizeCohortReviewDecisions`
+  counts by type, reclassification type, reviewer-note, supersession, and validity.
+  Decisions are append-only (supersede by reference), never mutate rosters or unlock
+  prior seasons, and a reset decision does not delete the first-year event. It is
+  the contract only: no storage write, no UI, no reset side effect. See
+  `docs/derived-logic.md` for the full contract. Remaining Phase 4 work adds local
+  storage integration and the manual review screen.
 
 ## Phase 5: Import preview and collision handling
 
