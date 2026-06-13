@@ -6,14 +6,27 @@ export interface ParsedAgeDivision {
   id: AgeDivisionId;
 }
 
-const ORDINALS: Record<AgeDivisionId, number> = {
-  SC: 1,
-  GR: 2,
-  PW: 3,
-  MM: 4,
-  GI: 5,
-  BA: 6,
-};
+/**
+ * The fixed age divisions in ascending ordinal order (SC youngest .. BA oldest).
+ * This is the single source of truth for both the ordinal lookup and the reverse
+ * rank -> id lookup. Age divisions never split or consolidate.
+ */
+export const AGE_DIVISION_IDS_IN_ORDER: readonly AgeDivisionId[] = [
+  'SC',
+  'GR',
+  'PW',
+  'MM',
+  'GI',
+  'BA',
+];
+
+const ORDINALS: Record<AgeDivisionId, number> = AGE_DIVISION_IDS_IN_ORDER.reduce(
+  (acc, id, index) => {
+    acc[id] = index + 1;
+    return acc;
+  },
+  {} as Record<AgeDivisionId, number>
+);
 
 const VALID_IDS = new Set<string>(Object.keys(ORDINALS));
 
@@ -31,6 +44,18 @@ export function parseAgeDivisionId(input: string): ParsedAgeDivision {
 export function getAgeDivisionRank(input: string): number {
   const { id } = parseAgeDivisionId(input);
   return ORDINALS[id];
+}
+
+/**
+ * Reverse of {@link getAgeDivisionRank}: returns the age-division id for a fixed
+ * ordinal rank (SC=1 .. BA=6), or `null` when the rank is out of range. Never
+ * throws, so callers stepping along an age-division path stay deterministic.
+ */
+export function getAgeDivisionIdByRank(rank: number): AgeDivisionId | null {
+  if (!Number.isInteger(rank) || rank < 1 || rank > AGE_DIVISION_IDS_IN_ORDER.length) {
+    return null;
+  }
+  return AGE_DIVISION_IDS_IN_ORDER[rank - 1];
 }
 
 /**
