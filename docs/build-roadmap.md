@@ -252,6 +252,21 @@ Slice status:
   only. It does not persist, reset cohort status, alter roster records, use fuzzy
   matching / birthdate / grade / notes / manual review, or render any UI badge.
   Persistence, manual review/reset, and UI wiring remain later work.
+- **Slice 6 (done): cohort assignment review action model (engine only).** A pure
+  helper (`applyCohortReclassificationReviewAction`) takes one slice 5 assignment
+  plus a requested action (`confirm`, `reset`, `defer`, `mark-insufficient-data`)
+  and returns a validated review-action result: accepted or rejected, with a
+  resulting review state (`confirmed`, `reset`, `deferred`, `insufficient-data`,
+  `rejected`), the would-be active status, an explicit reason, and any supplied
+  reviewer note / timestamp / id echoed back. A summary helper
+  (`summarizeCohortReclassificationReviewActions`) counts by acceptance, resulting
+  state, and action type. See `docs/derived-logic.md` ("Cohort assignment review
+  action model (Phase 4 slice 6)"). This is an engine-only action result model that
+  validates possible future review actions. It does not persist a decision, reset
+  cohort status, alter roster records, add UI, use fuzzy matching / birthdate /
+  grade / notes. An accepted `reset` only records that the recommendation was
+  accepted; nothing is committed. Persisting accepted actions and wiring a manual
+  review screen remain later work.
 
 ## Phase 5: Import preview and identity collision handling
 
