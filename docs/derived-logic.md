@@ -563,6 +563,69 @@ manual review/override. Loaded roster records, players, teams, first-year record
 carry-forward entries, and review entries remain authoritative and are preserved by
 reference and never mutated.
 
+### Cohort assignment review action model (Phase 4 slice 6)
+
+The sixth Phase 4 slice adds a pure deterministic engine helper
+(`applyCohortReclassificationReviewAction`) that defines what a **future** manual
+review workflow MAY do with a slice 5 assignment. It takes one assignment plus a
+requested action and returns an explicit, validated **review-action result**.
+
+This is an **engine-only action result model**. It validates possible future review
+actions; it does **not** persist any review decision, reset anything automatically
+(an accepted `reset` only records that the recommendation was accepted — no cohort
+status is changed), mutate roster records, or add UI. Future slices may persist
+accepted actions or wire a manual review screen.
+
+#### Actions
+
+- `confirm` — accept the assignment's status.
+- `reset` — accept a reset recommendation on a broken (inactive) assignment.
+- `defer` — postpone a decision on a questionable (review) assignment.
+- `mark-insufficient-data` — record that an insufficient-data assignment cannot be
+  judged yet.
+
+The action input also accepts optional `reviewerNote`, `reviewedAt`, and
+`reviewerId`; `reviewerId` is not required by this slice. Provided values are echoed
+back on the result (non-empty strings only); absent values stay absent.
+
+#### Resulting review states
+
+`confirmed`, `reset`, `deferred`, `insufficient-data`, or `rejected`.
+
+#### Mapping
+
+| requestedAction | assignment activeStatus | accepted | resultingReviewState | resultingActiveStatus | reason |
+| --- | --- | --- | --- | --- | --- |
+| `confirm` | `active` / `first-year` | true | `confirmed` | unchanged | `clean-assignment-confirmed` |
+| `confirm` | `review` | true | `confirmed` | `active` | `review-assignment-confirmed` |
+| `reset` | `inactive` (resetRecommended true) | true | `reset` | `inactive` (resetRecommended cleared) | `reset-recommendation-accepted` |
+| `reset` | `active` / `first-year` | false | `rejected` | unchanged | `reset-not-allowed-for-clean-assignment` |
+| `defer` | `review` | true | `deferred` | `review` | `review-deferred` |
+| `mark-insufficient-data` | `insufficient-data` | true | `insufficient-data` | `insufficient-data` | `insufficient-data-marked` |
+| `mark-insufficient-data` | (any other) | false | `rejected` | unchanged | `insufficient-data-action-not-needed` |
+| (any) | `unknown` | false | `rejected` | unchanged | `unknown-assignment-state` |
+| (any other invalid pairing) | — | false | `rejected` | unchanged | `invalid-action-for-assignment` |
+| (any) | no assignment supplied | false | `rejected` | `unknown` | `missing-assignment` |
+
+An `unknown` assignment state rejects every action before the action type is even
+considered. A rejected result leaves `resultingActiveStatus` / `resetRecommended`
+unchanged — nothing is committed in any case. `confidence` is `high` for the
+definite accepted outcomes (`confirmed`, `reset`) and `low` for `deferred`,
+`insufficient-data`, and every rejection.
+
+Each result preserves the source `assignment` reference (and through it every
+upstream object), mirrors `identityKey` / `reclassificationType` /
+`evaluatedSeasonId`, and records the `requestedAction`, `accepted`,
+`resultingReviewState`, `resultingActiveStatus`, `resetRecommended`, `confidence`,
+and `reason`. A summary helper
+(`summarizeCohortReclassificationReviewActions`) counts results by acceptance,
+resulting review state, and requested action type.
+
+This slice does **not** persist actions, reset cohort status, mutate roster records,
+add UI, change import behavior, use fuzzy matching, or consult birthdate, grade,
+notes, or manual review storage. The source assignment and every upstream object
+remain authoritative and are preserved by reference and never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

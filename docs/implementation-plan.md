@@ -354,6 +354,23 @@ Birthdate is not required for the basic version.
   review, and no roster mutation. See `docs/derived-logic.md` for the full
   contract. Remaining Phase 4 work adds persistence and the manual review/reset
   workflow.
+- **Slice 6 (done): cohort assignment review action model (engine only).**
+  `applyCohortReclassificationReviewAction` takes one slice 5 assignment plus a
+  requested action (`confirm`, `reset`, `defer`, `mark-insufficient-data`) and
+  returns a validated result: `accepted` plus a `resultingReviewState`
+  (`confirmed`, `reset`, `deferred`, `insufficient-data`, `rejected`), the would-be
+  active status, `resetRecommended`, `confidence`, an explicit `reason`, and any
+  supplied reviewer note / timestamp / id echoed back. Confirm is allowed on
+  active / first-year (clean-confirmed) and review (confirmed -> active); reset only
+  on inactive with a reset recommendation, and is rejected on clean assignments;
+  defer only on review; mark-insufficient-data only on insufficient-data; unknown
+  states and unmapped pairings are rejected with a named reason. A summary helper
+  (`summarizeCohortReclassificationReviewActions`) counts by acceptance, resulting
+  state, and action type. It is an engine-only action result model: nothing is
+  persisted or committed — an accepted reset only records acceptance — and there is
+  no UI, no roster mutation, no fuzzy matching / birthdate / grade / notes. See
+  `docs/derived-logic.md` for the full contract. Remaining Phase 4 work persists
+  accepted actions and wires the manual review screen.
 
 ## Phase 5: Import preview and collision handling
 
