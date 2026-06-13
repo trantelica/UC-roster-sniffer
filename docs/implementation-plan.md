@@ -324,6 +324,20 @@ Birthdate is not required for the basic version.
   and no roster mutation; a broken path is a review signal, not data deletion.
   See `docs/derived-logic.md` for the full contract. Remaining Phase 4 work adds
   cohort-offset persistence and review/reset.
+- **Slice 4 (done): cohort reclassification review classification (engine only).**
+  `classifyCohortReclassificationReview` consumes the slice 3 carry-forward result
+  (or its entries) and maps each verdict into a review outcome: `clean`
+  (first-year / carried-forward), `reset-recommended` (path-broken returned to the
+  normal age path), `needs-review` (path-broken by an unexpected division, an
+  `unknown` carry-forward, or an otherwise-clean entry carried forward with low
+  confidence), and `insufficient-data` (missing current record or unusable season
+  ordering). A summary helper (`summarizeCohortReclassificationReview`) counts by
+  review status, type, and confidence. It classifies only: reset is recommended,
+  never performed, and nothing is persisted. It is still derived metadata: no
+  persisted review decision, no automatic reset, no UI badges, no import change, no
+  fuzzy matching / birthdate / grade / notes / manual review, and no roster
+  mutation. See `docs/derived-logic.md` for the full contract. Remaining Phase 4
+  work adds cohort-offset persistence and the manual review/reset workflow.
 
 ## Phase 5: Import preview and collision handling
 

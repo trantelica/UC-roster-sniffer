@@ -441,6 +441,67 @@ import behavior, use fuzzy matching, or consult birthdate, grade, notes, or manu
 review decisions. Loaded roster records, players, teams, and first-year records
 remain authoritative and are preserved by reference and never mutated.
 
+### Cohort reclassification review classification (Phase 4 slice 4)
+
+The fourth Phase 4 slice adds a pure deterministic engine helper
+(`classifyCohortReclassificationReview`) that sits **on top of** the slice 3
+carry-forward result and classifies each carry-forward verdict into a simple
+**review outcome** a human can act on. It accepts either the slice 3 result object
+(`{ entries, summary }`) or a bare entry array.
+
+This slice **classifies** carry-forward results into review outcomes. It does
+**not** persist a review decision, reset cohort status automatically, add UI
+badges, or alter roster records. A broken path is a **review signal**, and reset is
+only **recommended, never performed**. Future slices may add persistence and a
+manual review / reset workflow.
+
+#### Review statuses
+
+- `clean` — the carry-forward verdict is trustworthy as-is.
+- `needs-review` — a human should look before trusting the verdict.
+- `reset-recommended` — the player has rejoined the normal age path, so a reviewer
+  may wish to reset the preserved cohort status. The reset is **not** performed.
+- `insufficient-data` — there is not enough information (no current record, or an
+  unusable season ordering) to judge the carried-forward status.
+
+#### Mapping
+
+Per carry-forward entry (exactly one review entry per carry-forward entry, in input
+order):
+
+| Carry-forward status | Carry-forward reason | reviewStatus | confidence | review reason |
+| --- | --- | --- | --- | --- |
+| `first-year` | (any) | `clean` | high | `valid-first-year-record` |
+| `carried-forward` | (any) | `clean` | high | `valid-carry-forward` |
+| `path-broken` | `returned-to-normal-path` | `reset-recommended` | high | `path-broken-returned-to-normal` |
+| `path-broken` | `unexpected-age-division` | `needs-review` | low | `path-broken-unexpected-age-division` |
+| `insufficient-history` | `missing-current-record` | `insufficient-data` | low | `missing-current-record` |
+| `insufficient-history` | `missing-season-order` / `first-season-not-in-order` / `evaluated-season-not-in-order` / `evaluated-season-before-first-detection` | `insufficient-data` | low | `unusable-season-order` |
+| `unknown` | `invalid-age-division` | `needs-review` | low | `invalid-age-division` |
+| `unknown` | `ambiguous-identity` | `needs-review` | low | `ambiguous-identity` |
+
+An otherwise-clean entry (`first-year` / `carried-forward`) that carried forward
+with **low** confidence is demoted to `needs-review` / `low-confidence-carry-forward`
+so it is confirmed before being trusted. Any carry-forward verdict whose reason is
+not covered above falls back to `unknown-carry-forward-result` (review status
+`needs-review` for `unknown`, `insufficient-data` for `insufficient-history`, and
+`needs-review` for an unmapped `path-broken` reason). `confidence` is `high` only
+for the `clean` outcomes and `reset-recommended`; everything else is `low`.
+
+Each review entry preserves the source `carryForwardEntry`, `player`,
+`firstYearRecord`, and `currentRecord` references (by reference, never copied),
+mirrors `identityKey`, `reclassificationType`, and `evaluatedSeasonId`, and records
+the `carryForwardStatus` / `carryForwardReason` it classified alongside the derived
+`reviewStatus` / `confidence` / `reason`. A summary helper
+(`summarizeCohortReclassificationReview`) counts entries by review status,
+reclassification type, and confidence.
+
+This slice does **not** persist review decisions, reset cohort status, add UI
+badges, change import behavior, use fuzzy matching, or consult birthdate, grade,
+notes, or manual review/override. Loaded roster records, players, teams, first-year
+records, and carry-forward entries remain authoritative and are preserved by
+reference and never mutated.
+
 ### Player movement taxonomy alignment (Phase 3 slice 5)
 
 This slice is a **spec alignment pass only**. It introduces no engine logic, no

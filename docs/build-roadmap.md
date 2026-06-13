@@ -222,6 +222,21 @@ Slice status:
   persist a cohort offset, alter roster records, use fuzzy matching / birthdate /
   grade / notes / manual review, or render any UI badge. Cohort-offset persistence
   and review/reset remain later Phase 4 work.
+- **Slice 4 (done): cohort reclassification review classification (engine only).**
+  A pure helper (`classifyCohortReclassificationReview`) takes the slice 3
+  carry-forward result (or its entries) and maps each verdict into a simple review
+  outcome: `clean` (first-year / carried-forward), `reset-recommended` (path-broken
+  by returning to the normal age path), `needs-review` (path-broken by an
+  unexpected division, an `unknown` carry-forward, or an otherwise-clean entry that
+  carried forward with low confidence), or `insufficient-data` (missing current
+  record or unusable season ordering). A summary helper
+  (`summarizeCohortReclassificationReview`) counts by review status, type, and
+  confidence. See `docs/derived-logic.md` ("Cohort reclassification review
+  classification (Phase 4 slice 4)"). This is still derived metadata. Reset is only
+  recommended, never performed; a broken path is a review signal. It does not
+  persist a review decision, reset cohort status, alter roster records, use fuzzy
+  matching / birthdate / grade / notes / manual review, or render any UI badge.
+  Persistence and the manual review/reset workflow remain later Phase 4 work.
 
 ## Phase 5: Import preview and identity collision handling
 
