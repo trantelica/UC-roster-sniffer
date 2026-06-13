@@ -267,6 +267,20 @@ Slice status:
   grade / notes. An accepted `reset` only records that the recommendation was
   accepted; nothing is committed. Persisting accepted actions and wiring a manual
   review screen remain later work.
+- **Slice 7 (done): cohort review decision persistence contract (specs + small
+  engine helper).** Specs define a separate, append-only `Cohort Review Decision`
+  record (see `docs/data-model.md`) built only from an accepted slice 6 action
+  result, plus pure helpers `createCohortReviewDecision` /
+  `validateCohortReviewDecision` / `summarizeCohortReviewDecisions`. Ids and
+  timestamps are caller-provided (no `Date.now()`), build returns a result object
+  instead of throwing, and rejected actions / missing identity / missing evaluated
+  season / missing id / missing timestamp all prevent creation. Reset decisions end
+  active status without deleting the first-year event; the `source` block keeps the
+  derived statuses/reasons + a logic version for re-audit. See
+  `docs/derived-logic.md` ("Cohort review decision persistence contract (Phase 4
+  slice 7)"). This is the **contract only**: no storage write, no UI, no roster
+  mutation, no prior-season unlocking, no reset side effect. Local storage
+  integration and the manual review screen remain later work.
 
 ## Phase 5: Import preview and identity collision handling
 

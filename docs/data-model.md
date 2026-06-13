@@ -235,6 +235,93 @@ manualLink
 createNew
 ```
 
+## Cohort Review Decision
+
+A persisted cohort review decision is a **separate, append-only record** that
+preserves a reviewer's accepted decision about a derived y-up / z-down cohort
+status. It is produced only from an **accepted** review action result (see
+`docs/derived-logic.md`, Phase 4 slices 6–7). It never rewrites source roster
+records, players, teams, imported data, or prior seasons.
+
+```json
+{
+  "decisionId": "cohort-decision-2027-jordan-smith-001",
+  "decisionType": "confirm",
+  "reclassificationType": "y-up",
+  "identityKey": "jordan smith",
+  "playerId": "player-generated-id",
+  "playerDisplayName": "Jordan Smith",
+  "firstDetectedSeasonId": "2026",
+  "evaluatedSeasonId": "2027",
+  "priorAgeDivisionId": "GR",
+  "firstDetectedAgeDivisionId": "MM",
+  "expectedAgeDivisionId": "GI",
+  "actualAgeDivisionId": "GI",
+  "cohortOffset": 1,
+  "reviewActionState": "confirmed",
+  "resultingActiveStatus": "active",
+  "resetRecommendedAtDecisionTime": false,
+  "reviewerNote": "Confirmed travelling with the older cohort.",
+  "reviewedAt": "2027-06-01T00:00:00Z",
+  "reviewerId": "coach-1",
+  "source": {
+    "logicVersion": "phase4-slice7-cohort-review-decision-v1",
+    "sourceAssignmentStatus": "active",
+    "sourceReviewStatus": "clean",
+    "sourceReviewReason": "valid-carry-forward",
+    "sourceCarryForwardStatus": "carried-forward",
+    "sourceCarryForwardReason": "expected-offset-path"
+  },
+  "audit": {
+    "createdAt": "2027-06-01T00:00:00Z",
+    "createdBy": "coach-1",
+    "supersedesDecisionId": "cohort-decision-2027-jordan-smith-000",
+    "lockedSourceSeasonIds": ["2025", "2026"]
+  }
+}
+```
+
+### Decision type values
+
+```text
+confirm
+reset
+defer
+mark-insufficient-data
+```
+
+### Review action state values
+
+```text
+confirmed
+reset
+deferred
+insufficient-data
+```
+
+### Notes
+
+- **Append-only.** A later decision may reference an earlier one via
+  `audit.supersedesDecisionId`, but never edits or deletes the earlier decision.
+- **Roster authority.** A decision never mutates roster rows, player names, team
+  assignments, imported data, or prior seasons, and never unlocks a locked prior
+  season. `audit.lockedSourceSeasonIds` records prior seasons that stay locked.
+- **Accepted-only.** Only an accepted review action result becomes a decision;
+  rejected action results never persist.
+- **Reset preserves history.** A `reset` decision ends the active cohort status from
+  the evaluated-season perspective (`resultingActiveStatus` is not active) but does
+  **not** delete the first-year reclassification event record.
+- **Coherence.** `decisionType` and `reviewActionState` are paired:
+  `confirm`/`confirmed`, `reset`/`reset`, `defer`/`deferred`,
+  `mark-insufficient-data`/`insufficient-data`.
+- **Re-auditable.** The `source` block captures the derived statuses/reasons and a
+  `logicVersion` so a decision can be re-audited against the logic that produced it.
+- **Deterministic ids/timestamps.** `decisionId`, `audit.createdAt`, and any
+  `reviewedAt` are caller-provided; the engine helpers never generate ids or read
+  the wall clock.
+- This slice defines the **contract only**. No storage write, no UI. Future slices
+  may add local storage integration and a manual review screen.
+
 ## Import Batch
 
 ```json
