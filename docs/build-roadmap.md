@@ -237,6 +237,21 @@ Slice status:
   persist a review decision, reset cohort status, alter roster records, use fuzzy
   matching / birthdate / grade / notes / manual review, or render any UI badge.
   Persistence and the manual review/reset workflow remain later Phase 4 work.
+- **Slice 5 (done): cohort reclassification derived assignment (engine only).** A
+  pure helper (`deriveCohortReclassificationAssignments`) folds the slice 4 review
+  result (which carries its slice 3 carry-forward entry) into one flat
+  per-player-season cohort assignment: `active` / `first-year` (clean
+  carried-forward / first-year), `inactive` with `resetRecommended` (review
+  reset-recommended), `review` (needs-review), `insufficient-data`, or `unknown`
+  for any unmapped combination. It surfaces the applied `cohortOffset`, the
+  upstream carry-forward / review statuses and reasons, and the age-division /
+  season ids. A summary helper (`summarizeCohortReclassificationAssignments`)
+  counts by active status, reset recommendation, type, and confidence. See
+  `docs/derived-logic.md` ("Cohort reclassification derived assignment (Phase 4
+  slice 5)"). This is an in-memory derived model: `resetRecommended` is advisory
+  only. It does not persist, reset cohort status, alter roster records, use fuzzy
+  matching / birthdate / grade / notes / manual review, or render any UI badge.
+  Persistence, manual review/reset, and UI wiring remain later work.
 
 ## Phase 5: Import preview and identity collision handling
 

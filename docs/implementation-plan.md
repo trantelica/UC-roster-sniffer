@@ -338,6 +338,22 @@ Birthdate is not required for the basic version.
   fuzzy matching / birthdate / grade / notes / manual review, and no roster
   mutation. See `docs/derived-logic.md` for the full contract. Remaining Phase 4
   work adds cohort-offset persistence and the manual review/reset workflow.
+- **Slice 5 (done): cohort reclassification derived assignment (engine only).**
+  `deriveCohortReclassificationAssignments` consumes the slice 4 review result (or
+  its entries) and produces one flat per-player-season cohort assignment per review
+  entry. It maps review/carry-forward state into an `activeStatus`: `first-year`
+  (clean + first-year), `active` (clean + carried-forward), `inactive` with
+  `resetRecommended` true (reset-recommended), `review` (needs-review),
+  `insufficient-data`, and `unknown` for any unmapped combination. It surfaces the
+  applied `cohortOffset`, the upstream carry-forward / review statuses and reasons,
+  and the age-division / season ids, all by reference. A summary helper
+  (`summarizeCohortReclassificationAssignments`) counts by active status, reset
+  recommendation, type, and confidence. It is an in-memory derived model:
+  `resetRecommended` is advisory only — no persistence, no automatic reset, no UI
+  badges, no import change, no fuzzy matching / birthdate / grade / notes / manual
+  review, and no roster mutation. See `docs/derived-logic.md` for the full
+  contract. Remaining Phase 4 work adds persistence and the manual review/reset
+  workflow.
 
 ## Phase 5: Import preview and collision handling
 
