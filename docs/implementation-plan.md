@@ -574,6 +574,29 @@ Import commit happens only after collision review.
   ("Applied Roster Import Identity Review Decision"), and `docs/derived-logic.md`
   ("Applying import identity review decisions (Phase 5 slice 5)"). Remaining Phase 5
   work applies outcomes to the roster (import commit) and adds the review UI.
+- **Slice 6 (done): import commit preview / dry-run plan (engine only).**
+  `createRosterImportCommitPreviewPlan(input)` folds slice 5 applied entries into a
+  deterministic dry-run commit plan (`src/engine/rosterImportCommitPreviewPlan.ts`):
+  per row, a `planStatus` and `plannedOperation`, plus `targetExistingRecordId`,
+  `reasons`, and `blockers`. link-to-existing (with target) -> ready-to-link;
+  link-to-existing (no target) -> blocked (`missing-target-existing-record-id`);
+  create-new -> ready-to-create; rejected -> rejected; deferred -> deferred;
+  unresolved -> blocked-unresolved (no auto-link); conflict -> blocked-conflict;
+  skipped-* -> their blocked status. `canCommit` requires at least one row, no
+  `blocked-*` rows, and a complete (or absent) target context; rejected and deferred
+  do not block; empty -> false; incomplete provided target context -> result-level
+  `invalid-target-context` blocker, `canCommit` false. Helpers
+  `summarizeRosterImportCommitPreviewPlanRows`,
+  `getRosterImportCommitPreviewPlanRowsReadyForCommit`, and
+  `getRosterImportCommitPreviewPlanRowsBlockingCommit` round out the contract. It is
+  planning only — no roster write, no creation/linking, no row deletion, no
+  persistence, no UI — and never mutates applied entries or nested
+  entries/candidates. It reuses (does not replace) the slice 5 contract. See
+  `docs/import-workflow.md` ("Import commit preview / dry-run plan (Phase 5 slice
+  6)"), `docs/data-model.md` ("Roster Import Commit Preview Plan"), and
+  `docs/derived-logic.md` ("Import commit preview / dry-run plan (Phase 5 slice 6)").
+  Remaining Phase 5 work performs the commit (applies the plan to the roster) and
+  adds the review UI.
 
 ## Phase 6: Schedule and results
 

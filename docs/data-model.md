@@ -836,6 +836,94 @@ selected-candidate-not-found
   instructions for a later apply step; reject does not delete the row and create-new
   does not write a roster entry here.
 
+## Roster Import Commit Preview Plan
+
+The dry-run import commit plan (Phase 5 slice 6), produced by
+`createRosterImportCommitPreviewPlan`
+(`src/engine/rosterImportCommitPreviewPlan.ts`) from slice 5 applied entries. It is
+**derived planning state only** — it describes what a future commit would do and
+what blocks it, and performs nothing.
+
+```json
+{
+  "canCommit": false,
+  "targetContext": {
+    "seasonId": "2026",
+    "districtId": "alta",
+    "ageDivisionId": "GI",
+    "teamId": "2026-alta-GI-A1"
+  },
+  "targetContextProvided": true,
+  "targetContextValid": true,
+  "rows": [
+    {
+      "previewSourceRowId": "r1",
+      "previewRowIndex": 0,
+      "previewPlayerName": "Jordan Smith",
+      "sourceEntryStatus": "single-candidate",
+      "effectiveOutcome": "link-to-existing",
+      "planStatus": "ready-to-link",
+      "plannedOperation": "link-existing-record",
+      "targetExistingRecordId": "alta-GI-A1-jordan-smith",
+      "reasons": ["accepted-candidate-link"],
+      "blockers": []
+    }
+  ],
+  "blockers": [],
+  "summary": { "totalRows": 1, "readyToLinkRows": 1, "canCommit": true }
+}
+```
+
+### Plan status values
+
+```text
+ready-to-link
+ready-to-create
+rejected
+deferred
+blocked-unresolved
+blocked-conflict
+blocked-invalid-preview-row
+blocked-review-preview-row
+```
+
+### Planned operation values
+
+```text
+link-existing-record
+create-new-roster-entry
+reject-import-row
+defer-review
+none
+```
+
+### Blocker codes
+
+```text
+unresolved-identity
+conflicting-decisions
+invalid-preview-row
+preview-row-needs-review
+missing-target-existing-record-id
+invalid-target-context
+```
+
+### Notes
+
+- **Dry-run only.** The plan never mutates roster records, preview rows, existing
+  records, applied entries, or candidates; each row keeps its source applied entry by
+  reference (`originalAppliedEntry`). `ready-to-link` / `ready-to-create` are future
+  operations, not writes.
+- **Commit gating.** Top-level `canCommit` is true only when there is at least one
+  row, no row is `blocked-*`, and any provided target context is complete. Rejected
+  and deferred rows do not block. An empty plan is `canCommit: false`.
+- **Target context.** Validated only when provided; an incomplete provided context
+  adds a result-level `invalid-target-context` blocker and makes `canCommit` false
+  without mutating rows. `summary.canCommit` is row-level readiness (ignores target
+  context); the top-level `canCommit` is authoritative.
+- **No auto-link.** Unresolved identities — including high-confidence single
+  candidates — block; they are never auto-linked.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

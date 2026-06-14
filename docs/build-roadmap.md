@@ -469,6 +469,31 @@ Slice status:
   import identity review decisions (Phase 5 slice 5)"). It reuses (does not replace)
   the slice 2/3/4 contracts. Actually applying outcomes to the roster (import
   commit) and the review UI remain later Phase 5 / Phase 6 work.
+- **Slice 6 (done): import commit preview / dry-run plan (engine only).** A pure
+  helper (`createRosterImportCommitPreviewPlan`) folds slice 5 applied outcomes into
+  a deterministic dry-run commit plan: per row (in input order) a `planStatus`
+  (`ready-to-link`, `ready-to-create`, `rejected`, `deferred`, `blocked-unresolved`,
+  `blocked-conflict`, `blocked-invalid-preview-row`, `blocked-review-preview-row`)
+  and a `plannedOperation` (`link-existing-record`, `create-new-roster-entry`,
+  `reject-import-row`, `defer-review`, `none`). link-to-existing with a target id ->
+  ready-to-link; without a target -> blocked (`missing-target-existing-record-id`);
+  create-new -> ready-to-create; unresolved -> blocked-unresolved (no auto-link, even
+  for high-confidence single candidates); conflict / skipped-* -> their blocked
+  status. `canCommit` is true only with at least one row, no `blocked-*` rows, and a
+  complete (or absent) target context; rejected and deferred do **not** block; an
+  empty plan is `canCommit: false`; an incomplete provided target context adds a
+  result-level `invalid-target-context` blocker. Helpers
+  `summarizeRosterImportCommitPreviewPlanRows`,
+  `getRosterImportCommitPreviewPlanRowsReadyForCommit`, and
+  `getRosterImportCommitPreviewPlanRowsBlockingCommit` round out the contract. It is
+  planning only — no roster write, no record creation/linking, no row deletion, no
+  persistence, no UI — and never mutates applied entries or nested original
+  entries/candidates (referenced via `originalAppliedEntry`). See
+  `docs/import-workflow.md` ("Import commit preview / dry-run plan (Phase 5 slice
+  6)"), `docs/data-model.md` ("Roster Import Commit Preview Plan"), and
+  `docs/derived-logic.md` ("Import commit preview / dry-run plan (Phase 5 slice 6)").
+  It reuses (does not replace) the slice 5 application contract. Performing the
+  commit and the review UI remain later Phase 5 / Phase 6 work.
 
 ## Phase 6: Schedule and result support
 
