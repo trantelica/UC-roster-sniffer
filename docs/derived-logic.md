@@ -1317,6 +1317,43 @@ persistence (no localStorage / IndexedDB / file write).
 Wiring this repository to actual local storage, applying decisions to an import, and
 the review UI remain later Phase 5 work.
 
+### Applying import identity review decisions (Phase 5 slice 5)
+
+Phase 5 slice 5 resolves slice 2 match entries against the active slice 3 decisions
+in memory, computing the **effective import outcome per row**
+(`applyRosterImportIdentityReviewDecisionsToMatches`,
+`src/engine/rosterImportIdentityReviewDecisionApplication.ts`), mirroring the
+Phase 4 slice 8 application step. It is **effective-state computation only**: no
+import apply/commit, no roster write, no record creation/linking, no row deletion,
+no persistence, and no UI. Each outcome is a future-apply instruction; source
+entries and decisions are referenced, never mutated.
+
+- **Match key.** `previewSourceRowId` + `previewRowIndex`. Entries are emitted in
+  input order; ignored decisions in decision input order.
+- **Effective outcomes.** `unresolved`, `link-to-existing`, `create-new`,
+  `rejected`, `deferred`, `skipped-invalid-preview-row`,
+  `skipped-review-preview-row`, `conflict`.
+- **No decision -> unresolved.** A matchable entry with no applicable decision is
+  `unresolved`; a high-confidence single candidate is never auto-linked.
+- **Applied mapping.** accept-candidate / manual-link -> `link-to-existing`;
+  create-new -> `create-new`; reject-candidates -> `rejected` (rejects the
+  interpretation, not the row); defer -> `deferred`.
+- **Skipped rows.** Always resolve to their skip outcome; any matching decision is
+  ignored with `decision-entry-status-mismatch`.
+- **Conflict.** Two or more current decisions for one entry -> `conflict`, none
+  applied.
+- **Ignored decisions.** Decisions are validated via
+  `validateRosterImportIdentityReviewDecision`; superseded decisions (via
+  `audit.supersedesDecisionId`) are ignored. Reasons: `invalid-decision`,
+  `superseded-decision`, `missing-preview-row-key`, `no-matching-entry`,
+  `duplicate-current-decision`, `decision-entry-status-mismatch`,
+  `selected-candidate-not-found` (an accept-candidate whose selected record is no
+  longer among the entry's candidates).
+
+`summarizeAppliedRosterImportIdentityReviewDecisions` counts outcomes, confidences,
+and ignored reasons. Actually applying outcomes to the roster (import commit) and
+the review UI remain later Phase 5 / Phase 6 work.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
