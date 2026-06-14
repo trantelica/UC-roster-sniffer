@@ -1534,6 +1534,60 @@ Ids and timestamps are always caller-provided, so output is fully reproducible.
 - Actual browser persistence, CSV / file parsing, and the review UI remain separate
   later slices.
 
+### Import application / projection (Phase 5 slice 8)
+
+Phase 5 slice 8 adds a pure, deterministic **in-memory import application /
+projection** (`createRosterImportApplicationProjection`,
+`src/engine/rosterImportApplicationProjection.ts`). It consumes a **committable**
+slice 6 dry-run commit preview plan plus existing roster records and computes, per
+plan row, the roster link / addition a future apply **would** produce. It is
+**projection only**: no import apply/commit, no roster write, no record
+creation/linking, no row deletion, no persistence, no browser storage, no file
+parsing, and no UI. No write/apply function is exported. It does not compare against
+prior seasons or derive roster movement, and it does not change player matching
+rules.
+
+- **Gating.** Projection proceeds only when `plan.canCommit` is true. A
+  non-committable plan returns `ok: false` with a result-level `plan-not-committable`
+  blocker and no projected rows. A defensively-present `blocked-*` plan row is
+  projected as `blocked` and forces `ok: false` even if `plan.canCommit` claims true.
+- **Projection outcomes (one per plan row, in plan order).** `projected-link`,
+  `projected-create`, `projected-reject`, `projected-defer`, `blocked`, `skipped`.
+- **ready-to-link** -> `projected-link` only when its `targetExistingRecordId`
+  resolves to exactly one existing record; otherwise `blocked` with
+  `invalid-plan-row` (no target id on the row), `missing-existing-record` (no match),
+  or `duplicate-existing-record-id` (2+ matches). A link never modifies the existing
+  record.
+- **ready-to-create** -> `projected-create` with a minimal, provisional
+  `projectedNewRecord` (deterministic `provisionalRecordId` from target context +
+  `previewSourceRowId` + `previewRowIndex`); blocked with `missing-target-context`,
+  `missing-preview-row-key`, or `missing-player-name-for-create` when those are
+  absent. The projected record is in-memory only and is never persisted; jersey /
+  grade are intentionally not chased through raw objects.
+- **rejected / deferred** -> `projected-reject` / `projected-defer` by default
+  (preserved, nothing deleted); optional `allowRejectedRows: false` /
+  `allowDeferredRows: false` project them as `skipped` (`skipped-non-committed-row`).
+- **`ok`** is true only when the plan is committable, there are no result-level
+  blockers, and no projected row carries a blocker.
+
+Blocker codes: `plan-not-committable`, `missing-existing-record`,
+`duplicate-existing-record-id`, `blocked-plan-row`, `invalid-plan-row`,
+`missing-target-context`, `missing-preview-row-key`, `missing-player-name-for-create`.
+Reason codes: `linked-to-existing-record`, `projected-new-roster-entry`,
+`reviewer-rejected`, `reviewer-deferred`, `blocked-by-plan`,
+`skipped-non-committed-row`.
+
+`summarizeRosterImportApplicationProjection` tallies outcomes, blockers, and a
+row-level `ok` (the result's top-level `ok` is authoritative, additionally requiring
+plan committability and no result-level blockers — mirroring the slice 6 `canCommit`
+split). `getRosterImportApplicationProjectionLinkedRows`,
+`getRosterImportApplicationProjectionNewRows`, and
+`getRosterImportApplicationProjectionSkippedRows` (reject / defer / skipped) filter
+the rows. Roster authority holds throughout: the plan, its rows, the original applied
+entries, and existing records are referenced, never mutated. Actually applying the
+projection (the real import apply / commit), persistence, file parsing, and the
+review UI remain later work and require explicit approval.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
