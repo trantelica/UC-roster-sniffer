@@ -218,6 +218,45 @@ Rejected results cannot become decisions. Supersession is represented only by
 decisions to an import, a decision repository, and the review UI remain later
 Phase 5 work.
 
+## Roster import identity review decision repository (Phase 5 slice 4)
+
+The fourth Phase 5 slice adds the narrow **repository / storage-boundary** layer
+for the slice 3 decisions
+(`src/engine/rosterImportIdentityReviewDecisionRepository.ts`). It mirrors the
+Phase 4 slice 9 cohort decision repository: how decisions are appended, loaded,
+validated, and exported / imported at the local data boundary. The repository state
+shape is `{ version, decisions }`.
+
+The app has no browser-storage persistence layer yet, so this is an **in-memory
+repository adapter** plus a documented, JSON-compatible export/import contract —
+**not** real persistence. It does **not** write to localStorage / IndexedDB / files
+/ sample data / app state, and it does **not** apply decisions to import preview
+rows, existing records, or roster data.
+
+Behavior:
+
+- **Append-only.** `appendRosterImportIdentityReviewDecision(s)` validate each
+  decision via `validateRosterImportIdentityReviewDecision`, accept valid ones, and
+  reject invalid (`invalid-decision`) and duplicate-`decisionId`
+  (`duplicate-decision-id`) decisions. Duplicates are detected against both existing
+  state and earlier decisions in the same batch; batch order is preserved. Every
+  operation returns a NEW state and never mutates the prior state or the decision
+  objects.
+- **Load.** `getRosterImportIdentityReviewDecisions` returns all decisions in append
+  order; `getActiveRosterImportIdentityReviewDecisions` returns only the decisions
+  not superseded by another decision's `audit.supersedesDecisionId`. Superseded
+  decisions remain in full history and are excluded from the active view only.
+- **Export / import.** `exportRosterImportIdentityReviewDecisionRepository` returns a
+  plain `{ version, decisions }` payload (no functions).
+  `importRosterImportIdentityReviewDecisionRepository` validates the envelope
+  (`invalid-repository-payload`, `unsupported-repository-version`,
+  `missing-decision-list`) and then validates each decision, performing a **partial
+  import** that reports accepted and rejected decisions; `ok` is false if anything
+  was rejected. It never mutates the payload.
+
+Wiring this repository to actual local storage and the review UI, and applying
+decisions to an import, remain later Phase 5 work.
+
 ## Roster import stages
 
 ### 1. Parse source data
