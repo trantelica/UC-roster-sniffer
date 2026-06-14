@@ -654,22 +654,52 @@ Import commit happens only after collision review.
   `docs/build-roadmap.md`. Remaining Phase 5 work performs the actual import apply /
   commit (and requires explicit approval), with real persistence, file parsing, and
   the review UI as separate later slices.
+- **Slice 9 (done): CSV / text roster parsing into the import preview contract
+  (engine only).** `parseRosterImportText(input)` converts pasted roster text into
+  slice 1 `RosterImportPreviewRowInput` rows, and
+  `createRosterImportPreviewFromText(input)` hands them to the existing
+  `createRosterImportPreview` (`src/engine/rosterImportTextParser.ts`). It supports
+  comma / tab / pipe delimited rows, newline-separated plain names, an optional
+  header (`hasHeader: true | false | 'auto'`), auto delimiter detection (presence
+  precedence tab > pipe > comma), basic trimming, and blank-line handling; full RFC
+  CSV quoting, escaped delimiters, Excel files, browser upload, and broad fuzzy
+  inference are reported, never guessed. Header aliases are narrow (name / player /
+  player name / athlete; jersey / jersey # / number / no / #; grade; note / notes)
+  with optional `options.columns` overrides; without a header, columns map
+  positionally by the row's own cell count (1 = name; 2 = jersey+name unless the
+  first looks like a name and the second a jersey; 3 = jersey+name+grade; 4+ adds
+  notes). Every non-empty source line is preserved as a parse row in source order
+  (missing names flagged and surfaced as `invalid` by the preview); blank lines are
+  skipped but counted; `sourceRowId` is deterministic (`line-<n>`) with no random ids
+  or `Date.now()`. Target context is validated independently (`invalid-target-context`)
+  before preview creation and passed through exactly; parser and preview issues stay
+  distinguishable via `{ parse, preview }`, and slice 1 validation is reused, not
+  duplicated. `summarizeRosterImportTextParseRows` rounds out the contract. It is
+  parser-to-preview only — no file upload, no browser File API, no UI, no persistence,
+  no roster mutation, no import apply/commit — and never mutates the input. It reuses
+  (does not replace) the slice 1 preview contract. See `docs/import-workflow.md`
+  ("CSV / text roster parsing (Phase 5 slice 9)"), `docs/data-model.md` ("Roster
+  Import Text Parse"), `docs/derived-logic.md` ("CSV / text roster parsing (Phase 5
+  slice 9)"), and `docs/build-roadmap.md`. File upload, persistence, UI, and import
+  apply / commit remain later work and require explicit approval.
 
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
-checkpointed**, slice 7 documents and confirms the contracts, and slice 8 adds a pure
-in-memory import application / projection from a committable plan. The acceptance
+checkpointed**, slice 7 documents and confirms the contracts, slice 8 adds a pure
+in-memory import application / projection from a committable plan, and slice 9 adds a
+pure text / CSV-like parser into the slice 1 preview contract. The acceptance
 criteria above are met by the engine pipeline: low-confidence collisions are never
 silently committed (unresolved identities and high-confidence single candidates
 block — never auto-link), user decisions are captured as append-only records, and
 the dry-run commit plan gates commit availability behind collision review
-(`canCommit`); slice 8 then projects what a committable plan would link / add without
-applying it. Phase 5 so far is engine-only with no file parsing, no persistence, no
-UI, and no import apply/commit. The next narrow work is **optional and requires
-explicit approval**: the actual import apply / commit that performs a projection's
-planned links / additions, plus real browser persistence, CSV / file parsing, and the
-review UI — each a separate later slice.
+(`canCommit`); slice 8 projects what a committable plan would link / add without
+applying it, and slice 9 stages pasted text into preserved preview rows. Phase 5 so
+far is engine-only with no file upload, no browser File API, no persistence, no UI,
+and no import apply/commit. The next narrow work is **optional and requires explicit
+approval**: the actual import apply / commit that performs a projection's planned
+links / additions, plus real browser persistence, file upload / Excel parsing, and
+the review UI — each a separate later slice.
 
 ## Phase 6: Schedule and results
 
