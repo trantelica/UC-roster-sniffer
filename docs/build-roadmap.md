@@ -82,9 +82,11 @@ documentation/spec-alignment checkpoint):
   validated reviewer action (slice 3), models a local decision repository /
   storage-boundary (slice 4), resolves decisions against matches into an effective
   in-memory outcome per row (slice 5), and folds those outcomes into a dry-run
-  commit preview plan with a `canCommit` readiness gate (slice 6). Slice 7 (this
-  slice) is the documentation/spec-alignment checkpoint; see
-  `docs/derived-logic.md` ("Phase 5 checkpoint"). Phase 5 so far has no file
+  commit preview plan with a `canCommit` readiness gate (slice 6). Slice 7 is the
+  documentation/spec-alignment checkpoint; see `docs/derived-logic.md` ("Phase 5
+  checkpoint"). Slice 8 adds a pure in-memory import application / projection from a
+  committable plan (the link / create / reject / defer outcomes a future apply would
+  produce), still with no persistence and no apply. Phase 5 so far has no file
   parsing, no file upload, no persistence, no browser storage, no `localStorage` /
   `IndexedDB`, no React/UI wiring, no sample-data mutation, no roster mutation, and
   no import apply/commit.
@@ -93,11 +95,9 @@ Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
 or ignores source roster records. Ambiguity affects derived metadata only.
 
-Next (optional): a pure **in-memory import application / projection** from a
-committable plan — describing the resulting roster additions / links without
-persisting, mutating sample data, parsing files, or wiring UI unless explicitly
-approved. Actual browser persistence, file parsing, and the review UI remain
-separate later slices.
+Next (optional, requires explicit approval): the actual import **apply / commit**
+that performs a projection's planned links / additions, plus real persistence, CSV /
+file parsing, and the review UI — each a separate later slice.
 
 ## Phase 0: Specification baseline
 
@@ -542,6 +542,32 @@ Slice status:
   Phase 5 slices 1–6 are **complete / checkpointed**; the next optional slice is a
   pure in-memory import application / projection (not actual persistence), and
   actual browser persistence, file parsing, and the review UI remain later slices.
+- **Slice 8 (done): pure in-memory import application / projection (engine only).**
+  A pure helper (`createRosterImportApplicationProjection`) consumes a **committable**
+  slice 6 dry-run commit preview plan plus existing roster records and computes, per
+  plan row (in plan order), the roster link / addition a future apply *would*
+  produce: `projected-link` (ready-to-link resolving to exactly one existing record),
+  `projected-create` (ready-to-create, with a provisional, deterministic
+  `projectedNewRecord` that is never persisted), `projected-reject` / `projected-defer`
+  (preserved; `skipped` when `allowRejectedRows` / `allowDeferredRows` is false), or
+  `blocked` (non-committable plan, missing/duplicate existing record, missing target
+  context / player name / preview row key, or a defensive `blocked-*` plan row).
+  Projection proceeds only when `plan.canCommit` is true; a non-committable plan
+  returns `ok: false` with a result-level `plan-not-committable` blocker and no rows.
+  Helpers `summarizeRosterImportApplicationProjection`,
+  `getRosterImportApplicationProjectionLinkedRows`,
+  `getRosterImportApplicationProjectionNewRows`, and
+  `getRosterImportApplicationProjectionSkippedRows` round out the contract. It is
+  projection only — no import apply/commit, no roster write, no record
+  creation/linking, no row deletion, no persistence, no browser storage, no file
+  parsing, no UI — and never mutates the plan, its rows, the original applied entries,
+  or the existing records (the projected link never modifies the existing record). It
+  reuses (does not replace) the slice 6 commit preview plan contract. See
+  `docs/import-workflow.md` ("Import application / projection (Phase 5 slice 8)"),
+  `docs/data-model.md` ("Roster Import Application Projection"), and
+  `docs/derived-logic.md` ("Import application / projection (Phase 5 slice 8)").
+  Actually applying the projection (the real import apply / commit), persistence,
+  file parsing, and the review UI remain later work and require explicit approval.
 
 ## Phase 6: Schedule and result support
 

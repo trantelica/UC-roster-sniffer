@@ -415,6 +415,72 @@ must not persist, mutate sample data, parse files, or wire UI unless explicitly
 approved. Actual browser persistence, CSV / file parsing, and the review UI remain
 separate later slices.
 
+## Import application / projection (Phase 5 slice 8)
+
+The eighth Phase 5 slice adds a pure, deterministic **in-memory import
+application / projection** (`src/engine/rosterImportApplicationProjection.ts`,
+`createRosterImportApplicationProjection`). Given a **committable** slice 6 dry-run
+commit preview plan plus a set of existing roster records, it answers: "if this
+already-reviewed plan were applied later, what roster links / additions would
+result?" It is **projection only** — not import apply/commit, not persistence, not
+sample-data mutation, not browser storage, not file parsing, and not UI. No
+write/apply function is exported.
+
+Each plan row becomes one projection row (in plan row order) with a
+`projectionStatus` and a `projectedOperation`:
+
+| Plan status | projectionStatus | projectedOperation |
+| --- | --- | --- |
+| ready-to-link (one matching existing record) | `projected-link` | `link-existing-record` |
+| ready-to-link (no target id on the row) | `blocked` | `none` (blocker `invalid-plan-row`) |
+| ready-to-link (target id matches no existing record) | `blocked` | `none` (blocker `missing-existing-record`) |
+| ready-to-link (target id matches 2+ existing records) | `blocked` | `none` (blocker `duplicate-existing-record-id`) |
+| ready-to-create (valid) | `projected-create` | `create-new-roster-entry` |
+| ready-to-create (incomplete target context) | `blocked` | `none` (blocker `missing-target-context`) |
+| ready-to-create (no preview row key) | `blocked` | `none` (blocker `missing-preview-row-key`) |
+| ready-to-create (no player name) | `blocked` | `none` (blocker `missing-player-name-for-create`) |
+| rejected | `projected-reject` | `reject-import-row` |
+| deferred | `projected-defer` | `defer-review` |
+| any `blocked-*` plan row (defensive) | `blocked` | `none` (blocker `blocked-plan-row`) |
+
+Behavior and boundaries:
+
+- **Gating.** Projection only proceeds when `plan.canCommit` is true. A
+  non-committable plan returns `ok: false` with a result-level `plan-not-committable`
+  blocker and **no** projected rows. Even when `plan.canCommit` claims true, a
+  defensively-present `blocked-*` plan row is projected as `blocked` and forces
+  `ok: false` — the row scan, not just the flag, decides readiness.
+- **Projected links never modify the existing record.** A `projected-link` only
+  references an existing record id; the record is read for resolution and never
+  mutated.
+- **Projected creates are provisional and not persisted.** A `projected-create`
+  carries a minimal `projectedNewRecord` (season / district / age division / team /
+  player name + source row metadata) with a deterministic `provisionalRecordId`
+  derived from the target context + `previewSourceRowId` + `previewRowIndex`. It is
+  an in-memory description only; no final/canonical id is generated and nothing is
+  written. Jersey number / grade are intentionally **not** chased through raw plan /
+  match objects (the plan row does not expose them cleanly); a later parser /
+  import-map slice may enrich the projected record.
+- **Rejected and deferred rows are preserved.** They project to `projected-reject` /
+  `projected-defer` (their default) and delete nothing. Optional
+  `allowRejectedRows: false` / `allowDeferredRows: false` instead project those rows
+  as `skipped` (`skipped-non-committed-row`) for callers that only want the actual
+  link / create changes.
+- **Duplicate / missing existing records block the affected link row only** and are
+  reported on that row; other rows still project.
+- **`ok`** is true only when `plan.canCommit` is true, there are no result-level
+  blockers, and no projected row carries a blocker.
+
+Helpers `summarizeRosterImportApplicationProjection` (counts
+link / create / reject / defer / blocked / skipped rows, blockers, and a row-level
+`ok`), `getRosterImportApplicationProjectionLinkedRows`,
+`getRosterImportApplicationProjectionNewRows`, and
+`getRosterImportApplicationProjectionSkippedRows` (reject / defer / skipped) round
+out the contract. The hard roster authority rule still holds: the plan, its rows, the
+original applied entries, and the existing records are referenced, never mutated.
+Actually applying the projection (the real import apply / commit), persistence, file
+parsing, and the review UI remain later work and require explicit approval.
+
 ## Roster import stages
 
 ### 1. Parse source data

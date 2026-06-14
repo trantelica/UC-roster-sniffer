@@ -624,21 +624,52 @@ Import commit happens only after collision review.
   ("Phase 5 checkpoint: import pipeline layers"), `docs/import-workflow.md` ("Phase 5
   checkpoint: import pipeline (Phase 5 slice 7)"), `docs/ui-workflow.md` ("Import
   pipeline UI (Phase 5 checkpoint)"), and `docs/build-roadmap.md`.
+- **Slice 8 (done): pure in-memory import application / projection (engine only).**
+  `createRosterImportApplicationProjection(input)` consumes a **committable** slice 6
+  dry-run commit preview plan plus existing roster records and computes, per plan row
+  (in plan order), the roster link / addition a future apply *would* produce
+  (`src/engine/rosterImportApplicationProjection.ts`). Outcomes: `projected-link`
+  (ready-to-link resolving to exactly one existing record; the existing record is
+  never modified), `projected-create` (ready-to-create, with a provisional,
+  deterministic `projectedNewRecord` — id derived from target context +
+  `previewSourceRowId` + `previewRowIndex` — that is never persisted),
+  `projected-reject` / `projected-defer` (preserved; `skipped` when
+  `allowRejectedRows` / `allowDeferredRows` is false), and `blocked`
+  (non-committable plan, missing/duplicate existing record, missing target context /
+  player name / preview row key, or a defensive `blocked-*` plan row). Projection
+  proceeds only when `plan.canCommit` is true; a non-committable plan returns
+  `ok: false` with a result-level `plan-not-committable` blocker and no rows; `ok` is
+  true only when the plan is committable and no row or result blocker exists. Helpers
+  `summarizeRosterImportApplicationProjection`,
+  `getRosterImportApplicationProjectionLinkedRows`,
+  `getRosterImportApplicationProjectionNewRows`, and
+  `getRosterImportApplicationProjectionSkippedRows` round out the contract. It is
+  projection only — no import apply/commit, no roster write, no record
+  creation/linking, no row deletion, no persistence, no browser storage, no file
+  parsing, no UI — and never mutates the plan, its rows, the original applied entries,
+  or the existing records. It reuses (does not replace) the slice 6 commit preview
+  plan contract. See `docs/import-workflow.md` ("Import application / projection
+  (Phase 5 slice 8)"), `docs/data-model.md` ("Roster Import Application Projection"),
+  `docs/derived-logic.md` ("Import application / projection (Phase 5 slice 8)"), and
+  `docs/build-roadmap.md`. Remaining Phase 5 work performs the actual import apply /
+  commit (and requires explicit approval), with real persistence, file parsing, and
+  the review UI as separate later slices.
 
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
-checkpointed**, and slice 7 documents and confirms the contracts. The acceptance
+checkpointed**, slice 7 documents and confirms the contracts, and slice 8 adds a pure
+in-memory import application / projection from a committable plan. The acceptance
 criteria above are met by the engine pipeline: low-confidence collisions are never
 silently committed (unresolved identities and high-confidence single candidates
 block — never auto-link), user decisions are captured as append-only records, and
 the dry-run commit plan gates commit availability behind collision review
-(`canCommit`). Phase 5 so far is engine-only with no file parsing, no persistence,
-no UI, and no import apply/commit. The next narrow work is **optional**: a pure
-in-memory import application / projection from a committable plan (not actual
-persistence), which must still not persist, mutate sample data, parse files, or wire
-UI unless explicitly approved. Actual browser persistence, CSV / file parsing, and
-the review UI remain separate later slices.
+(`canCommit`); slice 8 then projects what a committable plan would link / add without
+applying it. Phase 5 so far is engine-only with no file parsing, no persistence, no
+UI, and no import apply/commit. The next narrow work is **optional and requires
+explicit approval**: the actual import apply / commit that performs a projection's
+planned links / additions, plus real browser persistence, CSV / file parsing, and the
+review UI — each a separate later slice.
 
 ## Phase 6: Schedule and results
 

@@ -962,6 +962,140 @@ and deferred import rows are always preserved as rows. A future slice may add a 
 in-memory import application / projection from a committable plan; even then it must
 not persist, mutate sample data, parse files, or wire UI unless explicitly approved.
 
+## Roster Import Application Projection
+
+The in-memory import application projection (Phase 5 slice 8), produced by
+`createRosterImportApplicationProjection`
+(`src/engine/rosterImportApplicationProjection.ts`) from a **committable** slice 6
+commit preview plan plus existing roster records. It is **derived projection state
+only** — it describes the roster links / additions a future apply *would* produce and
+performs nothing. It does not persist, mutate sample data, mutate rosters, link
+records, create persisted entries, parse files, or wire UI.
+
+```json
+{
+  "ok": true,
+  "planCommittable": true,
+  "targetContext": {
+    "seasonId": "2026",
+    "districtId": "alta",
+    "ageDivisionId": "GI",
+    "teamId": "2026-alta-GI-A1"
+  },
+  "rows": [
+    {
+      "previewSourceRowId": "r1",
+      "previewRowIndex": 0,
+      "previewPlayerName": "Jordan Smith",
+      "planStatus": "ready-to-link",
+      "plannedOperation": "link-existing-record",
+      "projectionStatus": "projected-link",
+      "projectedOperation": "link-existing-record",
+      "targetExistingRecordId": "alta-GI-A1-jordan-smith",
+      "reasons": ["linked-to-existing-record"],
+      "blockers": []
+    },
+    {
+      "previewSourceRowId": "r2",
+      "previewRowIndex": 1,
+      "previewPlayerName": "Sam Lee",
+      "planStatus": "ready-to-create",
+      "plannedOperation": "create-new-roster-entry",
+      "projectionStatus": "projected-create",
+      "projectedOperation": "create-new-roster-entry",
+      "projectedNewRecord": {
+        "provisionalRecordId": "projected:2026:alta:GI:2026-alta-GI-A1:r2:1",
+        "seasonId": "2026",
+        "districtId": "alta",
+        "ageDivisionId": "GI",
+        "teamId": "2026-alta-GI-A1",
+        "playerName": "Sam Lee",
+        "sourceRowId": "r2",
+        "sourceRowIndex": 1,
+        "source": {
+          "logicVersion": "phase5-slice8-import-application-projection-v1",
+          "planStatus": "ready-to-create",
+          "provisional": true
+        }
+      },
+      "reasons": ["projected-new-roster-entry"],
+      "blockers": []
+    }
+  ],
+  "blockers": [],
+  "summary": { "totalRows": 2, "projectedLinkRows": 1, "projectedCreateRows": 1, "ok": true }
+}
+```
+
+### Projection status values
+
+```text
+projected-link
+projected-create
+projected-reject
+projected-defer
+blocked
+skipped
+```
+
+### Projected operation values
+
+```text
+link-existing-record
+create-new-roster-entry
+reject-import-row
+defer-review
+none
+```
+
+### Blocker codes
+
+```text
+plan-not-committable
+missing-existing-record
+duplicate-existing-record-id
+blocked-plan-row
+invalid-plan-row
+missing-target-context
+missing-preview-row-key
+missing-player-name-for-create
+```
+
+### Reason codes
+
+```text
+linked-to-existing-record
+projected-new-roster-entry
+reviewer-rejected
+reviewer-deferred
+blocked-by-plan
+skipped-non-committed-row
+```
+
+### Notes
+
+- **Projection only.** It never mutates the plan, plan rows, original applied
+  entries, or existing roster records; each projection row keeps its source plan row
+  by reference (`originalPlanRow`). `projected-link` / `projected-create` are future
+  operations, not writes.
+- **Committable plans only.** A non-committable plan yields `ok: false`, a
+  result-level `plan-not-committable` blocker, and no projected rows. A defensively
+  present `blocked-*` plan row is projected as `blocked` and forces `ok: false`.
+- **Projected links never modify the existing record** — they only reference its
+  `recordId` after resolving exactly one match (missing / duplicate ids block the
+  affected row).
+- **`ProjectedNewRosterRecord` is provisional and not persisted.** Its
+  `provisionalRecordId` is derived deterministically from the target context +
+  `previewSourceRowId` + `previewRowIndex`; no final/canonical id is generated.
+  Jersey number / grade are optional and intentionally omitted until a later parser /
+  import-map slice can enrich them.
+- **Rejected / deferred rows are preserved** (`projected-reject` / `projected-defer`
+  by default; `skipped` when `allowRejectedRows` / `allowDeferredRows` is false);
+  nothing is deleted.
+- **`summary.ok` is row-level** (no blocked rows, no row blockers); the result's
+  top-level `ok` is authoritative and additionally requires plan committability and
+  no result-level blockers.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
