@@ -1096,6 +1096,122 @@ skipped-non-committed-row
   top-level `ok` is authoritative and additionally requires plan committability and
   no result-level blockers.
 
+## Roster Import Text Parse
+
+The text / CSV-like parse result (Phase 5 slice 9), produced by
+`parseRosterImportText` (`src/engine/rosterImportTextParser.ts`) from pasted roster
+text plus a target context. It is **staging input only** — it converts text into
+slice 1 `RosterImportPreviewRowInput` rows; `createRosterImportPreviewFromText` then
+hands those rows to `createRosterImportPreview`. It does not parse files, upload, the
+browser File API, persist, mutate rosters, or apply imports.
+
+```json
+{
+  "ok": true,
+  "targetContext": {
+    "seasonId": "2026",
+    "districtId": "alta",
+    "ageDivisionId": "GI",
+    "teamId": "2026-alta-GI-A1"
+  },
+  "delimiter": ",",
+  "rows": [
+    {
+      "sourceRowId": "line-2",
+      "sourceLineNumber": 2,
+      "rawLine": "12,Cary Hudson,5",
+      "cells": ["12", "Cary Hudson", "5"],
+      "playerName": "Cary Hudson",
+      "jerseyNumber": "12",
+      "grade": "5",
+      "notes": null,
+      "issues": []
+    }
+  ],
+  "issues": [{ "code": "header-detected", "severity": "info", "message": "..." }],
+  "summary": {
+    "totalLines": 2,
+    "dataRows": 1,
+    "skippedEmptyLines": 0,
+    "headerDetected": true,
+    "withPlayerName": 1,
+    "missingPlayerName": 0,
+    "withJerseyNumber": 1,
+    "withGrade": 1,
+    "withNotes": 0,
+    "inconsistentColumnRows": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 1
+  }
+}
+```
+
+### Issue severity values
+
+```text
+info
+warning
+error
+```
+
+### Issue codes
+
+```text
+empty-input
+empty-line-skipped
+header-detected
+missing-player-name-column
+missing-player-name
+inconsistent-column-count
+unsupported-delimiter
+invalid-target-context
+quoted-csv-not-supported
+duplicate-source-row-id
+```
+
+### Supported delimiters
+
+```text
+,  (comma)
+\t (tab)
+|  (pipe)
+```
+
+### Header aliases (lowercased)
+
+```text
+playerName:   name, player, player name, athlete
+jerseyNumber: jersey, jersey #, number, no, #
+grade:        grade
+notes:        note, notes
+```
+
+### Notes
+
+- **Parse-to-preview only.** The parser converts text into slice 1 preview input
+  rows; it reuses (does not replace) `createRosterImportPreview`. Parser issues and
+  preview issues stay distinguishable (`createRosterImportPreviewFromText` returns
+  `{ parse, preview }`).
+- **Every non-empty source line is preserved** as a parse row in source order, even
+  when incomplete; a missing player name is flagged and flows into the preview's own
+  validation. Blank lines are skipped but counted in `summary.skippedEmptyLines`.
+- **`sourceRowId` is deterministic** (`line-<n>` from the 1-based source line number)
+  and `sourceLineNumber` is preserved; no random ids and no `Date.now()`.
+- **Unsupported delimiter / quoted CSV** are reported, never guessed: a quote
+  character flags `quoted-csv-not-supported` and the line is parsed literally; full
+  RFC CSV quoting, Excel files, and browser file upload are out of scope.
+- **Comma-in-name protection (auto mode).** A single comma between two non-numeric
+  text cells is preserved as the player name (not split), protecting the real-world
+  "Last, First" `player_name` shape (e.g. `Cary, Hudson`). A comma still splits when
+  the row is clearly tabular (recognized header, 3+ comma cells, or a 2-cell row where
+  either cell looks like a jersey number); an explicit `delimiter: ','` or a header
+  always forces comma columns.
+- **Target context** is validated independently and reported as
+  `invalid-target-context` before preview creation, then passed through exactly.
+  `parseRosterImportText`'s `ok` reflects structural success (no parser-level error);
+  per-row validity is owned by the preview. Inputs are never mutated.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

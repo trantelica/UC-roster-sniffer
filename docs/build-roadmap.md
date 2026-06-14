@@ -568,6 +568,34 @@ Slice status:
   `docs/derived-logic.md` ("Import application / projection (Phase 5 slice 8)").
   Actually applying the projection (the real import apply / commit), persistence,
   file parsing, and the review UI remain later work and require explicit approval.
+- **Slice 9 (done): CSV / text roster parsing into the import preview contract
+  (engine only).** A pure parser (`parseRosterImportText` /
+  `createRosterImportPreviewFromText`, `src/engine/rosterImportTextParser.ts`)
+  converts pasted roster text into slice 1 `RosterImportPreviewRowInput` rows and can
+  hand them to the existing `createRosterImportPreview`. It supports comma / tab /
+  pipe delimited rows, newline-separated plain names, an optional header
+  (`hasHeader: true | false | 'auto'`), auto delimiter detection (presence
+  precedence tab > pipe > comma), basic trimming, and blank-line handling; it
+  reports — never guesses — full RFC CSV quoting, escaped delimiters, Excel files,
+  browser upload, and fuzzy column inference. Header aliases are narrow (name /
+  player / athlete; jersey / number / no / #; grade; note / notes) with optional
+  `options.columns` overrides; no-header columns map positionally by the row's own
+  cell count (1 = name; 2 = jersey+name unless name+jersey; 3 = jersey+name+grade;
+  4+ adds notes). Every non-empty source line is preserved as a parse row in source
+  order (missing names flagged and flowed into the preview's own validation); blank
+  lines are skipped but counted; `sourceRowId` is deterministic (`line-<n>`) with no
+  random ids or `Date.now()`. Target context is validated independently
+  (`invalid-target-context`) before preview creation and passed through exactly;
+  parser issues and preview issues stay distinguishable (`{ parse, preview }`).
+  Helpers `summarizeRosterImportTextParseRows` round out the contract. It is
+  parser-to-preview only — no file upload, no browser File API, no UI, no
+  persistence, no roster mutation, no import apply/commit — and never mutates the
+  input text / target context / options. It reuses (does not replace) the slice 1
+  preview contract. See `docs/import-workflow.md` ("CSV / text roster parsing (Phase
+  5 slice 9)"), `docs/data-model.md` ("Roster Import Text Parse"), and
+  `docs/derived-logic.md` ("CSV / text roster parsing (Phase 5 slice 9)"). File
+  upload, persistence, UI, and import apply / commit remain later work and require
+  explicit approval.
 
 ## Phase 6: Schedule and result support
 

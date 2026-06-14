@@ -481,6 +481,95 @@ original applied entries, and the existing records are referenced, never mutated
 Actually applying the projection (the real import apply / commit), persistence, file
 parsing, and the review UI remain later work and require explicit approval.
 
+## CSV / text roster parsing (Phase 5 slice 9)
+
+The ninth Phase 5 slice adds a pure, deterministic **text / CSV-like parser** into
+the slice 1 import preview contract (`src/engine/rosterImportTextParser.ts`,
+`parseRosterImportText` and `createRosterImportPreviewFromText`). It converts pasted
+roster text (or simple delimited input) into slice 1 `RosterImportPreviewRowInput`
+rows and can hand them to the existing `createRosterImportPreview` helper. It answers:
+"can the system take pasted roster text and produce preserved import preview rows
+without touching roster data?"
+
+This is **parser-to-preview only**. It is NOT file upload, NOT the browser File API,
+NOT UI, NOT persistence, NOT roster mutation, and NOT import apply/commit. It does
+**not** decide whether a player is new / returning / linked / transferred / promoted /
+relegated / y-up / z-down — it only stages rows for the existing pipeline.
+
+Supported (kept simple and deterministic):
+
+- comma / tab / pipe delimited rows, and newline-separated plain names;
+- an optional header row (`hasHeader: true | false | 'auto'`);
+- auto delimiter detection (presence precedence: tab, then pipe, then comma; comma is
+  the harmless default when no delimiter is present);
+- basic trimming and blank-line handling.
+
+**Comma-in-name protection (auto mode).** In auto / omitted delimiter mode, a single
+comma between two **non-numeric text cells** is treated as part of the player name and
+is **not** split — this preserves the real-world "Last, First" `player_name` shape
+(e.g. `Cary, Hudson` -> `playerName: "Cary, Hudson"`). A comma still splits when the
+row is clearly tabular: a recognized header row, 3+ comma cells, or a 2-cell row where
+either cell looks like a jersey number (e.g. `12, Hudson Cary` or `Alice, 12`). To
+force comma columns regardless of shape, pass an explicit `delimiter: ','` (or use a
+recognized header). Tabs and pipes are unambiguous and always split.
+
+**Not** supported (reported, never guessed): full RFC CSV quoting, escaped delimiters
+inside names, multi-line quoted fields, Excel files, browser file upload, and fuzzy
+column inference beyond the narrow documented header aliases below.
+
+Header aliases (lowercased, narrow, no broad fuzzy matching):
+
+| Field | Recognized labels |
+| --- | --- |
+| playerName | name, player, player name, athlete |
+| jerseyNumber | jersey, jersey #, number, no, # |
+| grade | grade |
+| notes | note, notes |
+
+`options.columns` lets a caller map explicit header labels (e.g.
+`{ playerName: 'athlete_name' }`); explicit column labels are matched before the
+default aliases. With `hasHeader: 'auto'` (or omitted), a header is detected only when
+the first non-empty line contains a recognized label.
+
+Column behavior with a header maps recognized columns by index. Without a header,
+columns are positional **per row's own cell count**:
+
+- 1 column -> `playerName`;
+- 2 columns -> `jerseyNumber` + `playerName`, unless the first value looks like a name
+  and the second like a jersey number, then `playerName` + `jerseyNumber`;
+- 3 columns -> `jerseyNumber` + `playerName` + `grade`;
+- 4+ columns -> `jerseyNumber` + `playerName` + `grade` + `notes` (remaining cells
+  joined by a space).
+
+Preservation and reporting:
+
+- **Every non-empty source line becomes one parse row in source order**, even when it
+  is incomplete or malformed. A row with no resolvable player name is preserved and
+  flagged `missing-player-name`; it then flows into the slice 1 preview's own
+  validation (which marks it `invalid`).
+- **Blank lines are skipped but counted** in `summary.skippedEmptyLines`.
+- **`sourceRowId` is deterministic** (`line-<n>`, from the 1-based source line number)
+  and `sourceLineNumber` is preserved — no random ids, no `Date.now()`.
+- Parser issue codes: `empty-input`, `empty-line-skipped`, `header-detected`,
+  `missing-player-name-column`, `missing-player-name`, `inconsistent-column-count`,
+  `unsupported-delimiter`, `invalid-target-context`, `quoted-csv-not-supported`,
+  `duplicate-source-row-id`. A line containing a quote is flagged
+  `quoted-csv-not-supported` and parsed literally.
+- The target context is validated independently and reported as
+  `invalid-target-context` **before** preview creation; it is then passed through to
+  the preview exactly. **Parser issues and preview issues stay distinguishable** —
+  `createRosterImportPreviewFromText` returns both `{ parse, preview }` and does not
+  duplicate slice 1 validation.
+
+`parseRosterImportText` returns `{ ok, targetContext, delimiter, rows, issues,
+summary }`; its `ok` reflects structural success (no parser-level error issue), while
+per-row validity is owned by the preview. `summarizeRosterImportTextParseRows`
+tallies row-derived counts (context fields are supplied by the parser).
+`createRosterImportPreviewFromText` returns a null `preview` only for empty input.
+The hard roster authority rule still holds: the input text, target context, and
+options are referenced, never mutated. File upload, persistence, UI, and import
+apply / commit remain later work and require explicit approval.
+
 ## Roster import stages
 
 ### 1. Parse source data
