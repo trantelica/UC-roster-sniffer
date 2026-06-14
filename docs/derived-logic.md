@@ -1726,6 +1726,46 @@ across repeated calls; no roster records are created or mutated and no apply/wri
 function exists. UI, persistence, file upload, import apply/commit, coach analytics,
 and fuzzy matching remain later work and require explicit approval.
 
+### Scraped JSON full-file readiness report (Phase 5 slice 12)
+
+Phase 5 slice 12 adds a pure, deterministic **full-file readiness report**
+(`createUteConferenceScrapedJsonReadinessReport`,
+`src/engine/uteConferenceScrapedJsonReadinessReport.ts`) that classifies every team
+target in one scraped Ute Conference payload. It is a reporting/orchestration helper
+that **composes** the slice 10 source adapter and slice 11 canonical mapping —
+replacing/duplicating none of their logic — and is not UI, persistence, browser
+storage, file upload, roster mutation, import apply/commit, movement derivation, coach
+analytics, or fuzzy matching.
+
+- **Per-target `readinessStatus`:** `ready` (valid preview, no warnings),
+  `ready-with-warnings` (provisional district / age, unknown or color classification,
+  non-strict count mismatch), `needs-review` (player review-rows; missing coach name /
+  title; count mismatch under `strictCounts`), `blocked` (unresolved target, invalid
+  rows such as a missing player name, or underivable context), `empty` (zero rows — a
+  valid state). Empty teams are `empty`, never `blocked`.
+- **Player readiness** uses the slice 11 canonical preview helper (comma names
+  preserved; missing player name -> invalid preview row -> `blocked`); **coach
+  readiness** uses the slice 10 coach helper and never de-duplicates coaches (missing
+  title/name -> `needs-review`).
+- **Source-level:** unsupported `record_type` / invalid payload -> `ok: false` with
+  the source issue surfaced and no targets; empty league/team snapshots -> `ok: true`;
+  count mismatches are warnings unless `strictCounts` elevates them (rows still
+  preserved); year is never inferred from a filename.
+- **Reasons & confidence** are derived from the post-override mapping result, so a
+  caller override (per `sourceTargetId`) can move a provisional target up to `ready`.
+  `contextConfidence` / `targetContextProvisional` mirror the slice 11 mapping.
+- **Summary** counts targets by status, total/player/coach rows, and issues by
+  severity/code, plus `canProceedToTeamSelection` (source valid + at least one
+  ready/ready-with-warnings/needs-review) and `canProceedWithoutReview` (at least one
+  ready and no blocked/needs-review). Filter helpers return import-ready / needs-review
+  / blocked / empty targets.
+
+Roster authority holds: the payload is referenced, never mutated; rows, names, titles,
+source URLs, and order are preserved; output is identical across repeated calls; no
+roster records are created or mutated and no apply/write function exists. UI,
+persistence, file upload, import apply/commit, coach analytics, and fuzzy matching
+remain later work and require explicit approval.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

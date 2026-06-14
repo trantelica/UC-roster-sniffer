@@ -722,6 +722,59 @@ preserved exactly). `contextConfidence` is the weakest of the contributing mappi
 (`high` / `provisional` / `unknown`). The payload is never mutated; no roster records
 are written and no apply/persist function exists.
 
+## Scraped JSON full-file readiness report (Phase 5 slice 12)
+
+The twelfth Phase 5 slice adds a pure, deterministic **full-file readiness report**
+over one scraped Ute Conference JSON payload
+(`src/engine/uteConferenceScrapedJsonReadinessReport.ts`,
+`createUteConferenceScrapedJsonReadinessReport`). It answers: "given one scraped
+players or coaches JSON payload, what teams/rows are import-ready, empty, blocked,
+provisional, or need review?" It is a **reporting / orchestration helper** that
+composes the slice 10 source adapter and slice 11 canonical mapping — it replaces and
+duplicates none of their logic — and is NOT UI, persistence, browser storage, file
+upload, roster mutation, import apply/commit, movement derivation, coach analytics, or
+fuzzy matching.
+
+Each team target (in source order) is classified into a `readinessStatus`:
+
+| Status | Meaning |
+| --- | --- |
+| `ready` | valid preview, no warning/review reasons |
+| `ready-with-warnings` | valid preview with provisional/warning reasons (e.g. provisional district, unknown classification, non-strict count mismatch) |
+| `needs-review` | rows preserved but review needed (player review-rows, missing coach name/title, or a count mismatch under `strictCounts`) |
+| `blocked` | unresolved target, invalid rows (e.g. missing player name), or underivable context |
+| `empty` | zero rows (a valid source state, not corruption) |
+
+Each readiness target carries the source labels, the canonical ids
+(`canonicalAgeDivisionId` / `canonicalDistrictId` / `teamClassification` /
+`classificationHierarchyCode`), `rowCount`, `readinessReasons`, origin-tagged
+`issues`, the full `canonicalContextMapping`, `contextConfidence` /
+`targetContextProvisional`, and a `previewSummary` (players) or `coachPreviewSummary`
+(coaches). Player readiness uses the slice 11 canonical preview helper (so comma names
+are preserved and a high-confidence single candidate is never auto-anything); coach
+readiness uses the slice 10 coach helper and never de-duplicates coaches.
+
+Source-level behavior: an unsupported `record_type` (or invalid payload) yields
+`ok: false` with the source issue surfaced and no targets; a valid empty-league /
+empty-team snapshot is `ok: true`; count mismatches are warnings unless
+`strictCounts: true` (which elevates them to `needs-review` while preserving rows);
+the year is never inferred from a filename. Options:
+`targetContextOverridesBySourceTargetId` (apply slice 11 caller overrides per target),
+`districtRegistry`, `includeEmptyTeams` (default true), `includePreviewResults`
+(default true), and `strictCounts` (default false).
+
+The summary tallies targets by status, total/player/coach rows, and issue counts by
+severity and code, plus two gates: `canProceedToTeamSelection` (source valid and at
+least one ready / ready-with-warnings / needs-review target) and
+`canProceedWithoutReview` (at least one ready target and no blocked/needs-review
+targets). Helpers `summarizeUteConferenceScrapedJsonReadinessReport`,
+`getUteScrapedJsonImportReadyTargets`, `getUteScrapedJsonTargetsNeedingReview`,
+`getUteScrapedJsonBlockedTargets`, and `getUteScrapedJsonEmptyTargets` round out the
+contract. The payload is never mutated; rows, names, titles, source URLs, and order
+are preserved; no roster records are written and no apply/persist function exists. A
+future review/import UI may consume this report; that remains later work requiring
+explicit approval.
+
 ## Roster import stages
 
 ### 1. Parse source data

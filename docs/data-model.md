@@ -1387,6 +1387,111 @@ caller-override-used
   feeds the derived context into the slice 10 player adapter and returns the mapping +
   preview input + preview result; player names are preserved exactly.
 
+## Ute Scraped JSON Readiness Report
+
+The full-file readiness report (Phase 5 slice 12) is a **derived reporting result**,
+produced by `createUteConferenceScrapedJsonReadinessReport`
+(`src/engine/uteConferenceScrapedJsonReadinessReport.ts`) over one scraped Ute
+Conference payload. It composes the slice 10 adapter and slice 11 mapping to classify
+every team target. It is not a persisted record and never mutates the source.
+
+```json
+{
+  "ok": true,
+  "recordType": "players",
+  "sourceSummary": { "recordType": "players", "ok": true, "totalTeams": 4, "totalRows": 5 },
+  "issues": [],
+  "targets": [
+    {
+      "sourceTargetId": "scraped:2025:gridiron-league-12:0:0",
+      "recordType": "players",
+      "year": "2025",
+      "event": "Fall",
+      "ageDivisionLabel": "GridIron League 12",
+      "ageDivisionAlias": "GI",
+      "canonicalAgeDivisionId": "GI",
+      "districtName": "Alta",
+      "canonicalDistrictId": "alta",
+      "teamName": "GridIron A3",
+      "teamClassification": "A3",
+      "classificationHierarchyCode": "A",
+      "teamSourceUrl": "https://ute.example/alta/a3",
+      "rowCount": 2,
+      "readinessStatus": "ready-with-warnings",
+      "readinessReasons": ["valid-player-preview", "provisional-district"],
+      "issues": [{ "code": "district-mapping-provisional", "severity": "info", "origin": "mapping", "message": "..." }],
+      "contextConfidence": "provisional",
+      "targetContextProvisional": true,
+      "previewSummary": { "totalRows": 2, "readyRows": 2, "invalidRows": 0 },
+      "coachPreviewSummary": null
+    }
+  ],
+  "summary": {
+    "recordType": "players",
+    "totalTargets": 4,
+    "readyTargets": 0,
+    "readyWithWarningsTargets": 2,
+    "needsReviewTargets": 0,
+    "blockedTargets": 1,
+    "emptyTargets": 1,
+    "totalRows": 5,
+    "playerRows": 5,
+    "coachRows": 0,
+    "canProceedToTeamSelection": true,
+    "canProceedWithoutReview": false
+  }
+}
+```
+
+### Readiness status values
+
+```text
+ready
+ready-with-warnings
+needs-review
+blocked
+empty
+```
+
+### Readiness reason codes
+
+```text
+valid-player-preview
+valid-coach-preview
+empty-team
+empty-league
+provisional-district
+provisional-age-division
+unknown-team-classification
+color-team-classification-unknown
+missing-player-name
+missing-coach-name
+missing-coach-title
+invalid-target-context
+target-not-found
+count-mismatch
+unsupported-record-type
+invalid-payload
+```
+
+### Notes
+
+- **Composition only.** The report composes the slice 10 adapter and slice 11 mapping;
+  it replaces/duplicates neither and writes nothing.
+- **Empty is valid.** Empty teams are `empty` (not `blocked`); empty-league /
+  empty-team snapshots leave `ok: true`.
+- **Rows preserved.** Missing names/titles and count mismatches preserve rows;
+  `strictCounts: true` elevates a count mismatch to `needs-review` without dropping
+  rows. Coaches are never de-duplicated.
+- **Per-target issues** are origin-tagged (`source` / `mapping` / `preview` / `coach`)
+  with the underlying adapter/mapping code; the summary tallies them by severity and
+  code.
+- **Gates.** `canProceedToTeamSelection` requires a valid source and at least one
+  ready / ready-with-warnings / needs-review target; `canProceedWithoutReview`
+  additionally requires at least one ready target and no blocked/needs-review targets.
+- **Caller overrides** (per `sourceTargetId`) flow through to the slice 11 mapping and
+  can raise a provisional target to `ready`. The payload is never mutated.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
