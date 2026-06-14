@@ -718,6 +718,39 @@ no-effect
 - This slice defines the **action + decision contract only** — no repository, no
   apply, no persistence, and no UI.
 
+## Roster Import Identity Review Decision Repository
+
+The local repository / storage-boundary payload for import identity review
+decisions (Phase 5 slice 4). It is a plain, JSON-compatible envelope around an
+append-only, ordered list of `Roster Import Identity Review Decision` records,
+mirroring the `Cohort Review Decision Repository`.
+
+```json
+{
+  "version": "roster-import-identity-review-decisions.v1",
+  "decisions": [
+    { "decisionId": "import-2026-001-r1", "action": "accept-candidate" }
+  ]
+}
+```
+
+### Notes
+
+- `version` is an explicit schema tag (`roster-import-identity-review-decisions.v1`).
+  Import rejects any unsupported version.
+- `decisions` preserves append order. The repository is **append-only**: superseded
+  decisions stay in the list (excluded only from the active view via
+  `audit.supersedesDecisionId`); decisions are never overwritten or deleted.
+- Append/import validate every decision and reject invalid (`invalid-decision`) and
+  duplicate (`duplicate-decision-id`) records; import additionally guards the
+  envelope (`invalid-repository-payload`, `unsupported-repository-version`,
+  `missing-decision-list`) and performs a partial import (`ok` is false if anything
+  was rejected).
+- This is an **in-memory repository model and export/import contract only** — there
+  is no browser-storage (localStorage / IndexedDB / file) write yet, and no UI.
+  Repository operations never mutate roster records, preview rows, existing records,
+  or the decision objects.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

@@ -419,6 +419,33 @@ Slice status:
   the slice 1/2 contracts and adds **no** repository, apply, persistence, or UI.
   Applying decisions, a decision repository, and the review UI remain later Phase 5
   work.
+- **Slice 4 (done): import identity review decision repository (engine only,
+  storage boundary).** A small pure module
+  (`rosterImportIdentityReviewDecisionRepository`) models the local data boundary
+  for slice 3 decisions, mirroring the Phase 4 slice 9 cohort repository:
+  `createEmptyRosterImportIdentityReviewDecisionRepositoryState`,
+  `appendRosterImportIdentityReviewDecision(s)`,
+  `getRosterImportIdentityReviewDecisions`,
+  `getActiveRosterImportIdentityReviewDecisions`, and JSON-compatible
+  `exportRosterImportIdentityReviewDecisionRepository` /
+  `importRosterImportIdentityReviewDecisionRepository`. State is
+  `{ version: 'roster-import-identity-review-decisions.v1', decisions }`; it is
+  append-only, validates each decision via
+  `validateRosterImportIdentityReviewDecision`, rejects invalid and
+  duplicate-decisionId records (in-batch duplicates included, batch order
+  preserved), keeps superseded decisions in history while excluding them from the
+  active view (via `audit.supersedesDecisionId`), and imports partially after
+  validating the envelope (`invalid-repository-payload` /
+  `unsupported-repository-version` / `missing-decision-list`), with `ok` false if
+  anything was rejected. Every operation returns a new state and never mutates
+  inputs or roster/preview data. See `docs/import-workflow.md` ("Roster import
+  identity review decision repository (Phase 5 slice 4)"), `docs/data-model.md`
+  ("Roster Import Identity Review Decision Repository"), and `docs/derived-logic.md`
+  ("Import identity review decision repository (Phase 5 slice 4)"). It reuses (does
+  not replace) the slice 3 decision contract and adds **no** browser-storage write
+  (localStorage / IndexedDB / file), no apply, and no UI. Wiring to actual local
+  storage, applying decisions to imports, and the review UI remain later Phase 5
+  work.
 
 ## Phase 6: Schedule and result support
 

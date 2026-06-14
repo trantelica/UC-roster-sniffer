@@ -1288,6 +1288,35 @@ target; `summarizeRosterImportIdentityReviewDecisions` counts by action, effect,
 supersession, note, and validity. Applying decisions to an import, a decision
 repository, and the review UI remain later Phase 5 work.
 
+### Import identity review decision repository (Phase 5 slice 4)
+
+Phase 5 slice 4 adds the narrow repository / storage-boundary layer for the slice 3
+decisions (`src/engine/rosterImportIdentityReviewDecisionRepository.ts`), mirroring
+the Phase 4 slice 9 cohort decision repository. The state shape is
+`{ version, decisions }` and every operation is pure: it returns a new state and
+never mutates the prior state, the decision objects, or any roster / preview /
+existing-record data. There is no `Date.now()`, no generated ids, and no real
+persistence (no localStorage / IndexedDB / file write).
+
+- **Append-only.** `appendRosterImportIdentityReviewDecision(s)` validate each
+  decision via `validateRosterImportIdentityReviewDecision` and reject invalid
+  (`invalid-decision`) and duplicate-`decisionId` (`duplicate-decision-id`)
+  records. Duplicates are caught against existing state and earlier batch entries;
+  batch order is preserved.
+- **Active vs history.** `getRosterImportIdentityReviewDecisions` returns the full
+  append-ordered history; `getActiveRosterImportIdentityReviewDecisions` excludes
+  decisions superseded via another decision's `audit.supersedesDecisionId`.
+  Superseded decisions are never removed from history.
+- **Export / import.** `exportRosterImportIdentityReviewDecisionRepository` returns a
+  JSON-compatible `{ version, decisions }` payload;
+  `importRosterImportIdentityReviewDecisionRepository` validates the envelope
+  (`invalid-repository-payload` / `unsupported-repository-version` /
+  `missing-decision-list`) then each decision, performing a partial import (`ok` is
+  false if anything was rejected) without mutating the payload.
+
+Wiring this repository to actual local storage, applying decisions to an import, and
+the review UI remain later Phase 5 work.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
