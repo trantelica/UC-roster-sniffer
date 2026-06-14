@@ -682,24 +682,54 @@ Import commit happens only after collision review.
   Import Text Parse"), `docs/derived-logic.md` ("CSV / text roster parsing (Phase 5
   slice 9)"), and `docs/build-roadmap.md`. File upload, persistence, UI, and import
   apply / commit remain later work and require explicit approval.
+- **Slice 10 (done): Ute Conference scraped JSON source adapter (engine only).**
+  `src/engine/uteConferenceScrapedJsonAdapter.ts` reads harvested Ute Conference
+  website-scrape JSON and exposes importable team targets and source rows.
+  `detectUteConferenceScrapedJsonRecordType` returns `players` / `coaches` /
+  `unknown`; `summarizeUteConferenceScrapedJson` reports metadata + district / team /
+  row counts and issues; `listUteConferenceScrapedJsonTeamTargets` lists targets in
+  source order with a deterministic `sourceTargetId`;
+  `createPlayerRosterImportPreviewInputFromScrapedJson(payload, target)` builds a
+  slice 1 `RosterImportPreviewInput` (composed through `createRosterImportPreview`)
+  for a selected player team; and
+  `createCoachImportPreviewInputFromScrapedJson(payload, target)` builds a separate
+  coach preview shape. Player names, coach names, coach titles, and source URLs are
+  preserved exactly (commas, extra spaces, non-breaking spaces intact); coaches are
+  never de-duplicated; player and coach rows stay separate. Source ids are
+  deterministic (no random ids, no `Date.now()`); target context is caller-supplied
+  or derived as provisional slug ids (`targetContextProvisional`). Empty league
+  snapshots are valid (`empty-league`, `ok: true`); missing names/titles preserve the
+  row with a `missing-*` issue; count mismatches are non-destructive `count-mismatch`
+  warnings; `target-not-found` / `invalid-target` are reported for bad selectors. It
+  is a source adapter only — no UI, no persistence, no browser storage, no file
+  upload, no roster mutation, no import apply/commit, no coach analytics, no movement
+  derivation — and never mutates the payload. It reuses (does not replace) the slice 1
+  preview contract or the slice 9 parser. See `docs/import-workflow.md` ("Ute
+  Conference scraped JSON source adapter (Phase 5 slice 10)"), `docs/data-model.md`
+  ("Ute Conference Scraped JSON Source"), `docs/derived-logic.md` ("Ute Conference
+  scraped JSON source adapter (Phase 5 slice 10)"), and `docs/build-roadmap.md`. UI,
+  persistence, file upload, import apply/commit, and coach analytics remain later work
+  and require explicit approval.
 
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
 checkpointed**, slice 7 documents and confirms the contracts, slice 8 adds a pure
-in-memory import application / projection from a committable plan, and slice 9 adds a
-pure text / CSV-like parser into the slice 1 preview contract. The acceptance
-criteria above are met by the engine pipeline: low-confidence collisions are never
-silently committed (unresolved identities and high-confidence single candidates
-block — never auto-link), user decisions are captured as append-only records, and
-the dry-run commit plan gates commit availability behind collision review
-(`canCommit`); slice 8 projects what a committable plan would link / add without
-applying it, and slice 9 stages pasted text into preserved preview rows. Phase 5 so
-far is engine-only with no file upload, no browser File API, no persistence, no UI,
+in-memory import application / projection from a committable plan, slice 9 adds a pure
+text / CSV-like parser into the slice 1 preview contract, and slice 10 adds a source
+adapter for harvested Ute Conference scraped JSON (players and coaches). The
+acceptance criteria above are met by the engine pipeline: low-confidence collisions
+are never silently committed (unresolved identities and high-confidence single
+candidates block — never auto-link), user decisions are captured as append-only
+records, and the dry-run commit plan gates commit availability behind collision
+review (`canCommit`); slice 8 projects what a committable plan would link / add
+without applying it, slice 9 stages pasted text into preserved preview rows, and
+slice 10 adapts harvested Ute Conference JSON into those same preview inputs. Phase 5
+so far is engine-only with no file upload, no browser File API, no persistence, no UI,
 and no import apply/commit. The next narrow work is **optional and requires explicit
 approval**: the actual import apply / commit that performs a projection's planned
-links / additions, plus real browser persistence, file upload / Excel parsing, and
-the review UI — each a separate later slice.
+links / additions, plus real browser persistence, file upload / Excel parsing, coach
+analytics, and the review UI — each a separate later slice.
 
 ## Phase 6: Schedule and results
 

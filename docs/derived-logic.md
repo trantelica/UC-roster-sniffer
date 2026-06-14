@@ -1639,6 +1639,47 @@ Roster authority holds: the input text, target context, and options are referenc
 never mutated; output is identical across repeated calls. File upload, persistence,
 UI, and import apply / commit remain later work and require explicit approval.
 
+### Ute Conference scraped JSON source adapter (Phase 5 slice 10)
+
+Phase 5 slice 10 adds a pure, deterministic **source adapter** for harvested Ute
+Conference website-scrape JSON (`src/engine/uteConferenceScrapedJsonAdapter.ts`). It
+inspects the scraped shape and converts a selected team into import-ready preview
+inputs: player teams into the existing slice 1 `RosterImportPreviewInput` (composed
+through `createRosterImportPreview`), and coach teams into a separate coach preview
+shape. It is a **source adapter only**: no UI, no persistence, no browser storage, no
+file upload, no roster mutation, no import apply/commit, no coach analytics, and no
+movement derivation. It composes with — and never replaces — the slice 1 preview
+contract or the slice 9 parser.
+
+- **Record types.** `detectUteConferenceScrapedJsonRecordType` reads
+  `metadata.record_type` -> `players` / `coaches` / `unknown`.
+- **Targets.** `listUteConferenceScrapedJsonTeamTargets` lists one target per team in
+  source order with a deterministic `sourceTargetId`
+  (`scraped:<year>:<ageSlug>:<districtIndex>:<teamIndex>`); empty districts/teams are
+  preserved. `summarizeUteConferenceScrapedJson` reports metadata + district / team /
+  row counts and issues.
+- **Player rows** get `…:player:<i>`; **coach rows** get `…:coach:<i>` — deterministic,
+  no random ids, no `Date.now()`.
+- **Exact preservation.** Player names, coach names, coach titles, and source URLs are
+  preserved EXACTLY (`Last, First` commas, extra spaces, non-breaking spaces intact);
+  nothing is split, reordered, normalized, or rewritten. Coaches are never
+  de-duplicated; player and coach rows stay separate (coach data is not wired into the
+  player roster import preview).
+- **Provisional ids.** When a caller does not supply explicit target-context ids, the
+  adapter derives PROVISIONAL ids via a deterministic slug helper (e.g.
+  `2025-alta-gi-gridiron-a3`), flagged with `targetContextProvisional`; these are not
+  canonical roster ids and any field may be overridden.
+- **Incomplete data preserved.** Missing player/coach names and coach titles keep the
+  row and attach a `missing-*` issue (a missing player name flows into the preview's
+  own invalid-row validation).
+- **Empty league snapshots are valid** (`ok: true` + informational `empty-league`).
+- **Count mismatches** are non-destructive `count-mismatch` warnings; rows preserved.
+
+Roster authority holds: the payload is referenced, never mutated; output is identical
+across repeated calls; no roster records are created or mutated and no apply/write
+function exists. UI, persistence, file upload, import apply/commit, and coach
+analytics remain later work and require explicit approval.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

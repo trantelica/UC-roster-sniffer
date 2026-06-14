@@ -596,6 +596,33 @@ Slice status:
   `docs/derived-logic.md` ("CSV / text roster parsing (Phase 5 slice 9)"). File
   upload, persistence, UI, and import apply / commit remain later work and require
   explicit approval.
+- **Slice 10 (done): Ute Conference scraped JSON source adapter (engine only).** A
+  pure adapter (`src/engine/uteConferenceScrapedJsonAdapter.ts`) reads harvested Ute
+  Conference website-scrape JSON (`metadata` + `districts[] -> teams[] ->
+  players[]/coaches[]`), detects the record type
+  (`detectUteConferenceScrapedJsonRecordType`), summarizes it
+  (`summarizeUteConferenceScrapedJson`), lists importable team targets in source order
+  (`listUteConferenceScrapedJsonTeamTargets`, deterministic `sourceTargetId`), and
+  converts a selected team into import-ready preview inputs:
+  `createPlayerRosterImportPreviewInputFromScrapedJson` produces a slice 1
+  `RosterImportPreviewInput` (composed through `createRosterImportPreview`), and
+  `createCoachImportPreviewInputFromScrapedJson` produces a separate coach preview
+  shape. Player names, coach names, coach titles, and source URLs are preserved
+  exactly (`Last, First` commas, extra spaces, non-breaking spaces intact); coaches
+  are never de-duplicated; player and coach rows stay separate. Source row ids are
+  deterministic (`scraped:<year>:<ageSlug>:<districtIndex>:<teamIndex>:player|coach:<i>`);
+  target context is caller-supplied or derived as provisional slug ids
+  (`targetContextProvisional`). Empty league snapshots are valid source data; missing
+  names/titles preserve the row with a `missing-*` issue; count mismatches are
+  non-destructive `count-mismatch` warnings. It is a source adapter only — no UI, no
+  persistence, no browser storage, no file upload, no roster mutation, no import
+  apply/commit, no coach analytics, no movement derivation — and never mutates the
+  payload. It reuses (does not replace) the slice 1 preview contract or the slice 9
+  parser. See `docs/import-workflow.md` ("Ute Conference scraped JSON source adapter
+  (Phase 5 slice 10)"), `docs/data-model.md` ("Ute Conference Scraped JSON Source"),
+  and `docs/derived-logic.md` ("Ute Conference scraped JSON source adapter (Phase 5
+  slice 10)"). UI, persistence, file upload, import apply/commit, and coach analytics
+  remain later work and require explicit approval.
 
 ## Phase 6: Schedule and result support
 
