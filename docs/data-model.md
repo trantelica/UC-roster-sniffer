@@ -1301,6 +1301,92 @@ target-not-found
   `count-mismatch` warnings; rows are preserved. Missing names/titles preserve the row
   with a `missing-*` issue.
 
+## Ute Scraped Canonical Context Mapping
+
+The canonical context mapping (Phase 5 slice 11) is a **derived mapping result**,
+produced by `src/engine/uteConferenceScrapedCanonicalMapping.ts` from a scraped
+payload + team target. It converts scraped source labels into canonical (or
+provisional) import context values. It is not a persisted record and never mutates the
+source; raw values are preserved on every mapping result.
+
+```json
+{
+  "ok": true,
+  "season": { "rawValue": "2025", "canonicalValue": "2025", "seasonLabel": "Fall", "confidence": "high", "source": "metadata-year" },
+  "ageDivision": { "rawValue": "GridIron League 12", "canonicalValue": "GI", "confidence": "high", "source": "metadata-age-division" },
+  "district": { "rawValue": "Alta", "canonicalValue": "alta", "confidence": "provisional", "source": "district-name" },
+  "teamClassification": { "rawValue": "GridIron A3", "canonicalValue": "A3", "hierarchyCode": "A", "confidence": "high", "source": "team-name" },
+  "canonicalContext": {
+    "seasonId": "2025",
+    "districtId": "alta",
+    "ageDivisionId": "GI",
+    "teamId": "2025-alta-gi-a3",
+    "teamClassification": "A3"
+  },
+  "contextConfidence": "provisional",
+  "issues": []
+}
+```
+
+### Canonical age divisions
+
+```text
+SC  GR  PW  MM  GI  BA
+```
+
+### Mapping confidence values
+
+```text
+high          (direct, explicit source mapping or caller override)
+provisional   (inferred prefix / slug-derived id, or a label/alias conflict)
+unknown       (no safe mapping)
+```
+
+### Mapping source values
+
+```text
+metadata-age-division
+metadata-age-division-alias
+district-name
+team-name
+metadata-year
+caller-override
+```
+
+### Mapping issue codes
+
+```text
+missing-age-division
+unsupported-age-division
+conflicting-age-division-labels
+missing-team-name
+unsupported-team-classification
+color-team-classification-unknown
+missing-district
+district-mapping-provisional
+missing-season-year
+invalid-season-year
+target-not-found
+invalid-target
+caller-override-used
+```
+
+### Notes
+
+- **Deterministic mapping only.** Known scraped age-division labels map to canonical
+  ids; team classifications are extracted only from explicit coded team-name tokens
+  (validated via `parseTeamClassification`). No broad fuzzy matching and no invented
+  color-to-classification mapping — color team names stay `unknown` / review-needed.
+- **Raw preserved.** District/team/source values are preserved exactly; districts are
+  never collapsed (`Bingham` vs `Bingham Girls`).
+- **Provisional ids.** Without a canonical district registry, district/team ids are
+  provisional slugs; `contextConfidence` reflects the weakest contributing mapping.
+- **Caller overrides** replace derived canonical values, are recorded as
+  `caller-override` with a `caller-override-used` issue, and never rewrite raw source.
+- **Composition.** `createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext`
+  feeds the derived context into the slice 10 player adapter and returns the mapping +
+  preview input + preview result; player names are preserved exactly.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

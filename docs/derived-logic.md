@@ -1680,6 +1680,52 @@ across repeated calls; no roster records are created or mutated and no apply/wri
 function exists. UI, persistence, file upload, import apply/commit, and coach
 analytics remain later work and require explicit approval.
 
+### Canonical source mapping for scraped JSON (Phase 5 slice 11)
+
+Phase 5 slice 11 maps scraped Ute Conference **source labels** into canonical import
+context values (`src/engine/uteConferenceScrapedCanonicalMapping.ts`). It derives a
+canonical (or clearly provisional) season, age division, district, and team
+classification for a selected team. It is a **mapping adapter only**: no UI,
+persistence, browser storage, file upload, roster mutation, import apply/commit,
+movement derivation, coach analytics, or fuzzy identity matching. It reuses the
+existing age-division and team-classification helpers and composes with the slice 10
+adapter and slice 1 preview — replacing nothing. Mappings are deterministic: **no
+broad fuzzy matching** and **no invented color-to-classification mapping**.
+
+- **Canonical age divisions** stay `SC` / `GR` / `PW` / `MM` / `GI` / `BA`. Known
+  labels map deterministically (`SC League 7-8`/`Scout(s)` -> SC, `GR League 9`/
+  `Gremlin(s)` -> GR, `PW League 10`/`PeeWee(s)` -> PW, plus `MityMite` -> MM,
+  `GridIron` -> GI, `Bantam` -> BA). Precedence: metadata label, then alias, then a
+  team-name prefix fallback (`provisional`). Conflicting label/alias ->
+  `conflicting-age-division-labels` (resolved to the label, `provisional`); unmapped
+  -> `unsupported-age-division`; absent -> `missing-age-division`.
+- **Team classification** is extracted only from an explicit, validated coded trailing
+  token (e.g. `Gremlin A2` -> `A2`, `PeeWee B4` -> `B4`), validated through
+  `parseTeamClassification` (which also yields the hierarchy tier). Out-of-range codes
+  -> `unsupported-team-classification`; color names (`Scout White`/`Black`/`Gray`/
+  `Silver`) -> `color-team-classification-unknown` (review-needed), never an invented
+  class.
+- **District** names are preserved exactly; a caller `districtRegistry` gives a `high`
+  id, else a `provisional` slug (`district-mapping-provisional`). Districts are never
+  fuzzy-matched or collapsed (`Bingham` vs `Bingham Girls` stay distinct).
+- **Season** id comes from `metadata.year` (finite integer / 4-digit string) with
+  `metadata.event` as label; missing/invalid -> `missing-season-year` /
+  `invalid-season-year`; never inferred from a filename.
+- **Caller overrides** (`seasonId` / `districtId` / `ageDivisionId` / `teamId` /
+  `teamClassification`) replace derived values, are recorded as `caller-override` with
+  an info `caller-override-used` issue, and preserve the raw source.
+- **`contextConfidence`** is the weakest of the contributing mappings (`high` /
+  `provisional` / `unknown`); `target-not-found` / `invalid-target` are reported for
+  bad selectors. The player integration
+  (`createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext`) feeds
+  the derived context into the slice 10 player adapter and returns the canonical
+  mapping plus the preview input/result, preserving player names exactly.
+
+Roster authority holds: the payload is referenced, never mutated; output is identical
+across repeated calls; no roster records are created or mutated and no apply/write
+function exists. UI, persistence, file upload, import apply/commit, coach analytics,
+and fuzzy matching remain later work and require explicit approval.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
