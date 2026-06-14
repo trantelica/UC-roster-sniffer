@@ -1524,3 +1524,41 @@ real source shapes via contract tests
 - They prove raw names/titles/source URLs/order are preserved, coded classifications
   map while color teams stay unresolved, empty snapshots are valid, and the pipeline
   never mutates the payload.
+
+### Scraped JSON import session state (Phase 5 slice 14)
+
+An in-memory **import session state model** for one scraped JSON source file lives in
+`src/engine/uteConferenceScrapedJsonImportSession.ts`. It is engine-only, pure, and
+deterministic, and is intended for future UI consumption. It is **not** persisted,
+stored in the browser, or written anywhere — it is an in-process value built from a
+loaded payload.
+
+The `UteScrapedJsonImportSession` shape composes existing slice 10/11/12 outputs:
+
+- `status` — one of `uninitialized`, `source-loaded`, `target-selected`,
+  `target-blocked`, `ready-for-review`, `ready-for-preview`, `invalid-source`.
+- `sourceFingerprint` — a deterministic, non-cryptographic source/debug identifier
+  derived from stable source metadata (record type, year, event, age division and
+  alias, source URL) plus target and row counts. It never uses `Date.now()`,
+  randomness, or object identity.
+- `recordType`, `sourceSummary`, `readinessReport` — the slice 10 record type, slice
+  10 file summary, and slice 12 readiness report.
+- `selectedSourceTargetId`, `selectedTarget`, `selectedCanonicalContextMapping`,
+  `selectedPlayerPreviewInput`, `selectedPlayerPreviewResult`,
+  `selectedCoachPreviewResult` — the current selection (null when nothing is
+  selected). `selectedTarget` carries the slice 12 readiness target snapshot plus
+  selection-derived issues.
+- `issues` — session-level issues (codes: `invalid-source`,
+  `unsupported-record-type`, `readiness-report-failed`, `target-not-found`,
+  `target-blocked`, `target-empty`, `target-needs-review`,
+  `selected-target-missing-preview`, `source-fingerprint-mismatch`).
+- `summary` — deterministic flags for future UI (`totalTargets`,
+  `selectableTargets`, `blockedTargets`, `emptyTargets`, `selectedSourceTargetId`,
+  `selectedStatus`, `selectedRowCount`, `selectedIssueCount`, `canSelectTarget`,
+  `canProceedToPreview`, `canProceedWithoutReview`).
+- `sourcePayload` — the loaded payload, held **by reference only and never mutated**,
+  in memory only. It is retained solely so selection can re-run the existing
+  mapping/preview helpers; it is never written, uploaded, or persisted.
+
+The session never persists, applies, mutates rosters, commits imports, uploads files,
+derives movement, or creates coach analytics, and adds no UI.

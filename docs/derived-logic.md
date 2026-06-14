@@ -1785,6 +1785,49 @@ contracts only — they are not bundled into the app and create no app-visible s
 data; there is no UI, persistence, file upload, import apply, roster mutation, movement
 derivation, or coach analytics.
 
+### Scraped JSON import session state (Phase 5 slice 14)
+
+Phase 5 slice 14 adds a pure, deterministic in-memory **import session state model**
+for one scraped Ute Conference JSON source file
+(`src/engine/uteConferenceScrapedJsonImportSession.ts`). It is a session-state
+reducer/helper that **composes** the slice 10 source adapter, the slice 11 canonical
+mapping, and the slice 12 readiness report; it replaces and duplicates none of their
+business logic.
+
+Behavior:
+
+- **Load.** `createUteScrapedJsonImportSessionFromPayload(payload, options?)` builds
+  the slice 12 readiness report immediately, derives a deterministic
+  non-cryptographic `sourceFingerprint` (from stable metadata plus target/row counts —
+  never `Date.now()`, randomness, or object identity), and selects no target by
+  default. An unsupported / invalid source becomes an `invalid-source` session;
+  `createEmptyUteScrapedJsonImportSession()` yields an `uninitialized` session.
+- **Select.** `selectUteScrapedJsonImportSessionTarget(session, sourceTargetId,
+  options?)` resolves the target from the readiness report and re-runs the existing
+  preview helpers (players via the canonical-context player preview helper; coaches
+  via `createCoachImportPreviewInputFromScrapedJson`). Ready / ready-with-warnings →
+  `ready-for-preview`; needs-review → `ready-for-review`; blocked → `target-blocked`;
+  empty → `target-selected`. Selecting a blocked or empty target is allowed but yields
+  no usable preview. A missing target id, an unloaded/invalid source, or a supplied
+  `expectedSourceFingerprint` that does not match fails deterministically with the
+  matching issue code. A per-selection `override` can alter the selected canonical
+  context (re-running slice 12 for that target); re-selecting the same target is
+  idempotent.
+- **Clear.** `clearUteScrapedJsonImportSessionTarget(session)` removes the selection
+  while preserving the loaded source, readiness report, and fingerprint.
+- **Summary.** `summarizeUteScrapedJsonImportSession(session)` derives the
+  `canSelectTarget` / `canProceedToPreview` / `canProceedWithoutReview` flags and
+  selection counts. `canProceedToPreview` is true only when the selected target is
+  usable (ready, ready-with-warnings, or needs-review) with a preview;
+  `canProceedWithoutReview` is false when the selection needs review or is blocked.
+
+Standing contracts: player names, coach names, coach titles, source rows, source
+URLs, and source order are preserved exactly; every helper returns a new session and
+never mutates its inputs (the payload is held by reference only, in memory only);
+output is deterministic across repeated calls; and there is no import apply/commit,
+roster mutation, persistence, browser storage, file upload, movement derivation, coach
+analytics, or UI.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

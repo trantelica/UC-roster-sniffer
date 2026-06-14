@@ -328,6 +328,30 @@ per team, a `readinessStatus` (`ready` / `ready-with-warnings` / `needs-review` 
 gated on explicit approval; the report itself reads source data only and mutates
 nothing.
 
+### Scraped JSON import session state (Phase 5 slice 14)
+
+Slice 14 adds an engine-only, in-memory **import session state model** for one scraped
+JSON source file (`src/engine/uteConferenceScrapedJsonImportSession.ts`) that is
+**intended for future UI consumption** but **adds no UI itself**. It composes the
+slice 12 readiness report with target selection, canonical mapping, and preview
+outputs into one deterministic session object. A future import screen could:
+
+- load a source file into a session, reading `status`
+  (`uninitialized` / `source-loaded` / `target-selected` / `target-blocked` /
+  `ready-for-review` / `ready-for-preview` / `invalid-source`) and the deterministic
+  `sourceFingerprint`;
+- list selectable teams via `getUteScrapedJsonImportSessionSelectableTargets`, showing
+  blocked, empty, and needs-review targets distinctly;
+- select a team to surface its canonical mapping and player/coach preview, and clear
+  the selection to go back;
+- gate "preview" and "import without review" buttons on the summary flags
+  `canSelectTarget`, `canProceedToPreview`, and `canProceedWithoutReview`.
+
+That screen remains future work, gated on explicit approval. The session reads source
+data only and mutates nothing: it does not persist, store in the browser, upload
+files, apply/commit imports, mutate rosters, derive movement, or create coach
+analytics, and the loaded payload (if held) is kept by reference only, in memory only.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

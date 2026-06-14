@@ -780,6 +780,30 @@ Import commit happens only after collision review.
   `docs/derived-logic.md` (all "Scraped JSON fixture contracts (Phase 5 slice 13)"),
   and `docs/build-roadmap.md`.
 
+- **Slice 14 (done): scraped JSON import session state (engine only).** A pure,
+  deterministic in-memory session-state model for one scraped Ute Conference JSON
+  source file (`src/engine/uteConferenceScrapedJsonImportSession.ts`,
+  `src/test/uteConferenceScrapedJsonImportSession.test.ts`) that **composes** the slice
+  10 adapter, slice 11 canonical mapping, and slice 12 readiness report without
+  duplicating their logic. Loading a payload builds the readiness report plus a
+  deterministic non-cryptographic source fingerprint and selects no target by default;
+  unsupported/invalid sources become `invalid-source` sessions. Selecting a target
+  re-runs the existing preview helpers and stores the selected target, canonical
+  mapping, and preview output, mapping readiness status to a session status
+  (`ready-for-preview` / `ready-for-review` / `target-blocked` / `target-selected`).
+  Blocked, empty, and needs-review targets are tracked distinctly; missing targets,
+  unloaded sources, and `expectedSourceFingerprint` mismatches fail deterministically;
+  per-selection overrides can alter the canonical context; re-selection is idempotent;
+  clearing preserves the loaded source/report. The summary exposes deterministic UI
+  flags (`canSelectTarget`, `canProceedToPreview`, `canProceedWithoutReview`, and
+  selection counts). Names, titles, source rows, source URLs, and source order are
+  preserved exactly; helpers never mutate inputs (the payload is held by reference
+  only, in memory only); and there is no persistence, browser storage, file upload,
+  import apply/commit, roster mutation, movement derivation, coach analytics, or UI.
+  See `docs/import-workflow.md`, `docs/data-model.md`, `docs/derived-logic.md`,
+  `docs/ui-workflow.md`, and `docs/build-roadmap.md` (all "Scraped JSON import session
+  state (Phase 5 slice 14)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
@@ -788,8 +812,10 @@ in-memory import application / projection from a committable plan, slice 9 adds 
 text / CSV-like parser into the slice 1 preview contract, slice 10 adds a source
 adapter for harvested Ute Conference scraped JSON (players and coaches), slice 11
 adds canonical source-label mapping over that adapter, slice 12 adds a full-file
-readiness report that classifies every team target, and slice 13 hardens slices 10–12
-with representative scraped JSON fixture contracts (test-only). The acceptance criteria above
+readiness report that classifies every team target, slice 13 hardens slices 10–12
+with representative scraped JSON fixture contracts (test-only), and slice 14 adds a
+pure in-memory import session-state model that composes the readiness report, target
+selection, canonical mapping, and preview outputs. The acceptance criteria above
 are met by the engine pipeline: low-confidence collisions are never silently committed
 (unresolved identities and high-confidence single candidates block — never
 auto-link), user decisions are captured as append-only records, and the dry-run commit

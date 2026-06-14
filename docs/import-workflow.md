@@ -808,6 +808,44 @@ only**: they are not bundled into the app and create no app-visible sample data,
 there is no UI, persistence, file upload, import apply, roster mutation, movement
 derivation, or coach analytics.
 
+## Scraped JSON import session state (Phase 5 slice 14)
+
+The fourteenth Phase 5 slice adds an in-memory **import session state model** for one
+scraped Ute Conference JSON source file
+(`src/engine/uteConferenceScrapedJsonImportSession.ts`). It is **engine only** and is
+pure and deterministic. It answers: "can the system hold a scraped JSON source file,
+readiness report, selected team target, canonical mapping, and preview state in a
+deterministic session object without applying, writing, or persisting anything?"
+
+The session **composes** the existing slice 10/11/12 helpers and replaces or
+duplicates none of their logic. Loading a payload
+(`createUteScrapedJsonImportSessionFromPayload`) immediately builds the slice 12
+readiness report, derives a deterministic non-cryptographic source fingerprint, and
+selects no target by default. An unsupported / invalid source yields an
+`invalid-source` session. Selecting a target
+(`selectUteScrapedJsonImportSessionTarget`) re-runs the existing mapping and preview
+helpers — for players,
+`createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext`; for coaches,
+`createCoachImportPreviewInputFromScrapedJson` — and stores the selected target, its
+canonical context mapping, and its preview output. Blocked, empty, and needs-review
+targets are tracked distinctly (`target-blocked`, `target-empty`, and
+`ready-for-review` states); selecting a blocked or empty target is allowed but yields
+no usable preview. A missing target id, an unloaded/invalid source, or a fingerprint
+mismatch fails deterministically. Clearing
+(`clearUteScrapedJsonImportSessionTarget`) preserves the loaded source and readiness
+report while removing the selection.
+
+The session summary exposes deterministic flags for future UI: `totalTargets`,
+`selectableTargets`, `blockedTargets`, `emptyTargets`, `selectedSourceTargetId`,
+`selectedStatus`, `selectedRowCount`, `selectedIssueCount`, `canSelectTarget`,
+`canProceedToPreview`, and `canProceedWithoutReview`. The session state is intended
+for future UI consumption: player names, coach names, coach titles, source rows,
+source URLs, and source order are preserved exactly; every helper returns a new
+session object and never mutates its inputs; and the source payload, when held, is
+kept **by reference only, in memory only**, and is never written, uploaded, or
+persisted. It does **not** persist, apply, mutate rosters, commit imports, upload
+files, derive movement, or create coach analytics, and there is no UI.
+
 ## Roster import stages
 
 ### 1. Parse source data
