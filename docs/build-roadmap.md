@@ -680,6 +680,25 @@ Slice status:
   ("Ute Scraped JSON Readiness Report"), and `docs/derived-logic.md` ("Scraped JSON
   full-file readiness report (Phase 5 slice 12)"). A review/import UI may later consume
   this report; that and the other later-work items remain gated on explicit approval.
+- **Slice 13 (done): scraped JSON fixture contracts (engine-only, test hardening).**
+  A fixture/contract slice that adds **no production logic**. It anchors the scraped
+  JSON pipeline (slices 10–12) to representative real harvested source shapes via small
+  hand-curated fixtures under `src/test/fixtures/ute-scraped-json/` (players, coaches,
+  empty-league snapshots, a comma name `Cary, Hudson`, an extra-space name
+  `Moyer , Knox`, a non-breaking-space coach name, `Head Coach` / `Asst Coach` titles, a
+  coded classification `Gremlin A2`, and a color team `Scout White`) plus contract
+  tests (`src/test/uteConferenceScrapedJsonFixtureContracts.test.ts`) that run the
+  fixtures through the existing slice 10/11/12 public helpers only. The tests prove raw
+  names/titles, source URLs, and source order are preserved, coded classifications map
+  while color teams stay unresolved (no invented mapping), empty snapshots are valid
+  source data, payloads are never mutated, output is deterministic, and the engine
+  modules expose no apply/commit/write/persist API. Fixtures are test contracts only —
+  not bundled into the app and creating no app-visible sample data — with no UI,
+  persistence, file upload, import apply, roster mutation, movement derivation, or coach
+  analytics. See `docs/import-workflow.md` ("Scraped JSON fixture contracts (Phase 5
+  slice 13)"), `docs/data-model.md` ("Scraped JSON fixture contracts (Phase 5 slice
+  13)"), and `docs/derived-logic.md` ("Scraped JSON fixture contracts (Phase 5 slice
+  13)").
 
 ## Phase 6: Schedule and result support
 

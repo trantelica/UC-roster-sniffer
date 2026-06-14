@@ -775,6 +775,39 @@ are preserved; no roster records are written and no apply/persist function exist
 future review/import UI may consume this report; that remains later work requiring
 explicit approval.
 
+## Scraped JSON fixture contracts (Phase 5 slice 13)
+
+The thirteenth Phase 5 slice anchors the scraped JSON pipeline (slices 10–12) to
+representative real harvested source shapes via small, hand-curated **test fixtures**
+under `src/test/fixtures/ute-scraped-json/`. It adds **no production logic** — it is a
+fixture / contract-hardening slice that answers: "do our scraped JSON adapter,
+canonical mapping, and readiness report remain compatible with representative real
+harvested Ute Conference player, coach, and empty-snapshot source shapes?"
+
+The fixtures are minimized examples (not full harvested files) that preserve the real
+source structure (`metadata`, `districts[]` with `district` / `league` /
+`teams_count` / `teams[]`, and `players_count` + `players[]` or `coaches_count` +
+`coaches[]`). They cover: a players file (with a comma name `Cary, Hudson` and an
+extra-space name `Moyer , Knox`), a coaches file (with a non-breaking-space coach name
+and `Head Coach` / `Asst Coach` titles), valid empty-league snapshots for players and
+coaches (`teams_count: 0`, `teams: []`), a color/non-coded team (`Scout White`), and a
+coded-classification team (`Gremlin A2`).
+
+Contract tests (`src/test/uteConferenceScrapedJsonFixtureContracts.test.ts`) run the
+fixtures through the existing public helpers only —
+`detectUteConferenceScrapedJsonRecordType`, `summarizeUteConferenceScrapedJson`,
+`listUteConferenceScrapedJsonTeamTargets`,
+`mapUteScrapedTeamTargetToCanonicalContext`,
+`createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext`,
+`createCoachImportPreviewInputFromScrapedJson`, and
+`createUteConferenceScrapedJsonReadinessReport` — proving raw names/titles, source
+order, and empty snapshots are preserved, coded classifications map while color teams
+stay unresolved, payloads are never mutated, output is deterministic, and the engine
+modules expose no apply/commit/write/persist API. These fixtures are **test contracts
+only**: they are not bundled into the app and create no app-visible sample data, and
+there is no UI, persistence, file upload, import apply, roster mutation, movement
+derivation, or coach analytics.
+
 ## Roster import stages
 
 ### 1. Parse source data

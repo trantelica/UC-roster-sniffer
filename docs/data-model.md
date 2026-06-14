@@ -1503,3 +1503,24 @@ Local sample data under `data-samples/` exists to prove the data contract and to
 - The current fixture intentionally includes a same-slot team that appears in both 2025 and 2026 — same district, age division, and team code — so the selected-team roster-status summary can render an available state for visual testing.
 - Each roster import sample file represents a single season, matching the existing roster import contract.
 - Sample fixtures should remain small, deliberate, and contract-preserving. They should not silently reshape the sample contract to make code easier.
+
+### Scraped JSON fixture contracts (Phase 5 slice 13)
+
+Separate from the app sample data above, small hand-curated **scraped JSON test
+fixtures** live under `src/test/fixtures/ute-scraped-json/`. They are minimized
+examples of the harvested Ute Conference source shape — players, coaches,
+empty-league snapshots, a comma player name (`Cary, Hudson`), an extra-space name
+(`Moyer , Knox`), a non-breaking-space coach name, `Head Coach` / `Asst Coach` titles,
+a coded classification team (`Gremlin A2`), and a color/non-coded team
+(`Scout White`). They exist only to anchor the slice 10–12 scraped JSON pipeline to
+real source shapes via contract tests
+(`src/test/uteConferenceScrapedJsonFixtureContracts.test.ts`).
+
+- **Test contracts only.** These fixtures are not loaded by the app and create no
+  app-visible sample data; they are consumed exclusively by tests.
+- **Real shape, minimized.** They preserve the source structure (`metadata`,
+  `districts[]`, `teams[]`, `players[]` / `coaches[]`) but stay small for readable
+  tests.
+- They prove raw names/titles/source URLs/order are preserved, coded classifications
+  map while color teams stay unresolved, empty snapshots are valid, and the pipeline
+  never mutates the payload.

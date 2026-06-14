@@ -1766,6 +1766,25 @@ roster records are created or mutated and no apply/write function exists. UI,
 persistence, file upload, import apply/commit, coach analytics, and fuzzy matching
 remain later work and require explicit approval.
 
+### Scraped JSON fixture contracts (Phase 5 slice 13)
+
+Phase 5 slice 13 adds **no production logic**: it anchors the scraped JSON pipeline
+(slices 10–12) to representative real harvested source shapes via small hand-curated
+test fixtures (`src/test/fixtures/ute-scraped-json/`) and contract tests
+(`src/test/uteConferenceScrapedJsonFixtureContracts.test.ts`). The fixtures are
+minimized examples of the harvested Ute Conference source shape — players, coaches,
+empty-league snapshots, a comma player name, an extra-space player name, a
+non-breaking-space coach name, `Head Coach` / `Asst Coach` titles, a coded
+classification (`Gremlin A2`), and a color/non-coded team (`Scout White`). The tests
+run them through the existing slice 10/11/12 public helpers and confirm the standing
+contracts hold: raw names/titles, source URLs, and source order are preserved; coded
+classifications map while color teams stay unresolved (no invented mapping); empty
+snapshots are valid source data; payloads are never mutated; output is deterministic;
+and the engine modules expose no apply/commit/write/persist API. The fixtures are test
+contracts only — they are not bundled into the app and create no app-visible sample
+data; there is no UI, persistence, file upload, import apply, roster mutation, movement
+derivation, or coach analytics.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

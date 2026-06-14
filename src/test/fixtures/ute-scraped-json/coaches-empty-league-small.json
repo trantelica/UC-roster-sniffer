@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "organization": "Ute Conference",
+    "event": "2022 Fall Season",
+    "age_division": "GR League 9",
+    "age_division_alias": "GR",
+    "year": 2022,
+    "record_type": "coaches",
+    "total_districts": 1,
+    "districts_with_league": 1,
+    "districts_without_league": 0,
+    "total_teams": 0,
+    "total_coaches": 0,
+    "scraped_at": "2022-09-01T00:00:00Z",
+    "source_url": "https://ute.example/2022/gr/coaches"
+  },
+  "districts": [
+    {
+      "district": "Alta",
+      "league": "GR League 9",
+      "teams_count": 0,
+      "teams": []
+    }
+  ]
+}
