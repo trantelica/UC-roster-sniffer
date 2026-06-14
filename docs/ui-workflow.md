@@ -298,12 +298,32 @@ Phase 4 there are:
 the UI performs a reset. Rendering cohort status and a manual review screen are
 future work, layered on top of the existing engine when approved.
 
+## Import pipeline UI (Phase 5 checkpoint)
+
+Phase 5 slices 1–6 (import preview, identity match candidates, the review
+action/decision contract, the decision repository, effective decision application,
+and the dry-run commit preview plan) are checkpointed and are **engine-only — they
+add no UI** (see `docs/derived-logic.md`, "Phase 5 checkpoint"). Through Phase 5 so
+far there are:
+
+- no import preview, identity match, or collision review screens;
+- no controls to accept / reject / manually link / create-new;
+- no commit or dry-run plan UI;
+- no wiring of preview rows, match entries, review decisions, the decision
+  repository, applied outcomes, or the commit preview plan into React state.
+
+`ready-to-link` / `ready-to-create` plan rows are future intended operations only;
+nothing in the UI performs an import apply / commit, and a high-confidence single
+candidate is never auto-linked. Rendering the collision review and commit screens is
+future work, layered on top of the existing engine when approved.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.
 
-> Phase positioning: import preview and the collision UI below are **Phase 5 work**
-> and are not yet implemented. Phase 5 must preserve loaded roster authority and
+> Phase positioning: the collision UI below is the **future review screen** for the
+> Phase 5 engine pipeline and is **not yet implemented** (see "Import pipeline UI
+> (Phase 5 checkpoint)" above). Phase 5 must preserve loaded roster authority and
 > must not discard duplicate or ambiguous roster entries.
 
 The collision UI should show:

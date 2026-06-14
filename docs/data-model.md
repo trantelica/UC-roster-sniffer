@@ -924,6 +924,44 @@ invalid-target-context
 - **No auto-link.** Unresolved identities — including high-confidence single
   candidates — block; they are never auto-linked.
 
+### Phase 5 checkpoint: import pipeline layers
+
+Phase 5 slices 1–6 are checkpointed (see `docs/derived-logic.md`, "Phase 5
+checkpoint: import preview and identity collision pipeline (Phase 5 slice 7)"). The
+import preview and identity collision pipeline keeps these layers strictly distinct,
+and the data model must not collapse them:
+
+1. **Loaded authoritative roster data** — `Player`, `Player Season Assignment`,
+   `Team`, and the existing roster identity records supplied to matching. Loaded and
+   authoritative. Never altered, removed, suppressed, merged, nullified, reordered,
+   or ignored by any import logic.
+2. **Roster Import Preview rows** — staged candidate rows
+   (`createRosterImportPreview`). Non-destructive staging; not roster records.
+3. **Roster Import Preview Identity Match entries** — per-row candidate metadata
+   against existing records (`createRosterImportPreviewIdentityMatches`). Candidate
+   generation only; not a resolution or a decision.
+4. **Review actions** — a validated reviewer intent against one match entry
+   (`applyRosterImportIdentityReviewAction`). Not yet a stored decision.
+5. **Roster Import Identity Review Decision** — the separate, append-only records
+   built only from an accepted action. They influence derived effective outcomes in
+   memory but never rewrite roster data, preview rows, or match entries.
+6. **Roster Import Identity Review Decision Repository** — the local
+   storage-boundary envelope (`{ version, decisions }`). In-memory model and JSON
+   export/import contract only; no browser-storage write yet.
+7. **Applied Roster Import Identity Review Decision** — the in-memory per-row
+   effective outcome (`applyRosterImportIdentityReviewDecisionsToMatches`). Derived
+   state, not a roster write.
+8. **Roster Import Commit Preview Plan** — the dry-run per-row planned operation,
+   blockers, and the top-level `canCommit` gate
+   (`createRosterImportCommitPreviewPlan`). A plan, not a commit.
+
+Through Phase 5 so far there is no file parsing, no file upload, no browser
+persistence (`localStorage` / `IndexedDB` / file), no UI, no sample-data mutation, no
+roster mutation, and no import apply / commit. Invalid, duplicate, skipped, rejected,
+and deferred import rows are always preserved as rows. A future slice may add a pure
+in-memory import application / projection from a committable plan; even then it must
+not persist, mutate sample data, parse files, or wire UI unless explicitly approved.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
