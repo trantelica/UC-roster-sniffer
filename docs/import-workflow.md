@@ -130,6 +130,45 @@ there are no invalid rows. Warnings / review items never remove rows. This slice
 transferred players, resolve identity collisions, or apply the import — those are
 later Phase 5 / Phase 6 stages below.
 
+## Roster import preview identity matches (Phase 5 slice 2)
+
+The second Phase 5 slice adds pure, deterministic **candidate identity matching**
+(`src/engine/rosterImportPreviewIdentityMatch.ts`,
+`createRosterImportPreviewIdentityMatches`). Given the slice 1 preview rows and a
+set of existing roster identity records supplied in the input, it answers one
+question per ready preview row: "which existing roster records might this imported
+row correspond to?" The output is review metadata for later collision review and a
+future apply workflow — it is **candidate generation only**.
+
+What this slice does:
+
+- Produces one match entry per preview row, in preview row order. Only `ready`
+  rows are matched; `invalid` rows become `skipped-invalid-preview-row` entries and
+  `needs-review` rows become `skipped-review-preview-row` entries (both preserved,
+  never dropped).
+- Matches on the exact normalized identity key (reusing the Phase 2
+  `getPlayerIdentityKey` helper). One existing match -> `single-candidate`; more
+  than one -> `multiple-candidates` (review); none -> `no-match`.
+- Orders candidates by existing-record input order.
+- A jersey number can **add** a `matching-jersey-number` reason and **raise**
+  confidence within an exact-name candidate group, but never creates a match on its
+  own.
+- Duplicate existing names and duplicate preview names produce review metadata
+  (`existing-duplicate-name` / `preview-duplicate-name`), never discarded candidates
+  or entries.
+- An existing record with a missing/blank name cannot produce an identity key; it
+  is reported as a result-level `invalid-existing-record` issue (never throws) and
+  excluded from matching only.
+
+Helpers `summarizeRosterImportPreviewIdentityMatches`,
+`getRosterImportPreviewIdentityMatchesNeedingReview`, and
+`getRosterImportPreviewIdentityMatchesReadyForApply` round out the contract. A
+ready-for-apply entry is an unambiguous single high-confidence candidate with no
+review issues; no apply is performed. This slice does **not** resolve collisions,
+apply imports, compare against prior seasons, derive movement status, persist, or
+render UI. Candidate matches feed the collision review (stage 5) and commit
+(stage 6) below, which remain later Phase 5 work.
+
 ## Roster import stages
 
 ### 1. Parse source data
