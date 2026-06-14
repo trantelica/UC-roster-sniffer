@@ -700,6 +700,26 @@ Slice status:
   13)"), and `docs/derived-logic.md` ("Scraped JSON fixture contracts (Phase 5 slice
   13)").
 
+- **Slice 14 (done): scraped JSON import session state (engine only).** A pure,
+  deterministic in-memory session-state model for one scraped Ute Conference JSON
+  source file (`src/engine/uteConferenceScrapedJsonImportSession.ts`) that **composes**
+  the slice 10 adapter, slice 11 canonical mapping, and slice 12 readiness report
+  without duplicating their logic. Loading a payload builds the readiness report and a
+  deterministic non-cryptographic source fingerprint and selects no target by default;
+  an invalid/unsupported source becomes an `invalid-source` session. Selecting a target
+  re-runs the existing preview helpers and stores the selected target, canonical
+  mapping, and preview output; blocked, empty, and needs-review targets are tracked
+  distinctly; missing targets, unloaded sources, and fingerprint mismatches fail
+  deterministically; clearing preserves the loaded source/report. The session summary
+  exposes deterministic UI flags (`canSelectTarget`, `canProceedToPreview`,
+  `canProceedWithoutReview`, and selection counts). Names, titles, source rows, source
+  URLs, and source order are preserved exactly; helpers never mutate their inputs (the
+  payload is held by reference only, in memory only); and there is no persistence,
+  browser storage, file upload, import apply/commit, roster mutation, movement
+  derivation, coach analytics, or UI. See `docs/import-workflow.md`, `docs/data-model.md`,
+  `docs/derived-logic.md`, and `docs/ui-workflow.md` ("Scraped JSON import session state
+  (Phase 5 slice 14)").
+
 ## Phase 6: Schedule and result support
 
 Goal: derive records from game objects.
