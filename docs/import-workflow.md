@@ -295,6 +295,48 @@ longer among the entry's candidates is ignored with `selected-candidate-not-foun
 reasons. Nothing is mutated. Actually applying outcomes to the roster (the import
 commit), and the review UI, remain later Phase 5 / Phase 6 work.
 
+## Import commit preview / dry-run plan (Phase 5 slice 6)
+
+The sixth Phase 5 slice folds the slice 5 applied outcomes into a deterministic
+**dry-run commit plan** (`src/engine/rosterImportCommitPreviewPlan.ts`,
+`createRosterImportCommitPreviewPlan`). It answers: "if a future user tried to apply
+this import, what would the system plan to do, and what would block the commit?" It
+is **commit-preview planning only** — not import apply/commit, not roster mutation,
+not creating/linking records, not deleting/suppressing rows, not persistence, and
+not UI. A `ready-to-link` / `ready-to-create` row is a future intended operation,
+never a write.
+
+Each applied entry becomes one plan row (in input order) with a `planStatus` and a
+`plannedOperation`:
+
+| Effective outcome | planStatus | plannedOperation |
+| --- | --- | --- |
+| link-to-existing (with target id) | `ready-to-link` | `link-existing-record` |
+| link-to-existing (no target id) | `blocked-unresolved` | `none` (blocker `missing-target-existing-record-id`) |
+| create-new | `ready-to-create` | `create-new-roster-entry` |
+| rejected | `rejected` | `reject-import-row` |
+| deferred | `deferred` | `defer-review` |
+| unresolved | `blocked-unresolved` | `none` (blocker `unresolved-identity`) |
+| conflict | `blocked-conflict` | `none` (blocker `conflicting-decisions`) |
+| skipped-invalid-preview-row | `blocked-invalid-preview-row` | `none` |
+| skipped-review-preview-row | `blocked-review-preview-row` | `none` |
+
+Commit gating: `canCommit` is true only when there is at least one row, no row is
+`blocked-*`, and any provided target context (`seasonId` / `districtId` /
+`ageDivisionId` / `teamId`) is complete. **Rejected and deferred rows are explicit
+reviewer outcomes and do NOT block the commit.** An empty plan is `canCommit:
+false` (nothing to commit). An incomplete provided target context adds a
+result-level `invalid-target-context` blocker and makes `canCommit` false without
+mutating rows. Unresolved identities (including high-confidence single candidates)
+are never auto-linked — they block.
+
+Helpers `summarizeRosterImportCommitPreviewPlanRows`,
+`getRosterImportCommitPreviewPlanRowsReadyForCommit` (ready-to-link / ready-to-create
+only), and `getRosterImportCommitPreviewPlanRowsBlockingCommit` (blocked-* only)
+round out the contract. The hard roster authority rule still applies: rows preserve
+their source applied entry by reference and nothing is written. Performing the
+commit and the review UI remain later Phase 5 / Phase 6 work.
+
 ## Roster import stages
 
 ### 1. Parse source data

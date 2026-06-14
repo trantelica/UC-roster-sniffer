@@ -1354,6 +1354,38 @@ entries and decisions are referenced, never mutated.
 and ignored reasons. Actually applying outcomes to the roster (import commit) and
 the review UI remain later Phase 5 / Phase 6 work.
 
+### Import commit preview / dry-run plan (Phase 5 slice 6)
+
+Phase 5 slice 6 folds the slice 5 applied outcomes into a deterministic **dry-run
+commit plan** (`createRosterImportCommitPreviewPlan`,
+`src/engine/rosterImportCommitPreviewPlan.ts`): per row, what a future commit would
+do, and what blocks it. It is **planning only** — no import apply/commit, no roster
+write, no record creation/linking, no row deletion, no persistence, no UI. A
+`ready-to-link` / `ready-to-create` row is a future intended operation; source
+applied entries are referenced (`originalAppliedEntry`), never mutated.
+
+- **Outcome -> plan mapping.** link-to-existing with a target id ->
+  `ready-to-link` / `link-existing-record`; link-to-existing with no target id ->
+  `blocked-unresolved` (blocker `missing-target-existing-record-id`); create-new ->
+  `ready-to-create` / `create-new-roster-entry`; rejected -> `rejected` /
+  `reject-import-row`; deferred -> `deferred` / `defer-review`; unresolved ->
+  `blocked-unresolved` (blocker `unresolved-identity`); conflict ->
+  `blocked-conflict` (blocker `conflicting-decisions`); skipped-invalid ->
+  `blocked-invalid-preview-row`; skipped-review -> `blocked-review-preview-row`.
+- **Commit gating.** `canCommit` is true only with at least one row, no `blocked-*`
+  rows, and a complete (or absent) target context. Rejected and deferred rows are
+  explicit reviewer outcomes and do **not** block; an empty plan is `canCommit:
+  false`. An incomplete provided target context adds a result-level
+  `invalid-target-context` blocker and makes `canCommit` false without mutating rows.
+- **No auto-link.** Unresolved identities — including high-confidence single
+  candidates — block rather than auto-linking.
+
+`summarizeRosterImportCommitPreviewPlanRows` tallies statuses, planned operations,
+blockers, and a row-level `canCommit`;
+`getRosterImportCommitPreviewPlanRowsReadyForCommit` and
+`getRosterImportCommitPreviewPlanRowsBlockingCommit` filter the rows. Performing the
+commit and the review UI remain later Phase 5 / Phase 6 work.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
