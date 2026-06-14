@@ -446,6 +446,29 @@ Slice status:
   (localStorage / IndexedDB / file), no apply, and no UI. Wiring to actual local
   storage, applying decisions to imports, and the review UI remain later Phase 5
   work.
+- **Slice 5 (done): import identity decision application (engine only).** A pure
+  helper (`applyRosterImportIdentityReviewDecisionsToMatches`) resolves slice 2
+  match entries against active slice 3 decisions in memory and computes the
+  effective import outcome per row, mirroring the Phase 4 slice 8 application step.
+  Outcomes: `unresolved`, `link-to-existing`, `create-new`, `rejected`, `deferred`,
+  `skipped-invalid-preview-row`, `skipped-review-preview-row`, `conflict`. Decisions
+  match on `previewSourceRowId` + `previewRowIndex`; with no decision a matchable
+  entry stays `unresolved` (a high-confidence single candidate is never
+  auto-linked); accept-candidate / manual-link -> link-to-existing, create-new ->
+  create-new, reject-candidates -> rejected (row preserved), defer -> deferred.
+  Skipped rows always resolve to their skip outcome; two+ current decisions for one
+  entry -> conflict (none applied). Invalid, superseded (via
+  `audit.supersedesDecisionId`), key-less, unmatched, status-mismatched, and
+  selected-candidate-not-found decisions are ignored with explicit reasons in
+  decision input order; `summarizeAppliedRosterImportIdentityReviewDecisions` tallies
+  outcomes and ignored reasons. It is effective-state only — no roster write, no
+  record creation/linking, no row deletion, no persistence, no UI — and never
+  mutates entries or decisions. See `docs/import-workflow.md` ("Applying import
+  identity review decisions (Phase 5 slice 5)"), `docs/data-model.md` ("Applied
+  Roster Import Identity Review Decision"), and `docs/derived-logic.md` ("Applying
+  import identity review decisions (Phase 5 slice 5)"). It reuses (does not replace)
+  the slice 2/3/4 contracts. Actually applying outcomes to the roster (import
+  commit) and the review UI remain later Phase 5 / Phase 6 work.
 
 ## Phase 6: Schedule and result support
 

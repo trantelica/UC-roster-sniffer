@@ -552,6 +552,28 @@ Import commit happens only after collision review.
   Repository"), and `docs/derived-logic.md` ("Import identity review decision
   repository (Phase 5 slice 4)"). Remaining Phase 5 work wires this repository to
   actual local storage, applies decisions to imports, and adds the review UI.
+- **Slice 5 (done): import identity decision application (engine only).**
+  `applyRosterImportIdentityReviewDecisionsToMatches(entries, decisions)` resolves
+  slice 2 match entries against active slice 3 decisions in memory and computes the
+  effective import outcome per row (`src/engine/rosterImportIdentityReviewDecisionApplication.ts`),
+  mirroring the Phase 4 slice 8 application step. Outcomes: `unresolved`,
+  `link-to-existing`, `create-new`, `rejected`, `deferred`,
+  `skipped-invalid-preview-row`, `skipped-review-preview-row`, `conflict`. Decisions
+  match on `previewSourceRowId` + `previewRowIndex`; no decision -> `unresolved` (no
+  auto-link, even for a high-confidence single candidate); accept-candidate /
+  manual-link -> link-to-existing, create-new -> create-new, reject-candidates ->
+  rejected (row preserved), defer -> deferred. Skipped rows always resolve to their
+  skip outcome; 2+ current decisions -> conflict (none applied). Invalid, superseded,
+  key-less, unmatched, status-mismatched, and selected-candidate-not-found decisions
+  are ignored with explicit reasons in decision input order;
+  `summarizeAppliedRosterImportIdentityReviewDecisions` tallies the result. It is
+  effective-state only — no roster write, no creation/linking, no row deletion, no
+  persistence, no UI — and never mutates entries or decisions. It reuses (does not
+  replace) the slice 2/3/4 contracts. See `docs/import-workflow.md` ("Applying
+  import identity review decisions (Phase 5 slice 5)"), `docs/data-model.md`
+  ("Applied Roster Import Identity Review Decision"), and `docs/derived-logic.md`
+  ("Applying import identity review decisions (Phase 5 slice 5)"). Remaining Phase 5
+  work applies outcomes to the roster (import commit) and adds the review UI.
 
 ## Phase 6: Schedule and results
 

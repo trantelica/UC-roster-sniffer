@@ -751,6 +751,91 @@ mirroring the `Cohort Review Decision Repository`.
   Repository operations never mutate roster records, preview rows, existing records,
   or the decision objects.
 
+## Applied Roster Import Identity Review Decision
+
+The effective, in-memory resolution of slice 2 match entries against active slice 3
+decisions (Phase 5 slice 5), produced by
+`applyRosterImportIdentityReviewDecisionsToMatches`
+(`src/engine/rosterImportIdentityReviewDecisionApplication.ts`). It is **derived
+state only** — not a persisted record, not a commit, and not a roster write. Each
+effective outcome is a future-apply instruction.
+
+```json
+{
+  "entries": [
+    {
+      "previewSourceRowId": "r1",
+      "previewRowIndex": 0,
+      "previewPlayerName": "Jordan Smith",
+      "sourceEntryStatus": "single-candidate",
+      "effectiveOutcome": "link-to-existing",
+      "effectiveConfidence": "high",
+      "appliedDecisionId": "import-2026-001-r1",
+      "selectedExistingRecordId": "alta-GI-A1-jordan-smith",
+      "manualExistingRecordId": null,
+      "reasons": ["accept-candidate-applied"],
+      "issues": []
+    }
+  ],
+  "ignoredDecisions": [
+    { "decisionId": "import-2026-001-r9", "reason": "no-matching-entry" }
+  ],
+  "summary": { "totalEntries": 1, "linkToExisting": 1, "decisionsApplied": 1 }
+}
+```
+
+### Effective outcome values
+
+```text
+unresolved
+link-to-existing
+create-new
+rejected
+deferred
+skipped-invalid-preview-row
+skipped-review-preview-row
+conflict
+```
+
+### Effective confidence values
+
+```text
+high
+medium
+low
+none
+```
+
+### Ignored decision reason values
+
+```text
+invalid-decision
+superseded-decision
+missing-preview-row-key
+no-matching-entry
+duplicate-current-decision
+decision-entry-status-mismatch
+selected-candidate-not-found
+```
+
+### Notes
+
+- **Derived state only.** Outcomes never mutate roster records, preview rows,
+  existing records, candidates, decisions, or sample data; source entries and
+  decisions are referenced, never modified. The `originalEntry` is the slice 2 entry
+  by reference.
+- **Match key.** Decisions match an entry on `previewSourceRowId` +
+  `previewRowIndex`. Entry order is the input entry order; ignored decisions follow
+  decision input order.
+- **No auto-link.** With no applicable decision, a matchable entry is `unresolved`
+  even for a high-confidence single candidate. Skipped entries always resolve to
+  their skip outcome and accept no decisions.
+- **Conflict.** Two or more current (valid, non-superseded) decisions for one entry
+  yield `conflict` with none applied — surfaced for review.
+- **Future-facing.** `link-to-existing` / `create-new` / `rejected` / `deferred` are
+  instructions for a later apply step; reject does not delete the row and create-new
+  does not write a roster entry here.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

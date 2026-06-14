@@ -257,6 +257,44 @@ Behavior:
 Wiring this repository to actual local storage and the review UI, and applying
 decisions to an import, remain later Phase 5 work.
 
+## Applying import identity review decisions (Phase 5 slice 5)
+
+The fifth Phase 5 slice resolves slice 2 match entries against the (active) slice 3
+decisions in memory, computing the **effective import outcome per row**
+(`src/engine/rosterImportIdentityReviewDecisionApplication.ts`,
+`applyRosterImportIdentityReviewDecisionsToMatches`). It mirrors the Phase 4 slice 8
+decision-application step. It is **effective-state computation only** — not import
+apply/commit, not roster mutation, not creating/linking roster records, not
+deleting rows, not persistence, and not UI. Every outcome is a future-apply
+instruction, never an immediate write.
+
+Per entry (in input order), the effective outcome is one of: `unresolved`,
+`link-to-existing`, `create-new`, `rejected`, `deferred`,
+`skipped-invalid-preview-row`, `skipped-review-preview-row`, or `conflict`.
+
+- Decisions match an entry on `previewSourceRowId` + `previewRowIndex`.
+- With no applicable decision, a matchable entry is `unresolved` — a high-confidence
+  single candidate is **never** auto-linked.
+- An applied decision maps action -> outcome: accept-candidate / manual-link ->
+  `link-to-existing`; create-new -> `create-new`; reject-candidates -> `rejected`
+  (the interpretation is rejected for now, the row is **not** deleted); defer ->
+  `deferred`.
+- Skipped rows always resolve to their skip outcome; any decision targeting them is
+  ignored with `decision-entry-status-mismatch`.
+- Two or more current decisions for one entry make it a `conflict` (none applied,
+  surfaced for review).
+
+Decisions are validated with `validateRosterImportIdentityReviewDecision`;
+superseded decisions (via `audit.supersedesDecisionId`) are ignored. Ignored
+decisions are reported in decision input order with a reason (`invalid-decision`,
+`superseded-decision`, `missing-preview-row-key`, `no-matching-entry`,
+`duplicate-current-decision`, `decision-entry-status-mismatch`,
+`selected-candidate-not-found`). An `accept-candidate` whose selected record is no
+longer among the entry's candidates is ignored with `selected-candidate-not-found`.
+`summarizeAppliedRosterImportIdentityReviewDecisions` tallies outcomes and ignored
+reasons. Nothing is mutated. Actually applying outcomes to the roster (the import
+commit), and the review UI, remain later Phase 5 / Phase 6 work.
+
 ## Roster import stages
 
 ### 1. Parse source data
