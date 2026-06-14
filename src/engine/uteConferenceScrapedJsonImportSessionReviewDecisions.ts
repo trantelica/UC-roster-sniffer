@@ -319,7 +319,10 @@ export function clearUteScrapedJsonImportSessionReviewDecisions(
 export function getUteScrapedJsonImportSessionReviewDecisions(
   session: UteScrapedJsonImportSession | Partial<UteScrapedJsonImportSessionWithReviewDecisions>
 ): UteScrapedJsonImportSessionReviewDecision[] {
-  return (session.selectedReviewDecisions ?? []).map((decision) => ({ ...decision }));
+  if ('selectedReviewDecisions' in session && session.selectedReviewDecisions) {
+    return session.selectedReviewDecisions.map((decision) => ({ ...decision }));
+  }
+  return [];
 }
 
 export function summarizeUteScrapedJsonImportSessionReviewState(
