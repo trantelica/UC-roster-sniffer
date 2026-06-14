@@ -317,6 +317,17 @@ nothing in the UI performs an import apply / commit, and a high-confidence singl
 candidate is never auto-linked. Rendering the collision review and commit screens is
 future work, layered on top of the existing engine when approved.
 
+Slices 9–12 add engine-only ingestion for harvested data — a pasted-text/CSV parser
+(slice 9), a Ute Conference scraped-JSON source adapter (slice 10), canonical
+source-label mapping (slice 11), and a full-file **readiness report** (slice 12). None
+of these add UI. A future import screen could consume
+`createUteConferenceScrapedJsonReadinessReport` to drive team selection: it exposes,
+per team, a `readinessStatus` (`ready` / `ready-with-warnings` / `needs-review` /
+`blocked` / `empty`), human-readable reasons, and summary gates
+(`canProceedToTeamSelection`, `canProceedWithoutReview`). That UI remains future work,
+gated on explicit approval; the report itself reads source data only and mutates
+nothing.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

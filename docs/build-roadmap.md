@@ -650,6 +650,36 @@ Slice status:
   `docs/derived-logic.md` ("Canonical source mapping for scraped JSON (Phase 5 slice
   11)"). UI, persistence, file upload, import apply/commit, coach analytics, and a
   canonical district registry remain later work and require explicit approval.
+- **Slice 12 (done): scraped JSON full-file readiness report (engine only).** A pure
+  reporting/orchestration helper (`createUteConferenceScrapedJsonReadinessReport`,
+  `src/engine/uteConferenceScrapedJsonReadinessReport.ts`) classifies every team
+  target in one scraped Ute Conference payload as `ready`, `ready-with-warnings`,
+  `needs-review`, `blocked`, or `empty`, composing the slice 10 source adapter and
+  slice 11 canonical mapping (replacing neither). Each readiness target carries the
+  source labels, canonical ids, classification + hierarchy code, `rowCount`,
+  `readinessReasons`, origin-tagged `issues`, the `canonicalContextMapping`,
+  `contextConfidence` / `targetContextProvisional`, and a `previewSummary` (players) or
+  `coachPreviewSummary` (coaches). Players use the slice 11 canonical preview helper
+  (comma names preserved; missing player name -> blocked); coaches use the slice 10
+  coach helper and are never de-duplicated (missing title/name -> needs-review).
+  Unsupported `record_type` / invalid payload -> `ok: false` with the source issue and
+  no targets; empty league/team snapshots stay `ok: true`; count mismatches are
+  warnings unless `strictCounts` elevates them to needs-review (rows preserved); the
+  year is never inferred from a filename. Options:
+  `targetContextOverridesBySourceTargetId`, `districtRegistry`, `includeEmptyTeams`
+  (default true), `includePreviewResults` (default true), `strictCounts` (default
+  false). The summary tallies statuses, total/player/coach rows, and issues by
+  severity/code, plus `canProceedToTeamSelection` and `canProceedWithoutReview`;
+  helpers `summarizeUteConferenceScrapedJsonReadinessReport`,
+  `getUteScrapedJsonImportReadyTargets`, `getUteScrapedJsonTargetsNeedingReview`,
+  `getUteScrapedJsonBlockedTargets`, and `getUteScrapedJsonEmptyTargets` round out the
+  contract. It is a reporting helper only — no UI, persistence, browser storage, file
+  upload, roster mutation, import apply/commit, movement derivation, coach analytics,
+  or fuzzy matching — and never mutates the payload. See `docs/import-workflow.md`
+  ("Scraped JSON full-file readiness report (Phase 5 slice 12)"), `docs/data-model.md`
+  ("Ute Scraped JSON Readiness Report"), and `docs/derived-logic.md` ("Scraped JSON
+  full-file readiness report (Phase 5 slice 12)"). A review/import UI may later consume
+  this report; that and the other later-work items remain gated on explicit approval.
 
 ## Phase 6: Schedule and result support
 
