@@ -188,15 +188,47 @@ function countChar(line: string, ch: string): number {
   return n;
 }
 
+type AutoDelimiterResolution = {
+  delimiter: RosterImportTextDelimiter;
+  /** Whether to actually split lines on the delimiter. False preserves in-name commas. */
+  split: boolean;
+};
+
 /**
- * Detects a delimiter from a sample line. Precedence on presence: tab, then pipe,
- * then comma. Comma is the harmless default when no delimiter is present (a line with
- * no delimiter splits into a single cell).
+ * Resolves an auto / omitted delimiter from a sample line. Presence precedence: tab,
+ * then pipe, then comma. Tabs and pipes are unambiguous and always split.
+ *
+ * Comma is special-cased to protect the real-world "Last, First" `player_name` shape
+ * (e.g. "Cary, Hudson"): a single comma between two NON-numeric text cells is treated
+ * as part of the name (no split) unless a header forces columns. A comma still splits
+ * when the row is clearly tabular — a recognized header row, 3+ comma cells, or a
+ * 2-cell row where either cell looks like a jersey number (e.g. "12, Hudson Cary" or
+ * "Alice, 12"). To force comma columns regardless, pass an explicit `delimiter: ','`.
  */
-function detectDelimiter(line: string): RosterImportTextDelimiter {
-  if (countChar(line, '\t') > 0) return '\t';
-  if (countChar(line, '|') > 0) return '|';
-  return ',';
+function resolveAutoDelimiter(
+  sample: string,
+  options: RosterImportTextParseOptions | undefined
+): AutoDelimiterResolution {
+  if (countChar(sample, '\t') > 0) return { delimiter: '\t', split: true };
+  if (countChar(sample, '|') > 0) return { delimiter: '|', split: true };
+  if (countChar(sample, ',') > 0) {
+    const commaCells = sample.split(',').map((cell) => cell.trim());
+    const headerByOption = options?.hasHeader === true;
+    const headerByAuto =
+      options?.hasHeader !== false &&
+      looksLikeHeader(commaCells, options?.columns);
+    if (headerByOption || headerByAuto) return { delimiter: ',', split: true };
+    if (commaCells.length >= 3) return { delimiter: ',', split: true };
+    if (
+      commaCells.length === 2 &&
+      (looksLikeJersey(commaCells[0]) || looksLikeJersey(commaCells[1]))
+    ) {
+      return { delimiter: ',', split: true };
+    }
+    // Ambiguous single comma between two non-numeric text cells: preserve as a name.
+    return { delimiter: ',', split: false };
+  }
+  return { delimiter: ',', split: true };
 }
 
 /** Splits a line into trimmed cells on the delimiter. */
@@ -301,14 +333,26 @@ export function parseRosterImportText(
   const totalLines = lines.length;
 
   // Resolve the delimiter (explicit > auto). Defensive: an unsupported explicit
-  // delimiter falls back to auto detection with a warning.
+  // delimiter falls back to auto detection with a warning. `splitEnabled` is false
+  // only when auto detection decides a comma is part of a name (see
+  // `resolveAutoDelimiter`); an explicit delimiter always splits.
   const firstNonEmpty = lines.find((line) => line.trim() !== '');
   const requested = input.options?.delimiter;
+  const fallbackResolution: AutoDelimiterResolution = {
+    delimiter: ',',
+    split: true,
+  };
   let delimiter: RosterImportTextDelimiter;
+  let splitEnabled: boolean;
   if (requested === undefined || requested === 'auto') {
-    delimiter = firstNonEmpty ? detectDelimiter(firstNonEmpty) : ',';
+    const resolved = firstNonEmpty
+      ? resolveAutoDelimiter(firstNonEmpty, input.options)
+      : fallbackResolution;
+    delimiter = resolved.delimiter;
+    splitEnabled = resolved.split;
   } else if ((SUPPORTED_DELIMITERS as readonly string[]).includes(requested)) {
     delimiter = requested as RosterImportTextDelimiter;
+    splitEnabled = true;
   } else {
     resultIssues.push(
       issue(
@@ -317,8 +361,14 @@ export function parseRosterImportText(
         `Unsupported delimiter "${String(requested)}"; falling back to auto detection.`
       )
     );
-    delimiter = firstNonEmpty ? detectDelimiter(firstNonEmpty) : ',';
+    const resolved = firstNonEmpty
+      ? resolveAutoDelimiter(firstNonEmpty, input.options)
+      : fallbackResolution;
+    delimiter = resolved.delimiter;
+    splitEnabled = resolved.split;
   }
+  const toCells = (line: string): string[] =>
+    splitEnabled ? splitCells(line, delimiter) : [line.trim()];
 
   // Empty input: nothing to parse.
   const hasContent = firstNonEmpty !== undefined;
@@ -342,7 +392,7 @@ export function parseRosterImportText(
   }
 
   // Decide whether the first non-empty line is a header.
-  const firstCells = splitCells(firstNonEmpty, delimiter);
+  const firstCells = toCells(firstNonEmpty);
   const hasHeaderOption = input.options?.hasHeader;
   let headerDetected = false;
   if (hasHeaderOption === true) {
@@ -392,7 +442,7 @@ export function parseRosterImportText(
       return;
     }
 
-    const cells = splitCells(rawLine, delimiter);
+    const cells = toCells(rawLine);
     const rowIssues: RosterImportTextParseIssue[] = [];
 
     if (rawLine.includes('"')) {

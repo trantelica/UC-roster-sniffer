@@ -504,6 +504,15 @@ Supported (kept simple and deterministic):
   the harmless default when no delimiter is present);
 - basic trimming and blank-line handling.
 
+**Comma-in-name protection (auto mode).** In auto / omitted delimiter mode, a single
+comma between two **non-numeric text cells** is treated as part of the player name and
+is **not** split — this preserves the real-world "Last, First" `player_name` shape
+(e.g. `Cary, Hudson` -> `playerName: "Cary, Hudson"`). A comma still splits when the
+row is clearly tabular: a recognized header row, 3+ comma cells, or a 2-cell row where
+either cell looks like a jersey number (e.g. `12, Hudson Cary` or `Alice, 12`). To
+force comma columns regardless of shape, pass an explicit `delimiter: ','` (or use a
+recognized header). Tabs and pipes are unambiguous and always split.
+
 **Not** supported (reported, never guessed): full RFC CSV quoting, escaped delimiters
 inside names, multi-line quoted fields, Excel files, browser file upload, and fuzzy
 column inference beyond the narrow documented header aliases below.

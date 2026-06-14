@@ -1605,6 +1605,12 @@ match -> review -> plan -> projection pipeline.
   pipe, comma), basic trimming, and blank-line handling. Reported (never guessed):
   full RFC CSV quoting, escaped delimiters in names, multi-line quoted fields, Excel
   files, browser upload, and fuzzy column inference beyond the narrow header aliases.
+- **Comma-in-name protection (auto mode).** A single comma between two non-numeric
+  text cells is preserved as part of the player name (not split), protecting the
+  real-world "Last, First" `player_name` shape (e.g. `Cary, Hudson` stays one name). A
+  comma still splits when the row is clearly tabular: a recognized header, 3+ comma
+  cells, or a 2-cell row where either cell looks like a jersey number. An explicit
+  `delimiter: ','` or a recognized header always forces comma columns.
 - **Header aliases** (lowercased): playerName = name / player / player name /
   athlete; jerseyNumber = jersey / jersey # / number / no / #; grade = grade;
   notes = note / notes. `options.columns` maps explicit labels first, then aliases.

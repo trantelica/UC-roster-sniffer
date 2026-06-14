@@ -1201,6 +1201,12 @@ notes:        note, notes
 - **Unsupported delimiter / quoted CSV** are reported, never guessed: a quote
   character flags `quoted-csv-not-supported` and the line is parsed literally; full
   RFC CSV quoting, Excel files, and browser file upload are out of scope.
+- **Comma-in-name protection (auto mode).** A single comma between two non-numeric
+  text cells is preserved as the player name (not split), protecting the real-world
+  "Last, First" `player_name` shape (e.g. `Cary, Hudson`). A comma still splits when
+  the row is clearly tabular (recognized header, 3+ comma cells, or a 2-cell row where
+  either cell looks like a jersey number); an explicit `delimiter: ','` or a header
+  always forces comma columns.
 - **Target context** is validated independently and reported as
   `invalid-target-context` before preview creation, then passed through exactly.
   `parseRosterImportText`'s `ok` reflects structural success (no parser-level error);

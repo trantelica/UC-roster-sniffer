@@ -123,6 +123,70 @@ describe('auto delimiter detection', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Comma-in-name correction (Phase 5 slice 9 correction pass)
+//
+// A single comma between two non-numeric text cells is the real-world
+// "Last, First" player_name shape and must be preserved in auto mode, not split.
+// ---------------------------------------------------------------------------
+
+describe('comma-in-name preservation (auto delimiter)', () => {
+  it('auto preserves "Cary, Hudson" as one playerName', () => {
+    const result = parse('Cary, Hudson');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].playerName).toBe('Cary, Hudson');
+    expect(result.rows[0].jerseyNumber).toBeNull();
+    expect(result.rows[0].cells).toEqual(['Cary, Hudson']);
+  });
+
+  it('auto preserves multiple last-first style names line-by-line', () => {
+    const result = parse('Cary, Hudson\nSmith, John\nDoe, Jane');
+    expect(result.rows.map((r) => r.playerName)).toEqual([
+      'Cary, Hudson',
+      'Smith, John',
+      'Doe, Jane',
+    ]);
+    expect(result.rows.every((r) => r.jerseyNumber === null)).toBe(true);
+  });
+
+  it('explicit comma delimiter still parses two-column rows', () => {
+    const result = parse('12, Hudson Cary', { delimiter: ',' });
+    expect(result.delimiter).toBe(',');
+    expect(result.rows[0].jerseyNumber).toBe('12');
+    expect(result.rows[0].playerName).toBe('Hudson Cary');
+  });
+
+  it('comma header still parses recognized columns in auto mode', () => {
+    const result = parse('jersey,name\n12,Hudson Cary');
+    expect(result.summary.headerDetected).toBe(true);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].jerseyNumber).toBe('12');
+    expect(result.rows[0].playerName).toBe('Hudson Cary');
+  });
+
+  it('numeric jersey/name comma row still parses as two columns in auto mode', () => {
+    const result = parse('12, Hudson Cary', { hasHeader: false });
+    expect(result.delimiter).toBe(',');
+    expect(result.rows[0].jerseyNumber).toBe('12');
+    expect(result.rows[0].playerName).toBe('Hudson Cary');
+  });
+
+  it('name/jersey comma row (numeric second cell) still parses as two columns', () => {
+    const result = parse('Hudson Cary, 12', { hasHeader: false });
+    expect(result.rows[0].playerName).toBe('Hudson Cary');
+    expect(result.rows[0].jerseyNumber).toBe('12');
+  });
+
+  it('repeated calls are deterministic for comma-in-name input', () => {
+    const input = {
+      text: 'Cary, Hudson\nSmith, John',
+      targetContext: TARGET,
+      options: { delimiter: 'auto' as const },
+    };
+    expect(parseRosterImportText(input)).toEqual(parseRosterImportText(input));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 10-12. header handling
 // ---------------------------------------------------------------------------
 
