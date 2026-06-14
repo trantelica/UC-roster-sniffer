@@ -1251,6 +1251,43 @@ authority holds throughout: existing records and preview rows are referenced, ne
 mutated. Collision resolution, user decisions, and import apply remain later
 Phase 5 work.
 
+### Import identity review decision contract (Phase 5 slice 3)
+
+Phase 5 slice 3 captures the reviewer's choice from the collision workflow above as
+an append-only **decision** (`src/engine/rosterImportIdentityReviewDecision.ts`).
+It mirrors the Phase 4 action -> decision sequencing and is **decision capture
+only**: no collision resolution, no import apply, no repository, no persistence, no
+UI, and no roster mutation. A decision is a future-facing instruction a later apply
+step will consume.
+
+Action validation (`applyRosterImportIdentityReviewAction(entry, action)`):
+
+- **Allowed actions depend on entry status.** `no-match` allows create-new /
+  manual-link / defer; `single-candidate` and `multiple-candidates` allow
+  accept-candidate / reject-candidates / manual-link / create-new / defer;
+  `skipped-invalid-preview-row` and `skipped-review-preview-row` allow defer only.
+- **Required targets.** `accept-candidate` needs a `selectedExistingRecordId` that
+  is one of the entry's candidates; `manual-link` needs a `manualExistingRecordId`.
+  Every action needs a stable `previewSourceRowId` (a row with no stable id cannot
+  carry a decision).
+- **Effects are future-apply instructions.** accept-candidate / manual-link ->
+  `link-to-existing`; reject-candidates -> `reject-import-row` (rejects the
+  interpretation for now, never a deletion); create-new -> `create-new-roster-entry`
+  (no entry is created here); defer -> `defer-review`. A rejected action has effect
+  `no-effect`.
+
+Decision creation (`createRosterImportIdentityReviewDecision(actionResult,
+options)`): only an **accepted** result becomes a decision; rejected results are
+refused. `decisionId` / `createdAt` / `reviewedAt` are caller-provided (the helper
+never generates ids, never calls `Date.now()`, and never infers user identity).
+Decisions are append-only — supersession is recorded only via
+`audit.supersedesDecisionId`, and no prior decision is removed or rewritten.
+`validateRosterImportIdentityReviewDecision` enforces required keys, valid
+action/effect, their coherence, and that a `link-to-existing` decision carries a
+target; `summarizeRosterImportIdentityReviewDecisions` counts by action, effect,
+supersession, note, and validity. Applying decisions to an import, a decision
+repository, and the review UI remain later Phase 5 work.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

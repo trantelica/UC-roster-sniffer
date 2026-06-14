@@ -506,6 +506,28 @@ Import commit happens only after collision review.
   Preview Identity Match"), and `docs/derived-logic.md` ("Import preview identity
   match candidates (Phase 5 slice 2)"). Remaining Phase 5 work adds collision
   resolution, user decisions, and commit.
+- **Slice 3 (done): import identity review decision contract (engine only).**
+  `applyRosterImportIdentityReviewAction(entry, action)` validates a reviewer action
+  against a slice 2 match entry; `createRosterImportIdentityReviewDecision(actionResult,
+  options)` turns an accepted result into an append-only decision
+  (`src/engine/rosterImportIdentityReviewDecision.ts`), mirroring the Phase 4 action
+  -> decision sequencing. Allowed actions depend on entry status (skipped rows allow
+  defer only); `accept-candidate` needs a selected id present among the candidates,
+  `manual-link` needs a manual id, and every action needs a stable
+  `previewSourceRowId`. Effects (`link-to-existing`, `create-new-roster-entry`,
+  `reject-import-row`, `defer-review`, `no-effect`) are future-apply instructions —
+  reject rejects the interpretation for now (no deletion) and create-new creates
+  nothing here. Only accepted results become decisions; `decisionId` / `createdAt` /
+  `reviewedAt` are caller-provided (no id generation, no `Date.now()`, no inferred
+  identity); supersession is recorded only via `audit.supersedesDecisionId`.
+  `validateRosterImportIdentityReviewDecision` and
+  `summarizeRosterImportIdentityReviewDecisions` round out the contract. It reuses
+  (does not replace) the slice 1/2 contracts and adds **no** repository, apply,
+  persistence, or UI. See `docs/import-workflow.md` ("Roster import identity review
+  decisions (Phase 5 slice 3)"), `docs/data-model.md` ("Roster Import Identity Review
+  Decision"), and `docs/derived-logic.md` ("Import identity review decision contract
+  (Phase 5 slice 3)"). Remaining Phase 5 work adds a decision repository, applying
+  decisions to imports, and the review UI.
 
 ## Phase 6: Schedule and results
 

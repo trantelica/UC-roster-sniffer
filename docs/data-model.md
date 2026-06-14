@@ -643,6 +643,81 @@ invalid-existing-record
 - This slice is **engine only**: no collision resolution, no commit/apply, no
   prior-season comparison, no movement derivation, no persistence, and no UI.
 
+## Roster Import Identity Review Decision
+
+An import identity review decision (Phase 5 slice 3) is a **separate, append-only
+record** that captures a reviewer's choice about a slice 2 match entry and the
+future-apply instruction it implies. It is produced only from an **accepted**
+review action result (`applyRosterImportIdentityReviewAction`) and is built by
+`createRosterImportIdentityReviewDecision` (`src/engine/rosterImportIdentityReviewDecision.ts`).
+It never rewrites roster records, preview rows, or existing roster records, and it
+applies nothing on its own — a later apply step consumes it.
+
+```json
+{
+  "decisionId": "import-2026-001-r1",
+  "previewSourceRowId": "r1",
+  "previewRowIndex": 0,
+  "action": "accept-candidate",
+  "effect": "link-to-existing",
+  "selectedExistingRecordId": "alta-GI-A1-jordan-smith",
+  "manualExistingRecordId": null,
+  "reasonCodes": ["accept-candidate-confirmed"],
+  "createdAt": "2026-06-13T00:00:00Z",
+  "reviewedAt": "2026-06-13T00:00:00Z",
+  "reviewedBy": "coach-1",
+  "note": "Confirmed same player.",
+  "audit": {
+    "logicVersion": "phase5-slice3-import-identity-review-decision-v1",
+    "sourceEntryStatus": "single-candidate",
+    "supersedesDecisionId": "import-2026-001-r1-prev"
+  }
+}
+```
+
+### Action values
+
+```text
+accept-candidate
+reject-candidates
+manual-link
+create-new
+defer
+```
+
+### Effect values
+
+```text
+link-to-existing
+create-new-roster-entry
+reject-import-row
+defer-review
+no-effect
+```
+
+### Notes
+
+- **Append-only.** A later decision may reference an earlier one via
+  `audit.supersedesDecisionId`, but never edits or deletes the earlier decision.
+- **Accepted-only.** Only an accepted review action result becomes a decision;
+  rejected action results never persist.
+- **Future-facing instruction.** `effect` describes what a future apply step *may*
+  do. `reject-import-row` rejects the candidate interpretation for now — it never
+  deletes the import row or any roster record. `create-new-roster-entry` does not
+  create a roster entry in this slice.
+- **Roster authority.** A decision never mutates roster rows, existing records,
+  preview rows, or prior seasons.
+- **Deterministic ids/timestamps.** `decisionId`, `createdAt`, and `reviewedAt` are
+  caller-provided; the engine helpers never generate ids, read the wall clock, or
+  infer user identity. `reviewedBy` is optional.
+- **Coherence.** `action` and `effect` are paired (`accept-candidate` /
+  `manual-link` -> `link-to-existing`, `reject-candidates` -> `reject-import-row`,
+  `create-new` -> `create-new-roster-entry`, `defer` -> `defer-review`). A
+  `link-to-existing` decision must carry a `selectedExistingRecordId` or
+  `manualExistingRecordId`.
+- This slice defines the **action + decision contract only** — no repository, no
+  apply, no persistence, and no UI.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

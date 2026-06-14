@@ -169,6 +169,55 @@ apply imports, compare against prior seasons, derive movement status, persist, o
 render UI. Candidate matches feed the collision review (stage 5) and commit
 (stage 6) below, which remain later Phase 5 work.
 
+## Roster import identity review decisions (Phase 5 slice 3)
+
+The third Phase 5 slice adds a pure, deterministic **action + decision contract**
+for the collision review (stage 5 below):
+`src/engine/rosterImportIdentityReviewDecision.ts`. It defines what a reviewer may
+DO with a slice 2 match entry and how that choice is captured as an append-only
+DECISION record. It mirrors the Phase 4 sequencing (action -> decision; a
+repository comes later). It is **decision capture only** — not collision
+resolution, not import apply/commit, not a repository, not persistence, not file
+parsing, not UI, and not roster mutation.
+
+Review actions, by entry status:
+
+| Entry status | Allowed actions |
+| --- | --- |
+| `no-match` | create-new, manual-link, defer |
+| `single-candidate` | accept-candidate, reject-candidates, manual-link, create-new, defer |
+| `multiple-candidates` | accept-candidate, reject-candidates, manual-link, create-new, defer |
+| `skipped-invalid-preview-row` | defer only |
+| `skipped-review-preview-row` | defer only |
+
+`applyRosterImportIdentityReviewAction(entry, action)` validates one action against
+one entry and returns an accepted/rejected result with a future-apply `effect`
+(`link-to-existing`, `create-new-roster-entry`, `reject-import-row`,
+`defer-review`, or `no-effect` when rejected). `accept-candidate` requires a
+`selectedExistingRecordId` that exists among the entry's candidates; `manual-link`
+requires a `manualExistingRecordId`; any action requires a stable
+`previewSourceRowId`.
+
+Meaning of the actions (all future-facing — nothing is written here):
+
+- **reject-candidates** rejects the proposed candidate interpretation *for now*. It
+  never deletes the import row or any existing roster record.
+- **create-new** is only an instruction that a future apply *may* create a new
+  roster entry. No roster entry is created in this slice.
+- **manual-link** records an explicit link to a caller-supplied existing record id.
+- **defer** records that review was deferred and has no effect.
+
+`createRosterImportIdentityReviewDecision(actionResult, options)` turns an
+**accepted** result into an append-only `RosterImportIdentityReviewDecision`.
+Caller-provided `decisionId`, `createdAt`, and `reviewedAt` are required (the helper
+never generates ids, never calls `Date.now()`, and never infers user identity).
+Rejected results cannot become decisions. Supersession is represented only by
+`audit.supersedesDecisionId`; prior decisions are never removed or rewritten.
+`validateRosterImportIdentityReviewDecision` and
+`summarizeRosterImportIdentityReviewDecisions` round out the contract. Applying
+decisions to an import, a decision repository, and the review UI remain later
+Phase 5 work.
+
 ## Roster import stages
 
 ### 1. Parse source data

@@ -395,6 +395,30 @@ Slice status:
   **not** resolve collisions, capture decisions, apply imports, compare prior
   seasons, derive movement, persist, or render UI. Collision resolution, user
   decisions, and commit remain later Phase 5 work.
+- **Slice 3 (done): import identity review decision contract (engine only).** Pure
+  helpers (`applyRosterImportIdentityReviewAction`,
+  `createRosterImportIdentityReviewDecision`,
+  `validateRosterImportIdentityReviewDecision`,
+  `summarizeRosterImportIdentityReviewDecisions`) define what a reviewer may do with
+  a slice 2 match entry and capture it as an append-only decision, mirroring the
+  Phase 4 action -> decision sequencing. Allowed actions depend on entry status
+  (`no-match`: create-new / manual-link / defer; `single-candidate` /
+  `multiple-candidates`: accept-candidate / reject-candidates / manual-link /
+  create-new / defer; skipped rows: defer only). `accept-candidate` requires a
+  selected id present among the candidates; `manual-link` requires a manual id;
+  every action requires a stable `previewSourceRowId`. Effects are future-apply
+  instructions (`link-to-existing`, `create-new-roster-entry`, `reject-import-row`,
+  `defer-review`, `no-effect`): reject means reject the interpretation for now (no
+  deletion) and create-new creates nothing here. Only accepted results become
+  decisions; `decisionId` / `createdAt` / `reviewedAt` are caller-provided (no id
+  generation, no `Date.now()`, no inferred identity); supersession is recorded only
+  via `audit.supersedesDecisionId`. See `docs/import-workflow.md` ("Roster import
+  identity review decisions (Phase 5 slice 3)"), `docs/data-model.md` ("Roster
+  Import Identity Review Decision"), and `docs/derived-logic.md` ("Import identity
+  review decision contract (Phase 5 slice 3)"). This slice reuses (does not replace)
+  the slice 1/2 contracts and adds **no** repository, apply, persistence, or UI.
+  Applying decisions, a decision repository, and the review UI remain later Phase 5
+  work.
 
 ## Phase 6: Schedule and result support
 
