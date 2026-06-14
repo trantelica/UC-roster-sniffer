@@ -1386,6 +1386,154 @@ blockers, and a row-level `canCommit`;
 `getRosterImportCommitPreviewPlanRowsBlockingCommit` filter the rows. Performing the
 commit and the review UI remain later Phase 5 / Phase 6 work.
 
+### Phase 5 checkpoint: import preview and identity collision pipeline (Phase 5 slice 7)
+
+Phase 5 slices 1–6 are **complete / checkpointed**. Together they build one
+engine-only, pure-and-deterministic import pipeline that stages candidate roster
+rows, generates identity match candidates against existing roster records, captures
+an append-only reviewer decision, stores those decisions in a local
+storage-boundary repository, resolves decisions against matches into an effective
+in-memory outcome per row, and folds those outcomes into a dry-run commit preview
+plan. This slice adds **no product logic**; it confirms the contracts and the layer
+boundaries before any future import application / projection slice. It mirrors the
+Phase 4 slice 10 checkpoint.
+
+#### End-to-end pipeline
+
+The data flows in one direction, each stage layered on top of the previous one
+(never folded into it). Every stage lives in `src/engine/` and is covered by a
+matching `src/test/` suite.
+
+1. **Import preview rows** — `createRosterImportPreview`
+   (`rosterImportPreview.ts`). Stages each candidate roster row into a
+   non-destructive preview row (input order, deterministic `rowIndex`, original
+   `playerName`, `normalizedIdentityKey`, preserved passthrough `fields`, per-row
+   `issues`, and a `status` of `ready` / `needs-review` / `invalid`). Every input
+   row is preserved; ambiguity affects metadata only. No file parsing, no
+   comparison against existing rosters.
+2. **Identity match candidates** — `createRosterImportPreviewIdentityMatches`
+   (`rosterImportPreviewIdentityMatch.ts`). Produces, per ready preview row, the
+   existing roster records it might correspond to (`no-match` /
+   `single-candidate` / `multiple-candidates`), with skipped entries for
+   `invalid` / `needs-review` rows. Exact normalized identity key only; jersey
+   assists but never decides. Candidate generation only — no resolution.
+3. **Review action + decision contract** —
+   `applyRosterImportIdentityReviewAction` -> `createRosterImportIdentityReviewDecision`
+   (`rosterImportIdentityReviewDecision.ts`). Validates what a reviewer may do with
+   a match entry and captures an **accepted** choice as an append-only
+   `RosterImportIdentityReviewDecision` (a future-apply instruction). Ids and
+   timestamps are caller-provided; supersession is recorded only via
+   `audit.supersedesDecisionId`.
+4. **Decision repository / storage boundary** —
+   `rosterImportIdentityReviewDecisionRepository.ts`. Models the local data
+   boundary (`{ version, decisions }`) with pure append / load / active-view /
+   export / import helpers. An in-memory adapter plus a JSON-compatible
+   export/import contract — not real persistence.
+5. **Effective decision application** —
+   `applyRosterImportIdentityReviewDecisionsToMatches`
+   (`rosterImportIdentityReviewDecisionApplication.ts`). Resolves match entries
+   against the active decisions in memory, computing an effective outcome per row
+   (`unresolved` / `link-to-existing` / `create-new` / `rejected` / `deferred` /
+   `skipped-*` / `conflict`). No decision -> `unresolved`; a high-confidence single
+   candidate is never auto-linked. Conflicting current decisions are never resolved
+   by array order.
+6. **Dry-run commit preview plan** — `createRosterImportCommitPreviewPlan`
+   (`rosterImportCommitPreviewPlan.ts`). Folds applied outcomes into a per-row plan
+   (`planStatus` + `plannedOperation` + `targetExistingRecordId` + `reasons` +
+   `blockers`) and a top-level `canCommit` readiness gate. `ready-to-link` /
+   `ready-to-create` are future intended operations, never writes.
+
+#### The distinct data layers
+
+Phase 5 keeps these layers strictly separate, and the data model must not collapse
+them (see `docs/data-model.md`, "Phase 5 checkpoint: import pipeline layers"):
+
+1. **Loaded authoritative roster data** — `Player`, `Player Season Assignment`,
+   `Team`, and the existing roster identity records supplied to matching. Loaded
+   and authoritative.
+2. **Import preview rows** — staged candidate rows (slice 1). Not roster records.
+3. **Identity match entries** — per-row candidate metadata against existing records
+   (slice 2). Not a resolution, not a decision.
+4. **Review actions** — a validated reviewer intent against one match entry
+   (slice 3). Not yet a stored decision.
+5. **Append-only review decisions** — the captured `RosterImportIdentityReviewDecision`
+   records (slice 3). Separate records, never roster rows.
+6. **Decision repository state** — the local `{ version, decisions }` boundary
+   (slice 4). In-memory model + JSON export/import only.
+7. **Applied / effective outcome entries** — the in-memory per-row effective
+   outcome (slice 5). Derived state, not a write.
+8. **Dry-run commit preview plan rows** — the per-row planned operation and
+   blockers plus the top-level `canCommit` gate (slice 6). A plan, not a commit.
+
+#### Hard roster authority rule (carried forward, unchanged)
+
+- Loaded roster records remain authoritative (see `## Roster authority`).
+- Import preview, matching, decisions, application, and the commit plan must never
+  alter, remove, suppress, merge, nullify, rewrite, reorder, or ignore rostered
+  names.
+- Duplicate or ambiguous names affect **metadata / review state only**.
+- Invalid, duplicate, skipped, rejected, and deferred import rows remain preserved
+  as rows throughout the pipeline — nothing is dropped, and source objects are
+  referenced (never mutated) at every stage.
+
+#### Phase 5 is pure and deterministic
+
+Across the whole pipeline so far there is:
+
+- no file parsing;
+- no file upload;
+- no browser persistence;
+- no `localStorage`;
+- no `IndexedDB`;
+- no React state wiring;
+- no UI;
+- no sample-data mutation;
+- no roster mutation;
+- no import apply / commit.
+
+Ids and timestamps are always caller-provided, so output is fully reproducible.
+
+#### Append-only decision semantics
+
+- Review decisions are **append-only**.
+- Superseded decisions remain in repository history (referenced by
+  `audit.supersedesDecisionId`); they are never overwritten or removed.
+- The active view excludes superseded decisions only.
+- Decisions can influence derived **effective outcomes only** (via slice 5
+  application); they never mutate preview rows, match entries, roster records, or
+  sample data.
+
+#### Dry-run plan semantics
+
+- `ready-to-link` and `ready-to-create` are **future intended operations only** —
+  no record is linked or created.
+- `rejected` and `deferred` rows remain preserved (an explicit reviewer outcome,
+  not a deletion); they do **not** block commit.
+- `blocked-*` rows prevent commit availability.
+- **No decision means `unresolved`**, which blocks.
+- A high-confidence single candidate is **never** auto-linked.
+- Top-level `canCommit` is the **authoritative readiness gate** (`summary.canCommit`
+  is row-level only and ignores target context).
+
+#### Terminology confirmed
+
+- **"commit preview plan"** means the **dry-run plan only**.
+- **"ready-to-create"** does **not** create a roster entry.
+- **"ready-to-link"** does **not** link records.
+- **"rejected"** does **not** delete an import row.
+- **"deferred"** keeps review pending.
+- **"blocked"** prevents future commit availability until resolved.
+
+#### Boundary for the next possible slice
+
+- A future slice **may** produce a pure in-memory import **application / projection**
+  from a committable plan.
+- That projection **may** describe the resulting roster additions / links, but it
+  must still **not** persist, mutate sample data, parse files, or wire UI unless
+  explicitly approved.
+- Actual browser persistence, CSV / file parsing, and the review UI remain separate
+  later slices.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

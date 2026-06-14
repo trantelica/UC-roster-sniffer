@@ -337,6 +337,84 @@ round out the contract. The hard roster authority rule still applies: rows prese
 their source applied entry by reference and nothing is written. Performing the
 commit and the review UI remain later Phase 5 / Phase 6 work.
 
+## Phase 5 checkpoint: import pipeline (Phase 5 slice 7)
+
+Phase 5 slices 1–6 are **complete / checkpointed**. This slice is a
+documentation / spec-alignment checkpoint that adds **no product logic**. It records
+the import preview and identity collision pipeline end-to-end through the dry-run
+commit preview plan, and it pins the layer boundaries before any future import
+application / projection slice. The deeper engine-level checkpoint lives in
+`docs/derived-logic.md` ("Phase 5 checkpoint: import preview and identity collision
+pipeline (Phase 5 slice 7)").
+
+### Pipeline end-to-end (so far)
+
+1. **Import preview rows** — `createRosterImportPreview` (slice 1). Non-destructive
+   staging of every candidate row.
+2. **Identity match candidates** — `createRosterImportPreviewIdentityMatches`
+   (slice 2). Per ready row, the existing records it might correspond to.
+3. **Review action + decision contract** —
+   `applyRosterImportIdentityReviewAction` -> `createRosterImportIdentityReviewDecision`
+   (slice 3). An append-only reviewer decision (a future-apply instruction).
+4. **Decision repository** — `rosterImportIdentityReviewDecisionRepository` (slice
+   4). Local `{ version, decisions }` storage-boundary contract.
+5. **Effective decision application** —
+   `applyRosterImportIdentityReviewDecisionsToMatches` (slice 5). The effective
+   in-memory outcome per row.
+6. **Dry-run commit preview plan** — `createRosterImportCommitPreviewPlan` (slice
+   6). Per-row planned operation + blockers + the `canCommit` gate.
+
+### Distinct data layers
+
+Loaded authoritative roster data -> import preview rows -> identity match entries ->
+review actions -> append-only review decisions -> decision repository state ->
+applied / effective outcome entries -> dry-run commit preview plan rows. Each layer
+is separate and must not be collapsed.
+
+### Hard roster authority rule
+
+- Loaded roster records remain authoritative.
+- Import preview must **never** alter, remove, suppress, merge, nullify, rewrite,
+  reorder, or ignore rostered names.
+- Duplicate or ambiguous names affect **metadata / review state only**.
+- Invalid, duplicate, skipped, rejected, and deferred import rows remain preserved
+  as rows.
+
+### Current Phase 5 purity / boundaries
+
+No file parsing, no file upload, no browser persistence, no `localStorage`, no
+`IndexedDB`, no React wiring, no UI, no sample-data mutation, no roster mutation, and
+no import apply / commit. Ids and timestamps are caller-provided.
+
+### Decision semantics
+
+Review decisions are append-only; superseded decisions stay in repository history
+(active view excludes them only); decisions can influence derived effective outcomes
+only and never mutate preview rows, match entries, roster records, or sample data.
+
+### Dry-run plan semantics
+
+`ready-to-link` / `ready-to-create` are future intended operations only; `rejected`
+and `deferred` rows remain preserved and do not block; `blocked-*` rows prevent
+commit availability; no decision means `unresolved`; a high-confidence single
+candidate does not auto-link; top-level `canCommit` is the authoritative readiness
+gate.
+
+### Terminology
+
+"commit preview plan" means the dry-run plan only; "ready-to-create" does not create
+a roster entry; "ready-to-link" does not link records; "rejected" does not delete an
+import row; "deferred" keeps review pending; "blocked" prevents future commit
+availability until resolved.
+
+### Boundary for the next possible slice
+
+A future slice may produce a pure **in-memory import application / projection** from
+a committable plan, describing the resulting roster additions / links. Even then it
+must not persist, mutate sample data, parse files, or wire UI unless explicitly
+approved. Actual browser persistence, CSV / file parsing, and the review UI remain
+separate later slices.
+
 ## Roster import stages
 
 ### 1. Parse source data

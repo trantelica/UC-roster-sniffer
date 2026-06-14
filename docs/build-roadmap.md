@@ -32,7 +32,8 @@ sits ahead of canonical Phase 1.
 
 ## Current status checkpoint
 
-As of the Phase 4 checkpoint:
+As of the Phase 5 checkpoint (slices 1–6 complete; slice 7 is this
+documentation/spec-alignment checkpoint):
 
 - **Specification baseline — complete.** Governing docs and sample data contracts
   exist in the repo.
@@ -73,13 +74,30 @@ As of the Phase 4 checkpoint:
   `localStorage` / `IndexedDB`, no file writes, no React/UI wiring, no sample-data
   mutation, no roster mutation, and no reset side effect.
 
+- **Import preview and identity collision handling (Phase 5) — slices 1–6
+  complete / checkpointed (slice 7).** A single engine-only,
+  pure-and-deterministic import pipeline stages candidate roster rows into a
+  non-destructive preview (slice 1), generates identity match candidates against
+  existing roster records (slice 2), captures an append-only review decision from a
+  validated reviewer action (slice 3), models a local decision repository /
+  storage-boundary (slice 4), resolves decisions against matches into an effective
+  in-memory outcome per row (slice 5), and folds those outcomes into a dry-run
+  commit preview plan with a `canCommit` readiness gate (slice 6). Slice 7 (this
+  slice) is the documentation/spec-alignment checkpoint; see
+  `docs/derived-logic.md` ("Phase 5 checkpoint"). Phase 5 so far has no file
+  parsing, no file upload, no persistence, no browser storage, no `localStorage` /
+  `IndexedDB`, no React/UI wiring, no sample-data mutation, no roster mutation, and
+  no import apply/commit.
+
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
 or ignores source roster records. Ambiguity affects derived metadata only.
 
-Next: Phase 5 (import preview and identity collision handling). Phase 5 must
-preserve loaded roster authority and must not discard duplicate or ambiguous
-roster entries.
+Next (optional): a pure **in-memory import application / projection** from a
+committable plan — describing the resulting roster additions / links without
+persisting, mutating sample data, parsing files, or wiring UI unless explicitly
+approved. Actual browser persistence, file parsing, and the review UI remain
+separate later slices.
 
 ## Phase 0: Specification baseline
 
@@ -494,6 +512,36 @@ Slice status:
   `docs/derived-logic.md` ("Import commit preview / dry-run plan (Phase 5 slice 6)").
   It reuses (does not replace) the slice 5 application contract. Performing the
   commit and the review UI remain later Phase 5 / Phase 6 work.
+- **Slice 7 (done): Phase 5 checkpoint and import pipeline integration summary
+  (docs only).** A documentation / spec-alignment slice that adds no product logic.
+  It records the full Phase 5 import pipeline end-to-end (import preview rows ->
+  identity match candidates -> review action/decision contract -> decision
+  repository -> effective decision application -> dry-run commit preview plan) and
+  confirms the standing contracts: the distinct data layers (loaded authoritative
+  roster data, preview rows, match entries, review actions, append-only review
+  decisions, decision repository state, applied/effective outcome entries, dry-run
+  commit plan rows); the hard roster authority rule (loaded records authoritative,
+  duplicate/ambiguous names affect metadata/review state only, invalid / duplicate /
+  skipped / rejected / deferred rows preserved as rows); Phase 5 purity (no file
+  parsing, no file upload, no browser persistence, no `localStorage` / `IndexedDB`,
+  no React wiring, no UI, no sample-data mutation, no roster mutation, no import
+  apply/commit); append-only decision semantics (superseded decisions stay in
+  history, active view excludes them, decisions influence derived effective outcomes
+  only); dry-run plan semantics (`ready-to-link` / `ready-to-create` are future
+  operations only, rejected/deferred preserved and non-blocking, `blocked-*`
+  prevents commit, no decision means unresolved, high-confidence single candidates
+  never auto-link, top-level `canCommit` authoritative); and terminology ("commit
+  preview plan" = dry-run only; ready-to-create/ready-to-link/rejected/deferred/
+  blocked meanings). It defines the boundary for the next optional slice: a pure
+  in-memory import application / projection from a committable plan that still must
+  not persist, mutate sample data, parse files, or wire UI unless explicitly
+  approved. See `docs/derived-logic.md` ("Phase 5 checkpoint"),
+  `docs/data-model.md` ("Phase 5 checkpoint: import pipeline layers"),
+  `docs/import-workflow.md` ("Phase 5 checkpoint: import pipeline (Phase 5 slice
+  7)"), and `docs/ui-workflow.md` ("Import pipeline UI (Phase 5 checkpoint)").
+  Phase 5 slices 1–6 are **complete / checkpointed**; the next optional slice is a
+  pure in-memory import application / projection (not actual persistence), and
+  actual browser persistence, file parsing, and the review UI remain later slices.
 
 ## Phase 6: Schedule and result support
 

@@ -597,6 +597,48 @@ Import commit happens only after collision review.
   `docs/derived-logic.md` ("Import commit preview / dry-run plan (Phase 5 slice 6)").
   Remaining Phase 5 work performs the commit (applies the plan to the roster) and
   adds the review UI.
+- **Slice 7 (done): Phase 5 checkpoint and import pipeline integration summary
+  (docs only).** A documentation / spec-alignment slice that adds no product logic.
+  It documents the full Phase 5 import pipeline end-to-end (import preview rows ->
+  identity match candidates -> review action/decision contract -> decision
+  repository -> effective decision application -> dry-run commit preview plan) and
+  confirms the standing contracts: the distinct data layers (loaded authoritative
+  roster data, preview rows, match entries, review actions, append-only review
+  decisions, decision repository state, applied/effective outcome entries, dry-run
+  commit plan rows); the hard roster authority rule (loaded records authoritative;
+  duplicate/ambiguous names affect metadata/review state only; invalid / duplicate /
+  skipped / rejected / deferred import rows preserved as rows); Phase 5 purity (no
+  file parsing, no file upload, no browser persistence, no `localStorage` /
+  `IndexedDB`, no React wiring, no UI, no sample-data mutation, no roster mutation,
+  no import apply/commit); append-only decision semantics (superseded decisions stay
+  in history; active view excludes them; decisions influence derived effective
+  outcomes only); dry-run plan semantics (`ready-to-link` / `ready-to-create` are
+  future operations only; rejected/deferred preserved and non-blocking; `blocked-*`
+  prevents commit; no decision means unresolved; high-confidence single candidates
+  never auto-link; top-level `canCommit` authoritative); and the terminology
+  ("commit preview plan" = dry-run only; ready-to-create/ready-to-link/rejected/
+  deferred/blocked meanings). It defines the boundary for the next optional slice: a
+  pure in-memory import application / projection from a committable plan that still
+  must not persist, mutate sample data, parse files, or wire UI unless explicitly
+  approved. See `docs/derived-logic.md` ("Phase 5 checkpoint"), `docs/data-model.md`
+  ("Phase 5 checkpoint: import pipeline layers"), `docs/import-workflow.md` ("Phase 5
+  checkpoint: import pipeline (Phase 5 slice 7)"), `docs/ui-workflow.md` ("Import
+  pipeline UI (Phase 5 checkpoint)"), and `docs/build-roadmap.md`.
+
+### Phase 5 checkpoint
+
+Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
+checkpointed**, and slice 7 documents and confirms the contracts. The acceptance
+criteria above are met by the engine pipeline: low-confidence collisions are never
+silently committed (unresolved identities and high-confidence single candidates
+block — never auto-link), user decisions are captured as append-only records, and
+the dry-run commit plan gates commit availability behind collision review
+(`canCommit`). Phase 5 so far is engine-only with no file parsing, no persistence,
+no UI, and no import apply/commit. The next narrow work is **optional**: a pure
+in-memory import application / projection from a committable plan (not actual
+persistence), which must still not persist, mutate sample data, parse files, or wire
+UI unless explicitly approved. Actual browser persistence, CSV / file parsing, and
+the review UI remain separate later slices.
 
 ## Phase 6: Schedule and results
 
