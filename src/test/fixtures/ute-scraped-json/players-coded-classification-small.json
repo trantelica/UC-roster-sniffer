@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "organization": "Ute Conference",
+    "event": "2023 Fall Season",
+    "age_division": "GR League 9",
+    "age_division_alias": "GR",
+    "year": 2023,
+    "record_type": "players",
+    "total_districts": 1,
+    "districts_with_league": 1,
+    "districts_without_league": 0,
+    "total_teams": 1,
+    "total_players": 2,
+    "scraped_at": "2023-09-01T00:00:00Z",
+    "source_url": "https://ute.example/2023/gr/players"
+  },
+  "districts": [
+    {
+      "district": "Alta",
+      "league": "GR League 9",
+      "teams_count": 1,
+      "teams": [
+        {
+          "team_name": "Gremlin A2",
+          "source_url": "https://ute.example/2023/gr/alta/a2",
+          "players_count": 2,
+          "players": [
+            { "name": "Cee Dee" },
+            { "name": "Ef Gee" }
+          ]
+        }
+      ]
+    }
+  ]
+}

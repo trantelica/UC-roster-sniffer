@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "organization": "Ute Conference",
+    "event": "2022 Fall Season",
+    "age_division": "PW League 10",
+    "age_division_alias": "PW",
+    "year": 2022,
+    "record_type": "coaches",
+    "total_districts": 1,
+    "districts_with_league": 1,
+    "districts_without_league": 0,
+    "total_teams": 2,
+    "total_coaches": 3,
+    "scraped_at": "2022-09-01T00:00:00Z",
+    "source_url": "https://ute.example/2022/pw/coaches"
+  },
+  "districts": [
+    {
+      "district": "Alta",
+      "league": "PW League 10",
+      "teams_count": 2,
+      "teams": [
+        {
+          "team_name": "PeeWee C1",
+          "source_url": "https://ute.example/2022/pw/alta/c1",
+          "coaches_count": 2,
+          "coaches": [
+            { "name": "John Smith", "title": "Head Coach" },
+            { "name": "Dana Park", "title": "Asst Coach" }
+          ]
+        },
+        {
+          "team_name": "PeeWee A3",
+          "source_url": "https://ute.example/2022/pw/alta/a3",
+          "coaches_count": 1,
+          "coaches": [
+            { "name": "Lee Roy", "title": "Head Coach" }
+          ]
+        }
+      ]
+    }
+  ]
+}

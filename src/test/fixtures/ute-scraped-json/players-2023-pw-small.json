@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "organization": "Ute Conference",
+    "event": "2023 Fall Season",
+    "age_division": "PW League 10",
+    "age_division_alias": "PW",
+    "year": 2023,
+    "record_type": "players",
+    "total_districts": 1,
+    "districts_with_league": 1,
+    "districts_without_league": 0,
+    "total_teams": 2,
+    "total_players": 4,
+    "scraped_at": "2023-09-01T00:00:00Z",
+    "source_url": "https://ute.example/2023/pw/players"
+  },
+  "districts": [
+    {
+      "district": "Alta",
+      "league": "PW League 10",
+      "teams_count": 2,
+      "teams": [
+        {
+          "team_name": "PeeWee C1",
+          "source_url": "https://ute.example/2023/pw/alta/c1",
+          "players_count": 2,
+          "players": [
+            { "name": "Cary, Hudson" },
+            { "name": "Moyer , Knox" }
+          ]
+        },
+        {
+          "team_name": "PeeWee A3",
+          "source_url": "https://ute.example/2023/pw/alta/a3",
+          "players_count": 2,
+          "players": [
+            { "name": "Sam Lee" },
+            { "name": "Pat Ng" }
+          ]
+        }
+      ]
+    }
+  ]
+}

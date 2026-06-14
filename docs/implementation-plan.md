@@ -763,6 +763,22 @@ Import commit happens only after collision review.
   full-file readiness report (Phase 5 slice 12)"), `docs/build-roadmap.md`, and
   `docs/ui-workflow.md`. A review/import UI may later consume this report; that and the
   other later-work items remain gated on explicit approval.
+- **Slice 13 (done): scraped JSON fixture contracts (engine-only, test hardening).**
+  A fixture/contract slice that adds **no production logic**. Small hand-curated
+  fixtures under `src/test/fixtures/ute-scraped-json/` (players, coaches, empty-league
+  snapshots, a comma name `Cary, Hudson`, an extra-space name `Moyer , Knox`, a
+  non-breaking-space coach name, `Head Coach` / `Asst Coach` titles, a coded
+  classification `Gremlin A2`, and a color team `Scout White`) are exercised through
+  the existing slice 10/11/12 public helpers by
+  `src/test/uteConferenceScrapedJsonFixtureContracts.test.ts`. The tests prove raw
+  names/titles/source URLs/order are preserved, coded classifications map while color
+  teams stay unresolved, empty snapshots are valid, payloads are never mutated, output
+  is deterministic, and the engine modules expose no apply/commit/write/persist API.
+  Fixtures are test contracts only — not bundled into the app, no app-visible sample
+  data — with no UI, persistence, file upload, import apply, roster mutation, movement
+  derivation, or coach analytics. See `docs/import-workflow.md`, `docs/data-model.md`,
+  `docs/derived-logic.md` (all "Scraped JSON fixture contracts (Phase 5 slice 13)"),
+  and `docs/build-roadmap.md`.
 
 ### Phase 5 checkpoint
 
@@ -771,8 +787,9 @@ checkpointed**, slice 7 documents and confirms the contracts, slice 8 adds a pur
 in-memory import application / projection from a committable plan, slice 9 adds a pure
 text / CSV-like parser into the slice 1 preview contract, slice 10 adds a source
 adapter for harvested Ute Conference scraped JSON (players and coaches), slice 11
-adds canonical source-label mapping over that adapter, and slice 12 adds a full-file
-readiness report that classifies every team target. The acceptance criteria above
+adds canonical source-label mapping over that adapter, slice 12 adds a full-file
+readiness report that classifies every team target, and slice 13 hardens slices 10–12
+with representative scraped JSON fixture contracts (test-only). The acceptance criteria above
 are met by the engine pipeline: low-confidence collisions are never silently committed
 (unresolved identities and high-confidence single candidates block — never
 auto-link), user decisions are captured as append-only records, and the dry-run commit
