@@ -1208,6 +1208,49 @@ The user can:
 - manually link to an existing person
 - create a new person
 
+### Import preview identity match candidates (Phase 5 slice 2)
+
+Phase 5 slice 2 adds the first derived layer of the collision workflow above:
+**candidate identity matching** (`createRosterImportPreviewIdentityMatches`,
+`src/engine/rosterImportPreviewIdentityMatch.ts`). It consumes the slice 1 preview
+rows plus a set of existing roster identity records and produces, per preview row,
+the existing records it might correspond to — the "proposed match / confidence /
+reason codes" inputs the collision UI will later present. It is **candidate
+generation only**: it does not resolve collisions, capture user decisions, or apply
+imports.
+
+Contract:
+
+- **Only `ready` rows are matched.** `invalid` rows become
+  `skipped-invalid-preview-row` and `needs-review` rows become
+  `skipped-review-preview-row`; both are preserved, never dropped.
+- **Exact normalized identity key only.** Matching reuses the Phase 2
+  `getPlayerIdentityKey` helper — no fuzzy matching, no nickname inference, no
+  prior-season comparison. One existing match -> `single-candidate`; more than one
+  -> `multiple-candidates` (review); none -> `no-match`.
+- **Jersey assists, never decides.** A matching jersey number adds a
+  `matching-jersey-number` reason and raises confidence one notch within an
+  exact-name candidate group (capped at `high`). It never creates a match on its
+  own — different names that share a jersey number do not match.
+- **Ambiguity becomes review metadata.** Duplicate existing names
+  (`existing-duplicate-name`, `same-name-duplicate-existing`, confidence `low`) and
+  duplicate ready-preview names (`preview-duplicate-name`,
+  `same-name-duplicate-preview`, confidence `low`) are flagged for review, never
+  discarded. A clean single match is `exact-identity-key` at `high` confidence.
+- **Deterministic ordering.** Entries follow preview row order; candidates follow
+  existing-record input order.
+- **No throwing on bad input.** An existing record with a missing/blank name is
+  reported as a result-level `invalid-existing-record` issue and excluded from
+  matching only.
+
+`getRosterImportPreviewIdentityMatchesReadyForApply` returns only unambiguous
+single high-confidence entries with no review issues (a candidate set for a future
+apply workflow); `getRosterImportPreviewIdentityMatchesNeedingReview` returns
+multiple-candidate entries and any entry carrying a warning/error issue. Roster
+authority holds throughout: existing records and preview rows are referenced, never
+mutated. Collision resolution, user decisions, and import apply remain later
+Phase 5 work.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

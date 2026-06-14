@@ -518,6 +518,131 @@ invalid-target-context
 - This slice is **contract only**: no file/CSV parsing, no identity collision
   resolution, no import commit/apply, no persistence, and no UI.
 
+## Roster Import Preview Identity Match
+
+A roster import preview identity match (Phase 5 slice 2) is a **pure, in-memory,
+non-destructive** structure produced by
+`createRosterImportPreviewIdentityMatches` (`src/engine/rosterImportPreviewIdentityMatch.ts`).
+It pairs slice 1 preview rows with existing roster identity records supplied in the
+input and records candidate matches for later collision review. It is candidate
+metadata only — not a resolved match, not a decision, and not a commit.
+
+```json
+{
+  "entries": [
+    {
+      "previewSourceRowId": "r1",
+      "previewRowIndex": 0,
+      "previewPlayerName": "Jordan Smith",
+      "previewNormalizedIdentityKey": "jordan smith",
+      "status": "single-candidate",
+      "candidates": [
+        {
+          "previewSourceRowId": "r1",
+          "previewRowIndex": 0,
+          "existingRecordId": "alta-GI-A1-jordan-smith",
+          "existingPlayerName": "Jordan Smith",
+          "matchType": "exact-identity-key",
+          "confidence": "high",
+          "reasons": ["exact-normalized-name-match"]
+        }
+      ],
+      "issues": []
+    }
+  ],
+  "summary": {
+    "totalEntries": 1,
+    "noMatchEntries": 0,
+    "singleCandidateEntries": 1,
+    "multipleCandidateEntries": 0,
+    "skippedInvalidEntries": 0,
+    "skippedReviewEntries": 0,
+    "readyForApplyEntries": 1,
+    "needsReviewEntries": 0,
+    "totalCandidates": 1
+  },
+  "issues": []
+}
+```
+
+An existing roster identity record supplied as input carries:
+
+```json
+{
+  "recordId": "alta-GI-A1-jordan-smith",
+  "seasonId": "2026",
+  "districtId": "alta",
+  "ageDivisionId": "GI",
+  "teamId": "2026-alta-GI-A1",
+  "playerName": "Jordan Smith",
+  "jerseyNumber": "7",
+  "grade": "6",
+  "raw": null
+}
+```
+
+### Entry status values
+
+```text
+no-match
+single-candidate
+multiple-candidates
+skipped-invalid-preview-row
+skipped-review-preview-row
+```
+
+### Match type values
+
+```text
+exact-identity-key
+same-name-duplicate-existing
+same-name-duplicate-preview
+jersey-assisted-exact-name
+```
+
+### Confidence values
+
+```text
+high
+medium
+low
+none
+```
+
+### Reason / issue codes
+
+```text
+exact-normalized-name-match
+matching-jersey-number
+existing-duplicate-name
+preview-duplicate-name
+preview-row-invalid
+preview-row-needs-review
+no-existing-identity-match
+invalid-existing-record
+```
+
+### Notes
+
+- **Candidate generation only.** This structure is metadata for later collision
+  review and a future apply workflow. It does not resolve collisions or apply
+  imports.
+- **Roster authority.** Matching never alters, removes, suppresses, merges,
+  nullifies, rewrites, reorders, or ignores existing roster records or preview
+  rows. Source objects are referenced, never mutated.
+- Only `ready` preview rows are matched; `invalid` / `needs-review` rows are
+  preserved as skipped entries. Entries follow preview row order; candidates follow
+  existing-record input order.
+- Matching reuses the Phase 2 `getPlayerIdentityKey` helper (exact normalized
+  identity key). Jersey number can add a reason and raise confidence within an
+  exact-name candidate group but never creates a match alone.
+- Duplicate existing names and duplicate preview names produce review metadata, not
+  discarded candidates/entries. An existing record with a missing/blank name is
+  reported via a result-level `invalid-existing-record` issue and excluded from
+  matching only (never throws).
+- This slice is **engine only**: no collision resolution, no commit/apply, no
+  prior-season comparison, no movement derivation, no persistence, and no UI.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

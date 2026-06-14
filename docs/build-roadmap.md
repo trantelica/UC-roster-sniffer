@@ -373,6 +373,28 @@ Slice status:
   against existing rosters, classify movement, resolve identity collisions, apply
   imports, parse files, persist, or render UI. Roster comparison, collision review,
   and commit remain later Phase 5 work.
+- **Slice 2 (done): import preview identity match candidates (engine only).** A
+  pure helper (`createRosterImportPreviewIdentityMatches`) pairs slice 1 preview
+  rows with existing roster identity records supplied in the input and generates
+  candidate matches per ready preview row. Only `ready` rows are matched (`invalid`
+  -> `skipped-invalid-preview-row`, `needs-review` -> `skipped-review-preview-row`,
+  both preserved). Matching is exact normalized identity key (reusing the Phase 2
+  `getPlayerIdentityKey` helper): one match -> `single-candidate`, more than one ->
+  `multiple-candidates` (review), none -> `no-match`. A jersey number can add a
+  `matching-jersey-number` reason and raise confidence within an exact-name
+  candidate group but never creates a match alone. Duplicate existing names and
+  duplicate preview names produce review metadata (never discarded); an existing
+  record with a missing name is reported as `invalid-existing-record` without
+  throwing. Helpers `summarizeRosterImportPreviewIdentityMatches`,
+  `getRosterImportPreviewIdentityMatchesNeedingReview`, and
+  `getRosterImportPreviewIdentityMatchesReadyForApply` round out the contract. See
+  `docs/import-workflow.md` ("Roster import preview identity matches (Phase 5 slice
+  2)"), `docs/data-model.md` ("Roster Import Preview Identity Match"), and
+  `docs/derived-logic.md` ("Import preview identity match candidates (Phase 5 slice
+  2)"). This slice reuses (does not replace) the slice 1 preview contract and does
+  **not** resolve collisions, capture decisions, apply imports, compare prior
+  seasons, derive movement, persist, or render UI. Collision resolution, user
+  decisions, and commit remain later Phase 5 work.
 
 ## Phase 6: Schedule and result support
 
