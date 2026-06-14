@@ -710,26 +710,55 @@ Import commit happens only after collision review.
   scraped JSON source adapter (Phase 5 slice 10)"), and `docs/build-roadmap.md`. UI,
   persistence, file upload, import apply/commit, and coach analytics remain later work
   and require explicit approval.
+- **Slice 11 (done): canonical source mapping for scraped Ute JSON (engine only).**
+  `src/engine/uteConferenceScrapedCanonicalMapping.ts` maps scraped source labels into
+  canonical import context. `mapUteScrapedAgeDivisionLabel` -> canonical `SC` / `GR` /
+  `PW` / `MM` / `GI` / `BA` (metadata label > alias > team-name prefix fallback, with
+  conflict / unsupported / missing issues); `mapUteScrapedTeamClassification` extracts
+  only explicit coded team-name tokens (validated via `parseTeamClassification`) and
+  leaves color names unknown (no invented mapping); `mapUteScrapedDistrict` preserves
+  the raw name and yields a registry id (`high`) or a provisional slug, never
+  collapsing distinct names; `mapUteScrapedSeason` maps `metadata.year` + `event`,
+  never from a filename. `mapUteScrapedTeamTargetToCanonicalContext` (and the coach
+  wrapper `mapCoachScrapedTeamTargetToCanonicalContext`) compose these into a
+  `canonicalContext` (`seasonId` / `districtId` / `ageDivisionId` / `teamId` /
+  `teamClassification`) with a weakest-of `contextConfidence`, applying caller
+  overrides (recorded as `caller-override`, raw source preserved).
+  `createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext` feeds the
+  derived context into the slice 10 player adapter and returns the canonical mapping +
+  preview input + preview result, with player names preserved exactly. It is a mapping
+  adapter only — no UI, persistence, browser storage, file upload, roster mutation,
+  import apply/commit, movement derivation, coach analytics, or fuzzy matching — and
+  never mutates the payload. It reuses the existing age-division / team-classification
+  helpers, the slice 10 adapter, and the slice 1 preview. See `docs/import-workflow.md`
+  ("Canonical source mapping for scraped JSON (Phase 5 slice 11)"), `docs/data-model.md`
+  ("Ute Scraped Canonical Context Mapping"), `docs/derived-logic.md` ("Canonical source
+  mapping for scraped JSON (Phase 5 slice 11)"), and `docs/build-roadmap.md`. A
+  canonical district registry, UI, persistence, file upload, import apply/commit, and
+  coach analytics remain later work and require explicit approval.
 
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
 checkpointed**, slice 7 documents and confirms the contracts, slice 8 adds a pure
 in-memory import application / projection from a committable plan, slice 9 adds a pure
-text / CSV-like parser into the slice 1 preview contract, and slice 10 adds a source
-adapter for harvested Ute Conference scraped JSON (players and coaches). The
-acceptance criteria above are met by the engine pipeline: low-confidence collisions
-are never silently committed (unresolved identities and high-confidence single
-candidates block — never auto-link), user decisions are captured as append-only
-records, and the dry-run commit plan gates commit availability behind collision
-review (`canCommit`); slice 8 projects what a committable plan would link / add
-without applying it, slice 9 stages pasted text into preserved preview rows, and
-slice 10 adapts harvested Ute Conference JSON into those same preview inputs. Phase 5
-so far is engine-only with no file upload, no browser File API, no persistence, no UI,
-and no import apply/commit. The next narrow work is **optional and requires explicit
+text / CSV-like parser into the slice 1 preview contract, slice 10 adds a source
+adapter for harvested Ute Conference scraped JSON (players and coaches), and slice 11
+adds canonical source-label mapping over that adapter. The acceptance criteria above
+are met by the engine pipeline: low-confidence collisions are never silently committed
+(unresolved identities and high-confidence single candidates block — never
+auto-link), user decisions are captured as append-only records, and the dry-run commit
+plan gates commit availability behind collision review (`canCommit`); slice 8 projects
+what a committable plan would link / add without applying it, slice 9 stages pasted
+text into preserved preview rows, slice 10 adapts harvested Ute Conference JSON into
+those same preview inputs, and slice 11 derives canonical (or provisional) season /
+age-division / district / classification context for a selected team. Phase 5 so far
+is engine-only with no file upload, no browser File API, no persistence, no UI, and no
+import apply/commit. The next narrow work is **optional and requires explicit
 approval**: the actual import apply / commit that performs a projection's planned
-links / additions, plus real browser persistence, file upload / Excel parsing, coach
-analytics, and the review UI — each a separate later slice.
+links / additions, plus a canonical district registry, real browser persistence, file
+upload / Excel parsing, coach analytics, and the review UI — each a separate later
+slice.
 
 ## Phase 6: Schedule and results
 

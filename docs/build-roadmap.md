@@ -623,6 +623,33 @@ Slice status:
   and `docs/derived-logic.md` ("Ute Conference scraped JSON source adapter (Phase 5
   slice 10)"). UI, persistence, file upload, import apply/commit, and coach analytics
   remain later work and require explicit approval.
+- **Slice 11 (done): canonical source mapping for scraped Ute JSON (engine only).** A
+  pure mapping adapter (`src/engine/uteConferenceScrapedCanonicalMapping.ts`) converts
+  scraped source labels into canonical internal import context.
+  `mapUteScrapedAgeDivisionLabel` maps known labels to canonical `SC` / `GR` / `PW` /
+  `MM` / `GI` / `BA` (metadata label > alias > team-name prefix fallback; conflicts and
+  unsupported labels reported); `mapUteScrapedTeamClassification` extracts only
+  explicit coded team-name tokens (`Gremlin A2` -> `A2`, `PeeWee B4` -> `B4`, validated
+  via `parseTeamClassification`), leaving color names (`Scout White`/etc.) unknown with
+  no invented mapping; `mapUteScrapedDistrict` preserves the raw name and yields a
+  registry id (`high`) or a provisional slug (never collapsing `Bingham` vs `Bingham
+  Girls`); `mapUteScrapedSeason` maps `metadata.year` (+ `event` label), never from a
+  filename. `mapUteScrapedTeamTargetToCanonicalContext` (+ a coach wrapper) composes
+  these into a `canonicalContext` with a weakest-of `contextConfidence`, and
+  `createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext` feeds that
+  context into the slice 10 player adapter, returning the mapping + preview input +
+  preview result with player names preserved exactly. Caller overrides
+  (`seasonId` / `districtId` / `ageDivisionId` / `teamId` / `teamClassification`)
+  replace derived values, are recorded as `caller-override`, and preserve raw source.
+  It is a mapping adapter only — no UI, persistence, browser storage, file upload,
+  roster mutation, import apply/commit, movement derivation, coach analytics, or fuzzy
+  matching — and never mutates the payload. It reuses the existing age-division /
+  team-classification helpers, the slice 10 adapter, and the slice 1 preview. See
+  `docs/import-workflow.md` ("Canonical source mapping for scraped JSON (Phase 5 slice
+  11)"), `docs/data-model.md` ("Ute Scraped Canonical Context Mapping"), and
+  `docs/derived-logic.md` ("Canonical source mapping for scraped JSON (Phase 5 slice
+  11)"). UI, persistence, file upload, import apply/commit, coach analytics, and a
+  canonical district registry remain later work and require explicit approval.
 
 ## Phase 6: Schedule and result support
 

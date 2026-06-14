@@ -648,6 +648,80 @@ output is identical across repeated calls. No roster records are created or muta
 and no apply/write/persist function exists. UI, persistence, file upload, import
 apply/commit, and coach analytics remain later work and require explicit approval.
 
+## Canonical source mapping for scraped JSON (Phase 5 slice 11)
+
+The eleventh Phase 5 slice maps the scraped Ute Conference **source labels** into
+canonical internal import context values
+(`src/engine/uteConferenceScrapedCanonicalMapping.ts`). Slice 10 exposed raw source
+targets/rows; this slice derives a canonical (or clearly provisional) season, age
+division, district, and team classification for a selected team. It answers: "given a
+scraped JSON payload and team target, can the system derive canonical season, age
+division, district, and team/classification context without mutating the source
+data?"
+
+This is a **mapping adapter only** — NOT UI, persistence, browser storage, file
+upload, roster mutation, import apply/commit, movement derivation, coach analytics, or
+fuzzy identity matching. It reuses the existing age-division and team-classification
+helpers and composes with the slice 10 adapter and slice 1 preview; it replaces
+nothing. Mappings are deterministic — there is **no broad fuzzy matching** and **no
+invented color-to-classification mapping**.
+
+### Canonical age divisions
+
+`SC`, `GR`, `PW`, `MM`, `GI`, `BA`. Known scraped labels map deterministically:
+
+| Source label / form | Canonical |
+| --- | --- |
+| `SC League 7-8`, `Scout`, `Scouts` (or a `Scout…` team prefix) | `SC` |
+| `GR League 9`, `Gremlin(s)` (or a `Gremlin…` team prefix) | `GR` |
+| `PW League 10`, `PeeWee(s)` / `Pee Wee` (or a `PeeWee…` team prefix) | `PW` |
+| `MM`, `MityMite` / `Mity Mite` / `Mighty Mite(s)` | `MM` |
+| `GI`, `GridIron` / `Grid Iron` | `GI` |
+| `BA`, `Bantam(s)` | `BA` |
+
+Precedence is metadata label, then alias, then a **team-name prefix fallback** (used
+only when the label/alias are missing or unmapped; reported as `provisional`,
+source `team-name`). A label that conflicts with the alias is reported
+(`conflicting-age-division-labels`) and resolved to the label as `provisional`. An
+unmapped label is `unsupported-age-division` (`unknown`); none present is
+`missing-age-division`.
+
+### Team classification extraction
+
+Only an **explicit, validated coded trailing token** is extracted from the team name
+(`Gremlin A2` -> `A2`, `Gremlin D2` -> `D2`, `PeeWee C1` -> `C1`, `PeeWee B4` -> `B4`,
+validated via `parseTeamClassification`, which also yields the hierarchy tier). An
+out-of-range code (e.g. `C3`, `D1`) is `unsupported-team-classification`. Color-based
+team names (`Scout White` / `Black` / `Gray` / `Silver`) are left classification
+`unknown` / review-needed (`color-team-classification-unknown`) — **no color-to-class
+mapping is invented**.
+
+### District and season mapping
+
+District names are preserved EXACTLY. A caller-supplied exact-name `districtRegistry`
+yields a `high`-confidence id; otherwise a deterministic slug is derived and marked
+`provisional` (`district-mapping-provisional`). Districts are never fuzzy-matched or
+collapsed (`Bingham` and `Bingham Girls` stay distinct). The season id comes from
+`metadata.year` (finite integer or 4-digit string) with `metadata.event` as the
+label; a missing/invalid year reports `missing-season-year` / `invalid-season-year`
+and is never inferred from a filename.
+
+### Caller overrides & functions
+
+A caller may override `seasonId` / `districtId` / `ageDivisionId` / `teamId` /
+`teamClassification`; an override is applied, recorded with source `caller-override`
+and an info `caller-override-used` issue, and the raw source values are preserved.
+Functions: `mapUteScrapedAgeDivisionLabel`, `mapUteScrapedTeamClassification`,
+`mapUteScrapedDistrict`, `mapUteScrapedSeason`,
+`mapUteScrapedTeamTargetToCanonicalContext` (+ a coach-target wrapper
+`mapCoachScrapedTeamTargetToCanonicalContext`), and
+`createPlayerRosterImportPreviewInputFromScrapedJsonWithCanonicalContext` — which
+feeds the derived canonical context into the slice 10 player adapter and returns the
+`canonicalContextMapping`, `previewInput`, and `previewResult` together (player names
+preserved exactly). `contextConfidence` is the weakest of the contributing mappings
+(`high` / `provisional` / `unknown`). The payload is never mutated; no roster records
+are written and no apply/persist function exists.
+
 ## Roster import stages
 
 ### 1. Parse source data
