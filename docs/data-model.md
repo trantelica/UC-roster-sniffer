@@ -1212,6 +1212,95 @@ notes:        note, notes
   `parseRosterImportText`'s `ok` reflects structural success (no parser-level error);
   per-row validity is owned by the preview. Inputs are never mutated.
 
+## Ute Conference Scraped JSON Source
+
+The harvested Ute Conference website-scrape JSON (Phase 5 slice 10) is an **external
+source shape**, read by the adapter `src/engine/uteConferenceScrapedJsonAdapter.ts`.
+It is **not** an internal record and is never persisted; the adapter converts a
+selected team into the existing `Roster Import Preview` input (players) or a separate
+coach preview shape (coaches).
+
+```json
+{
+  "metadata": {
+    "organization": "Ute Conference",
+    "event": "Fall",
+    "age_division": "GridIron League 12",
+    "age_division_alias": "GI",
+    "year": 2025,
+    "record_type": "players",
+    "total_districts": 2,
+    "districts_with_league": 2,
+    "districts_without_league": 0,
+    "total_teams": 3,
+    "total_players": 5,
+    "scraped_at": "2025-09-01T00:00:00Z",
+    "source_url": "https://ute.example/players"
+  },
+  "districts": [
+    {
+      "district": "Alta",
+      "league": "GI League 12",
+      "teams_count": 2,
+      "teams": [
+        {
+          "team_name": "GridIron A3",
+          "source_url": "https://ute.example/alta/a3",
+          "players_count": 3,
+          "players": [{ "name": "Cary, Hudson" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Coach files use `record_type: "coaches"`, and each team carries `coaches_count` and
+`coaches[] { name, title }` instead of `players_count` / `players[]`.
+
+### Record type values
+
+```text
+players
+coaches
+unknown
+```
+
+### Adapter issue codes
+
+```text
+invalid-payload
+missing-metadata
+unsupported-record-type
+missing-districts
+missing-team-name
+missing-player-name
+missing-coach-name
+missing-coach-title
+count-mismatch
+empty-league
+invalid-target
+target-not-found
+```
+
+### Notes
+
+- **Source adapter only.** The payload is read, never mutated; no roster records are
+  created or mutated, nothing is persisted, and there is no apply/write function.
+- **Team targets** are listed in source order with a deterministic `sourceTargetId`
+  (`scraped:<year>:<ageSlug>:<districtIndex>:<teamIndex>`); player/coach source rows
+  add `:player:<i>` / `:coach:<i>`.
+- **Exact preservation.** Player names, coach names, coach titles, and source URLs are
+  preserved exactly (commas, extra spaces, non-breaking spaces intact); coaches are
+  never de-duplicated; player and coach rows are kept separate.
+- **Provisional target context.** When a caller supplies no explicit ids, the adapter
+  derives provisional slug-based ids (`targetContextProvisional: true`); these are not
+  canonical roster ids.
+- **Empty league snapshots** are valid source data (`ok: true` + `empty-league`).
+- **Count mismatches** (declared `*_count` / `total_*` vs actual) are non-destructive
+  `count-mismatch` warnings; rows are preserved. Missing names/titles preserve the row
+  with a `missing-*` issue.
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
