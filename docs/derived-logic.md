@@ -1828,6 +1828,78 @@ output is deterministic across repeated calls; and there is no import apply/comm
 roster mutation, persistence, browser storage, file upload, movement derivation, coach
 analytics, or UI.
 
+### Scraped JSON import session review decisions (Phase 5 slice 15)
+
+Phase 5 slice 15 adds a pure, deterministic **session-level review-decision state**
+layer over the slice 14 session
+(`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`). It answers:
+"can the session hold a reviewer's decisions for the rows of the currently selected
+scraped JSON target, and expose deterministic review metadata that reflects those
+decisions, before anything is applied or committed?" It is review **metadata only** —
+it never applies, commits, mutates, suppresses, or reorders source data.
+
+**Why it does not compose the slice 2–5 identity-review stack.** The canonical
+identity-review helpers — `applyRosterImportIdentityReviewAction`,
+`createRosterImportIdentityReviewDecision`, the decision repository
+(`appendRosterImportIdentityReviewDecisions` et al.), and the decision application
+module (`applyRosterImportIdentityReviewDecisionsToMatches`) — all operate on identity
+**match entries** (`RosterImportPreviewIdentityMatchEntry`). Those entries only exist
+after preview rows are matched against an existing-roster registry
+(`ExistingRosterIdentityRecord[]`). The scraped JSON session (slices 10–14) has **no
+existing-roster registry** wired in and computes **no match entries** — it carries
+slice 1 preview rows only. So the full Slice 3–5 decision/repository/application stack
+genuinely does not fit this session layer yet, and is intentionally not invoked here.
+When a real existing-roster registry and match layer are wired into the scraped
+session (a later, separately approved slice), these session review decisions are the
+natural input to the canonical decision pipeline.
+
+**How it stays bound to the canonical vocabulary (not a parallel model).** Rather than
+inventing free-floating apply semantics, the session review actions are projected onto
+the canonical identity-review vocabulary by
+`mapUteScrapedJsonImportSessionReviewAction`:
+
+- `confirm-row-identity` → canonical action `null`, effect `no-effect`
+- `mark-row-needs-review` → canonical action `defer`, effect `defer-review`
+- `ignore-row-for-review` → canonical action `null`, effect `no-effect`
+
+Only `mark-row-needs-review` corresponds to a canonical action (`defer`); the other two
+are review-layer annotations with no candidate-matching counterpart (there are no match
+entries here). Every action maps to a **review-only** canonical effect (`no-effect` or
+`defer-review`) and never to a roster-mutating effect (`link-to-existing`,
+`create-new-roster-entry`, `reject-import-row`). `uteScrapedJsonImportSessionReview-
+ActionMutatesRoster` is therefore always false — that is how the layer guarantees,
+by construction, that holding decisions can never apply, commit, or alter source data.
+
+Behavior:
+
+- **Set / add.** `setUteScrapedJsonImportSessionReviewDecisions(session, decisions,
+  options?)` and `addUteScrapedJsonImportSessionReviewDecision(session, decision,
+  options?)` accept a decision only when the session has a selected target and the
+  decision's `sourceFingerprint`, `sourceTargetId`, and `sourceRowId` all match the
+  currently selected target's preview rows. Mismatches are recorded as deterministic
+  rejections (`empty-session`, `no-selected-target`, `source-fingerprint-mismatch`,
+  `target-mismatch`, `missing-source-row-id`, `row-not-found`). Last write wins per
+  row; reapplying an unchanged decision is idempotent.
+- **Clear.** `clearUteScrapedJsonImportSessionReviewDecisions(session)` removes all
+  review decisions while preserving the loaded source and selection.
+- **Read.** `getUteScrapedJsonImportSessionReviewDecisions(session)` and
+  `summarizeUteScrapedJsonImportSessionReviewState(session)` always **re-validate**
+  stored decisions against the *current* selected target id, source fingerprint, and
+  preview rows. This is the decision-isolation guarantee: decisions made for a
+  previously selected target can never surface after a target switch — even if a caller
+  carries the decision-bearing session forward without clearing first. The slice 14
+  `selectUteScrapedJsonImportSessionTarget` / `clearUteScrapedJsonImportSessionTarget`
+  helpers additionally rebuild the session and drop the decision-bearing fields
+  entirely, so switching targets isolates decisions automatically.
+
+Standing contracts: review decisions change only review metadata — the slice 14
+`status`, `summary`, readiness report, and preview rows are untouched, and blocked or
+empty targets never become import-ready because decisions exist. Player names, source
+rows, source URLs, and source order are preserved exactly; decisions are deep-copied;
+every helper returns a new object and never mutates its inputs; output is deterministic;
+and there is no import apply/commit, roster mutation, persistence, browser storage,
+file upload, movement derivation, coach analytics, or UI.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

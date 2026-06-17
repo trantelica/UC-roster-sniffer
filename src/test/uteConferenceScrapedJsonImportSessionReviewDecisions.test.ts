@@ -12,7 +12,10 @@ import {
   clearUteScrapedJsonImportSessionReviewDecisions,
   getUteScrapedJsonImportSessionReviewDecisions,
   summarizeUteScrapedJsonImportSessionReviewState,
+  mapUteScrapedJsonImportSessionReviewAction,
+  uteScrapedJsonImportSessionReviewActionMutatesRoster,
   type UteScrapedJsonImportSessionReviewDecision,
+  type UteScrapedJsonImportSessionReviewDecisionAction,
 } from '../engine/uteConferenceScrapedJsonImportSessionReviewDecisions';
 
 import playersPw from './fixtures/ute-scraped-json/players-2023-pw-small.json';
@@ -210,5 +213,110 @@ describe('scraped JSON import session review decisions', () => {
     expect(withDecision.status).toBe('target-blocked');
     expect(withDecision.summary.canProceedToPreview).toBe(false);
     expect(withDecision.selectedReviewState.acceptedDecisionCount).toBe(0);
+  });
+});
+
+const ALL_ACTIONS: UteScrapedJsonImportSessionReviewDecisionAction[] = [
+  'confirm-row-identity',
+  'mark-row-needs-review',
+  'ignore-row-for-review',
+];
+
+describe('canonical identity-review vocabulary adapter (composition)', () => {
+  it('every session action maps to a review-only canonical effect, never a mutating one', () => {
+    const reviewOnlyEffects = new Set(['no-effect', 'defer-review']);
+    for (const action of ALL_ACTIONS) {
+      const mapping = mapUteScrapedJsonImportSessionReviewAction(action);
+      expect(reviewOnlyEffects.has(mapping.identityReviewEffect)).toBe(true);
+      expect(uteScrapedJsonImportSessionReviewActionMutatesRoster(action)).toBe(false);
+    }
+  });
+
+  it('only mark-row-needs-review binds to a canonical action (defer)', () => {
+    expect(mapUteScrapedJsonImportSessionReviewAction('mark-row-needs-review')).toEqual({
+      sessionAction: 'mark-row-needs-review',
+      identityReviewAction: 'defer',
+      identityReviewEffect: 'defer-review',
+    });
+    expect(
+      mapUteScrapedJsonImportSessionReviewAction('confirm-row-identity').identityReviewAction
+    ).toBeNull();
+    expect(
+      mapUteScrapedJsonImportSessionReviewAction('ignore-row-for-review').identityReviewAction
+    ).toBeNull();
+  });
+
+  it('accepted decisions carry the canonical review-only effect on their row state', () => {
+    const selected = selectedPlayerSession();
+    const next = setUteScrapedJsonImportSessionReviewDecisions(selected, [
+      firstDecision(selected, 'ignore-row-for-review'),
+    ]);
+    const row = next.selectedReviewState.rowStates.find(
+      (state) => state.decisionAction === 'ignore-row-for-review'
+    );
+    expect(row?.identityReviewEffect).toBe('no-effect');
+  });
+});
+
+describe('decisions affect review metadata only', () => {
+  it('holding decisions does not change the slice 14 summary, readiness, or preview rows', () => {
+    const selected = selectedPlayerSession();
+    const next = setUteScrapedJsonImportSessionReviewDecisions(selected, [
+      firstDecision(selected, 'mark-row-needs-review'),
+    ]);
+
+    // slice 14 selection / readiness / preview are untouched by review metadata.
+    expect(next.status).toBe(selected.status);
+    expect(next.summary).toEqual(selected.summary);
+    expect(next.readinessReport).toBe(selected.readinessReport);
+    expect(next.selectedPlayerPreviewResult).toBe(selected.selectedPlayerPreviewResult);
+    // The review state is additive metadata; the source row order is preserved.
+    expect(next.selectedReviewState.rowStates.map((state) => state.rowIndex)).toEqual(
+      selected.selectedPlayerPreviewResult!.rows.map((row) => row.rowIndex)
+    );
+  });
+});
+
+describe('target switch cannot leak prior-target decisions without an explicit clear', () => {
+  it('decisions carried onto a different selected target are auto-isolated on read', () => {
+    const loaded = createUteScrapedJsonImportSessionFromPayload(playersPw);
+    const ids = getUteScrapedJsonImportSessionSelectableTargets(loaded).map(
+      (target) => target.sourceTargetId
+    );
+    const targetA = selectUteScrapedJsonImportSessionTarget(loaded, ids[0]);
+    const targetB = selectUteScrapedJsonImportSessionTarget(loaded, ids[1]);
+
+    const withDecisionsA = setUteScrapedJsonImportSessionReviewDecisions(targetA, [
+      firstDecision(targetA),
+    ]);
+    expect(getUteScrapedJsonImportSessionReviewDecisions(withDecisionsA)).toHaveLength(1);
+
+    // Simulate a caller carrying target A's decisions onto target B WITHOUT clearing.
+    const leaked = {
+      ...targetB,
+      selectedReviewDecisions: withDecisionsA.selectedReviewDecisions,
+      selectedReviewState: withDecisionsA.selectedReviewState,
+    };
+
+    // Reads are re-validated against the current selection, so nothing leaks.
+    expect(getUteScrapedJsonImportSessionReviewDecisions(leaked)).toEqual([]);
+    const summary = summarizeUteScrapedJsonImportSessionReviewState(leaked);
+    expect(summary.acceptedDecisionCount).toBe(0);
+    expect(summary.sourceTargetId).toBe(ids[1]);
+  });
+
+  it('slice 14 target switch drops the decision-bearing fields entirely', () => {
+    const loaded = createUteScrapedJsonImportSessionFromPayload(playersPw);
+    const ids = getUteScrapedJsonImportSessionSelectableTargets(loaded).map(
+      (target) => target.sourceTargetId
+    );
+    const targetA = selectUteScrapedJsonImportSessionTarget(loaded, ids[0]);
+    const withDecisionsA = setUteScrapedJsonImportSessionReviewDecisions(targetA, [
+      firstDecision(targetA),
+    ]);
+
+    const switched = selectUteScrapedJsonImportSessionTarget(withDecisionsA, ids[1]);
+    expect('selectedReviewDecisions' in switched).toBe(false);
+    expect(getUteScrapedJsonImportSessionReviewDecisions(switched)).toEqual([]);
   });
 });

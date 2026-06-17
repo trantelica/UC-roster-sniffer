@@ -1562,3 +1562,32 @@ The `UteScrapedJsonImportSession` shape composes existing slice 10/11/12 outputs
 
 The session never persists, applies, mutates rosters, commits imports, uploads files,
 derives movement, or creates coach analytics, and adds no UI.
+
+### Scraped JSON import session review decisions (Phase 5 slice 15)
+
+A session-level **review-decision state** layer extends the slice 14 session
+(`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`). It is
+engine-only, pure, deterministic, and review-metadata only — it is **not** persisted,
+stored in the browser, or written anywhere, and it never alters source data.
+
+- `UteScrapedJsonImportSessionReviewDecision` — a reviewer decision keyed by
+  `sourceFingerprint` + `sourceTargetId` + `sourceRowId`, with an `action`
+  (`confirm-row-identity` | `mark-row-needs-review` | `ignore-row-for-review`) and an
+  optional `note`.
+- `UteScrapedJsonImportSessionWithReviewDecisions` — the slice 14 session plus
+  `selectedReviewDecisions` (the accepted decisions for the current target) and
+  `selectedReviewState` (derived review metadata).
+- `UteScrapedJsonImportSessionReviewState` — derived counts and per-row review state
+  (`rowStates`), accepted/rejected counts, rejected-decision reasons, and issues. Each
+  row state carries the canonical `identityReviewEffect` the decision projects onto.
+
+The session review actions are **not** a parallel decision model: they are projected
+onto the canonical identity-review vocabulary
+(`RosterImportIdentityReviewActionType` / `...Effect`) via
+`mapUteScrapedJsonImportSessionReviewAction`, and every action maps to a review-only
+effect (`no-effect` or `defer-review`), never a roster-mutating one. The full slice 2–5
+identity-review decision/repository/application helpers are intentionally not composed
+at this layer because the scraped session has no existing-roster registry or identity
+match entries yet (see `docs/derived-logic.md`, "Scraped JSON import session review
+decisions"). Stored decisions are always re-validated against the current selection on
+read, so decisions never leak across a target switch.
