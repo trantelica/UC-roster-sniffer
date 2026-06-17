@@ -846,6 +846,37 @@ kept **by reference only, in memory only**, and is never written, uploaded, or
 persisted. It does **not** persist, apply, mutate rosters, commit imports, upload
 files, derive movement, or create coach analytics, and there is no UI.
 
+## Scraped JSON import session review decisions (Phase 5 slice 15)
+
+The fifteenth Phase 5 slice adds a **session-level review-decision state** layer over
+the slice 14 session
+(`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`). It is **engine
+only**, pure, deterministic, and review **metadata only**. It answers: "can the session
+hold a reviewer's decisions for the rows of the currently selected scraped JSON target,
+and reflect them in deterministic review metadata, before anything is applied or
+committed?" It never applies, commits, mutates, suppresses, or reorders source data.
+
+A decision is keyed by `sourceFingerprint` + `sourceTargetId` + `sourceRowId`, with an
+action of `confirm-row-identity`, `mark-row-needs-review`, or `ignore-row-for-review`.
+`setUteScrapedJsonImportSessionReviewDecisions` /
+`addUteScrapedJsonImportSessionReviewDecision` accept a decision only when the session
+has a selected target and the decision matches that target's fingerprint, target id,
+and an existing preview row; all other decisions are recorded as deterministic
+rejections. `getUteScrapedJsonImportSessionReviewDecisions` and
+`summarizeUteScrapedJsonImportSessionReviewState` re-validate stored decisions against
+the current selection on every read, so decisions never leak across a target switch.
+
+This layer does **not** add its own apply semantics. The three actions are projected
+onto the canonical identity-review vocabulary via
+`mapUteScrapedJsonImportSessionReviewAction`, and every action maps to a review-only
+effect (`no-effect` or `defer-review`) — never a roster-mutating effect. The full
+slice 2–5 identity-review decision/repository/application helpers are intentionally not
+composed here because the scraped session has no existing-roster registry or identity
+match entries yet; see `docs/derived-logic.md` ("Scraped JSON import session review
+decisions") for the full rationale. There is no persistence, browser storage, file
+upload, import apply/commit, roster mutation, movement derivation, coach analytics, or
+UI.
+
 ## Roster import stages
 
 ### 1. Parse source data

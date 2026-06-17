@@ -804,6 +804,31 @@ Import commit happens only after collision review.
   `docs/ui-workflow.md`, and `docs/build-roadmap.md` (all "Scraped JSON import session
   state (Phase 5 slice 14)").
 
+- **Slice 15 (done, governance-corrected): scraped JSON import session review
+  decisions (engine only).** A pure, deterministic session-level review-decision state
+  layer over the slice 14 session
+  (`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`,
+  `src/test/uteConferenceScrapedJsonImportSessionReviewDecisions.test.ts`) that holds a
+  reviewer's per-row decisions for the currently selected target and reflects them in
+  deterministic review metadata only. It does **not** compose the slice 2–5
+  identity-review decision/repository/application helpers, because those require
+  identity match entries / an existing-roster registry the scraped session does not
+  have yet; instead the three actions (`confirm-row-identity` / `mark-row-needs-review`
+  / `ignore-row-for-review`) are projected onto the canonical identity-review
+  vocabulary via `mapUteScrapedJsonImportSessionReviewAction`, mapping only to
+  review-only effects (`no-effect` / `defer-review`) so the layer can never apply or
+  mutate by construction. Decisions are accepted only for the selected
+  target/fingerprint/row and are re-validated against the current selection on every
+  read, so they cannot leak across a target switch. **Governance note:** this slice was
+  written directly onto main before authorization; the correction pass added the
+  canonical-vocabulary adapter, read-time decision isolation, and folded the standalone
+  `docs/phase5-slice15-import-session-review-decision-state.md` into the source-of-truth
+  docs (then removed it). No UI, persistence, browser storage, file upload, import
+  apply/commit, roster mutation, movement derivation, or coach analytics. See
+  `docs/import-workflow.md`, `docs/data-model.md`, `docs/derived-logic.md`,
+  `docs/ui-workflow.md`, and `docs/build-roadmap.md` (all "Scraped JSON import session
+  review decisions (Phase 5 slice 15)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
@@ -813,9 +838,11 @@ text / CSV-like parser into the slice 1 preview contract, slice 10 adds a source
 adapter for harvested Ute Conference scraped JSON (players and coaches), slice 11
 adds canonical source-label mapping over that adapter, slice 12 adds a full-file
 readiness report that classifies every team target, slice 13 hardens slices 10–12
-with representative scraped JSON fixture contracts (test-only), and slice 14 adds a
+with representative scraped JSON fixture contracts (test-only), slice 14 adds a
 pure in-memory import session-state model that composes the readiness report, target
-selection, canonical mapping, and preview outputs. The acceptance criteria above
+selection, canonical mapping, and preview outputs, and slice 15 adds a pure
+session-level review-decision state layer (review metadata only, no apply/commit) over
+that session. The acceptance criteria above
 are met by the engine pipeline: low-confidence collisions are never silently committed
 (unresolved identities and high-confidence single candidates block — never
 auto-link), user decisions are captured as append-only records, and the dry-run commit

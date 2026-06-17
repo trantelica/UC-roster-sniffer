@@ -352,6 +352,20 @@ data only and mutates nothing: it does not persist, store in the browser, upload
 files, apply/commit imports, mutate rosters, derive movement, or create coach
 analytics, and the loaded payload (if held) is kept by reference only, in memory only.
 
+### Scraped JSON import session review decisions (Phase 5 slice 15)
+
+Slice 15 adds an engine-only **session-level review-decision state** layer
+(`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`) that is intended
+for future UI consumption but **adds no UI itself**. A future review screen could let a
+reviewer mark each preview row of the selected target as `confirm-row-identity`,
+`mark-row-needs-review`, or `ignore-row-for-review`, then read
+`summarizeUteScrapedJsonImportSessionReviewState` to show per-row review status and
+counts. The layer is review **metadata only**: decisions never apply, commit, mutate,
+suppress, or reorder source data; they are projected onto canonical review-only effects;
+and they are auto-isolated to the currently selected target (re-validated on read), so a
+screen switching targets cannot show stale decisions. Any commit/apply remains a
+separate, later, explicitly approved slice.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

@@ -720,6 +720,31 @@ Slice status:
   `docs/derived-logic.md`, and `docs/ui-workflow.md` ("Scraped JSON import session state
   (Phase 5 slice 14)").
 
+- **Slice 15 (done, governance-corrected): scraped JSON import session review
+  decisions (engine only).** A pure, deterministic **session-level review-decision
+  state** layer over the slice 14 session
+  (`src/engine/uteConferenceScrapedJsonImportSessionReviewDecisions.ts`). It holds a
+  reviewer's per-row decisions (`confirm-row-identity` / `mark-row-needs-review` /
+  `ignore-row-for-review`) for the currently selected target and reflects them in
+  deterministic review metadata — and nothing else. It is review **metadata only**: it
+  never applies, commits, mutates, suppresses, or reorders source data. It does **not**
+  compose the slice 2–5 identity-review decision/repository/application helpers, because
+  those operate on identity match entries that require an existing-roster registry the
+  scraped session does not have yet; instead the three actions are projected onto the
+  canonical identity-review vocabulary (`mapUteScrapedJsonImportSessionReviewAction`),
+  mapping only to review-only effects (`no-effect` / `defer-review`) so the layer can
+  never apply or mutate by construction. Decisions are accepted only for the selected
+  target/fingerprint/row, and stored decisions are re-validated against the current
+  selection on every read so they cannot leak across a target switch. This slice was
+  written onto main before authorization and then corrected under governance: the
+  canonical-vocabulary adapter, the read-time decision isolation, and the doc fold were
+  added, and the standalone `docs/phase5-slice15-*.md` was removed in favor of the
+  source-of-truth docs. No UI, persistence, browser storage, file upload, import
+  apply/commit, roster mutation, movement derivation, or coach analytics. See
+  `docs/import-workflow.md`, `docs/data-model.md`, `docs/derived-logic.md`, and
+  `docs/ui-workflow.md` ("Scraped JSON import session review decisions (Phase 5 slice
+  15)").
+
 ## Phase 6: Schedule and result support
 
 Goal: derive records from game objects.
