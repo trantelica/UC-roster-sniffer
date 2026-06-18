@@ -12,9 +12,14 @@ import {
 } from '../engine/uteConferenceScrapedJsonReadinessReport';
 import {
   buildScrapedJsonImportRosterAwareReview,
+  findExistingRosterTeamForContext,
   type ScrapedImportRosterAwareReview,
   type ScrapedImportReviewDecisionMap,
 } from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
+import {
+  buildScrapedJsonImportStagedProjection,
+  type ScrapedImportStagedProjection,
+} from '../engine/uteConferenceScrapedJsonImportStagedProjection';
 import type { Team } from '../domain/types';
 import type {
   UteScrapedJsonImportSession,
@@ -149,6 +154,11 @@ export type ScrapedImportPreviewViewModel = {
    * reviewer's in-memory decisions.
    */
   rosterReview: ScrapedImportRosterAwareReview;
+  /**
+   * Staged, in-memory projected roster for the selected target (preview only). Stageable
+   * only when the dry run is clean; otherwise carries the reason it is unavailable.
+   */
+  stagedProjection: ScrapedImportStagedProjection;
 };
 
 export type ScrapedImportPreviewViewModelOptions = {
@@ -210,6 +220,26 @@ export function buildScrapedJsonImportPreviewViewModel(
 
   const selected = buildSelectedView(session);
 
+  const rosterReview = buildScrapedJsonImportRosterAwareReview(
+    session,
+    existingTeams,
+    reviewDecisions
+  );
+  // Locate the same existing team slice 18 matched, to supply the "actual" roster side.
+  const ctx = session.selectedCanonicalContextMapping?.canonicalContext ?? null;
+  const existingTeam = ctx
+    ? findExistingRosterTeamForContext(existingTeams, {
+        seasonId: ctx.seasonId,
+        districtId: ctx.districtId,
+        ageDivisionId: ctx.ageDivisionId,
+        teamClassification: ctx.teamClassification,
+      })
+    : null;
+  const stagedProjection = buildScrapedJsonImportStagedProjection(
+    rosterReview,
+    existingTeam
+  );
+
   return {
     status: session.status,
     invalidSource: session.status === 'invalid-source',
@@ -231,11 +261,8 @@ export function buildScrapedJsonImportPreviewViewModel(
     emptyTargets,
     hasSelection: selected !== null,
     selected,
-    rosterReview: buildScrapedJsonImportRosterAwareReview(
-      session,
-      existingTeams,
-      reviewDecisions
-    ),
+    rosterReview,
+    stagedProjection,
   };
 }
 

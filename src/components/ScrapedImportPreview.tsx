@@ -16,6 +16,7 @@ import type {
   ScrapedImportReviewRow,
   ScrapedImportRosterAwareReview,
 } from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
+import type { ScrapedImportStagedProjection } from '../engine/uteConferenceScrapedJsonImportStagedProjection';
 import { loadSampleData } from '../data/loadSampleData';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
@@ -107,6 +108,9 @@ export default function ScrapedImportPreview() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [reviewDecisions, setReviewDecisions] =
     useState<ScrapedImportReviewDecisionMap>({});
+  // Staged projection is an explicit in-memory action; it is invalidated by any change
+  // to the loaded source, the selected target, or the identity decisions.
+  const [staged, setStaged] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const baseSession = useMemo(
@@ -131,21 +135,25 @@ export default function ScrapedImportPreview() {
     [session, reviewDecisions]
   );
 
-  // Selecting / switching a target isolates identity decisions to that target.
+  // Selecting / switching a target isolates identity decisions to that target and
+  // invalidates any staged projection.
   function selectTarget(id: string) {
     setSelectedTargetId(id);
     setReviewDecisions({});
+    setStaged(false);
   }
 
   function clearTarget() {
     setSelectedTargetId(null);
     setReviewDecisions({});
+    setStaged(false);
   }
 
   function setRowDecision(
     sourceRowId: string,
     kind: ScrapedImportReviewDecisionKind | null
   ) {
+    setStaged(false);
     setReviewDecisions((prev) => {
       const next = { ...prev };
       if (kind === null) delete next[sourceRowId];
@@ -157,6 +165,7 @@ export default function ScrapedImportPreview() {
   function resetSelection() {
     setSelectedTargetId(null);
     setReviewDecisions({});
+    setStaged(false);
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -263,6 +272,9 @@ export default function ScrapedImportPreview() {
           onSelect={selectTarget}
           onClearTarget={clearTarget}
           onSetRowDecision={setRowDecision}
+          staged={staged}
+          onStage={() => setStaged(true)}
+          onClearStaged={() => setStaged(false)}
         />
       )}
     </div>
@@ -281,6 +293,9 @@ function Workbench({
   onSelect,
   onClearTarget,
   onSetRowDecision,
+  staged,
+  onStage,
+  onClearStaged,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -289,6 +304,9 @@ function Workbench({
   onSelect: (id: string) => void;
   onClearTarget: () => void;
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+  staged: boolean;
+  onStage: () => void;
+  onClearStaged: () => void;
 }) {
   return (
     <>
@@ -352,7 +370,11 @@ function Workbench({
           <SelectedTargetDetail
             selected={vm.selected}
             rosterReview={vm.rosterReview}
+            stagedProjection={vm.stagedProjection}
+            staged={staged}
             onSetRowDecision={onSetRowDecision}
+            onStage={onStage}
+            onClearStaged={onClearStaged}
           />
         </>
       )}
@@ -449,11 +471,19 @@ function ReadonlyTargetSection({
 function SelectedTargetDetail({
   selected,
   rosterReview,
+  stagedProjection,
+  staged,
   onSetRowDecision,
+  onStage,
+  onClearStaged,
 }: {
   selected: ScrapedImportSelectedView | null;
   rosterReview: ScrapedImportRosterAwareReview;
+  stagedProjection: ScrapedImportStagedProjection;
+  staged: boolean;
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+  onStage: () => void;
+  onClearStaged: () => void;
 }) {
   if (!selected) {
     return (
@@ -587,6 +617,112 @@ function SelectedTargetDetail({
 
       {selected.recordType === 'players' && (
         <RosterReviewPanel rosterReview={rosterReview} onSetRowDecision={onSetRowDecision} />
+      )}
+
+      {selected.recordType === 'players' && (
+        <StagedProjectionPanel
+          stagedProjection={stagedProjection}
+          staged={staged}
+          onStage={onStage}
+          onClearStaged={onClearStaged}
+        />
+      )}
+    </div>
+  );
+}
+
+function StagedProjectionPanel({
+  stagedProjection,
+  staged,
+  onStage,
+  onClearStaged,
+}: {
+  stagedProjection: ScrapedImportStagedProjection;
+  staged: boolean;
+  onStage: () => void;
+  onClearStaged: () => void;
+}) {
+  return (
+    <div className="import-section import-staged">
+      <div className="import-section-head">
+        <h3>Staged projection</h3>
+        <span className="import-tag">Preview only · in memory only · nothing has been applied</span>
+      </div>
+
+      {!stagedProjection.stageable ? (
+        <p className="import-empty">{stagedProjection.message}</p>
+      ) : !staged ? (
+        <>
+          <p className="import-reasons">
+            The dry run is clean. Stage a preview-only projected roster to inspect the
+            result in memory. Nothing is applied, saved, or written.
+          </p>
+          <button type="button" className="import-decision-button" onClick={onStage}>
+            Stage preview
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="import-section-head">
+            <p className="import-review">
+              Projected roster for {stagedProjection.existingTeamId}:{' '}
+              {stagedProjection.actualRosterCount} current +{' '}
+              {stagedProjection.stagedNewCount} new ={' '}
+              <strong>{stagedProjection.projectedRosterCount}</strong> projected
+              {stagedProjection.stagedLinkCount > 0
+                ? ` · ${stagedProjection.stagedLinkCount} linked`
+                : ''}
+              {stagedProjection.deferredCount > 0
+                ? ` · ${stagedProjection.deferredCount} deferred`
+                : ''}
+            </p>
+            <button type="button" className="import-link-button" onClick={onClearStaged}>
+              Clear staged preview
+            </button>
+          </div>
+
+          <div className="import-roster-columns">
+            <div className="import-roster-column import-roster-actual">
+              <h4>Actual roster ({stagedProjection.actualRosterCount})</h4>
+              <ul className="import-roster-list">
+                {stagedProjection.existingPlayers.map((player, index) => (
+                  <li key={index}>
+                    {player.name}
+                    {player.linked && (
+                      <span className="import-roster-tag import-roster-linked">
+                        ← links {player.linkedFromImportedName}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="import-roster-column import-roster-projected">
+              <h4>Projected roster ({stagedProjection.projectedRosterCount})</h4>
+              <ul className="import-roster-list">
+                {stagedProjection.existingPlayers.map((player, index) => (
+                  <li key={`e-${index}`}>
+                    {player.name}
+                    <span className="import-roster-tag">existing</span>
+                  </li>
+                ))}
+                {stagedProjection.projectedNewPlayers.map((player) => (
+                  <li key={`n-${player.rowIndex}`} className="import-roster-new">
+                    {player.name ?? '(missing)'}
+                    <span className="import-roster-tag import-roster-new-tag">new</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {stagedProjection.deferredRows.length > 0 && (
+            <p className="import-reasons">
+              Deferred (not added):{' '}
+              {stagedProjection.deferredRows.map((r) => r.name ?? '(missing)').join(', ')}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

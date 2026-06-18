@@ -1937,6 +1937,28 @@ payload, preview rows, existing roster, and prior seasons are never mutated; and
 imported and existing player names are preserved exactly. Coach targets have no player
 identity review (out of scope).
 
+### Staged in-memory roster projection (Phase 5 slice 19)
+
+Phase 5 slice 19 adds a pure, deterministic staged roster projection
+(`src/engine/uteConferenceScrapedJsonImportStagedProjection.ts`). It COMPOSES the slice
+18 review — `buildScrapedJsonImportStagedProjection(review, existingTeam)` — rather than
+re-running the slice 2/3/5/6/8 chain (which would duplicate it). It is stageable only
+when the review is `available`, an existing team was located, and the dry run is clean
+(`summary.canCommit` — no unresolved/blocked rows); otherwise it returns a deterministic
+unavailable reason (`review-unavailable` / `missing-existing-team` / `dry-run-not-clean`).
+
+When stageable it assembles, in memory only: `existingPlayers` (the actual roster in
+source order, each annotated `linked` when a confirmed import link targets it — matched
+by the slice 18 row's `linkTargetExistingRecordId`, which uses the same
+`${teamId}#${index}` ids), `projectedNewPlayers` (imported `projected-create` rows in
+imported source order), `deferredRows` (deferred outcomes — listed but NOT added), and
+counts where `projectedRosterCount = actualRosterCount + stagedNewCount` (links do not
+grow the roster). Deferred is a deliberate reviewer outcome and does not block staging.
+Nothing is applied, committed, written, created, linked, persisted, or mutated; the
+review, existing team and players, payload, and prior seasons are never mutated; raw
+imported and existing names and existing-roster source order are preserved exactly; and
+output is identical across repeated calls.
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.

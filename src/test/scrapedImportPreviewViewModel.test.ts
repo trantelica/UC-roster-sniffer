@@ -236,4 +236,67 @@ describe('scraped JSON import preview view model', () => {
       buildScrapedJsonImportPreviewViewModel(selected)
     );
   });
+
+  it('15. staged projection in the view model reflects (invalidates with) decisions', () => {
+    const team = {
+      teamId: '2026-alta-GR-B1',
+      seasonId: '2026',
+      districtId: 'alta',
+      ageDivisionId: 'GR',
+      teamCode: 'B1',
+      draftOrder: 1,
+      divisionTeamCount: 1,
+      headCoach: null,
+      assistantCoaches: [],
+      players: [{ name: 'Jordan Smith' }],
+    };
+    const payload = {
+      metadata: {
+        organization: 'Ute Conference',
+        event: '2026 Fall Season',
+        age_division: 'GR League 9',
+        age_division_alias: 'GR',
+        year: 2026,
+        record_type: 'players',
+        source_url: 'x',
+      },
+      districts: [
+        {
+          district: 'Alta',
+          league: 'GR League 9',
+          teams_count: 1,
+          teams: [
+            {
+              team_name: 'Gremlin B1',
+              source_url: 'y',
+              players_count: 1,
+              players: [{ name: 'Jordan Smith' }],
+            },
+          ],
+        },
+      ],
+    };
+    const session = createUteScrapedJsonImportSessionFromPayload(payload);
+    const selected = selectUteScrapedJsonImportSessionTarget(
+      session,
+      getUteScrapedJsonImportSessionSelectableTargets(session)[0].sourceTargetId
+    );
+
+    // Without a decision, the single-candidate row is unresolved -> not stageable.
+    const vmNoDecision = buildScrapedJsonImportPreviewViewModel(selected, {
+      existingTeams: [team],
+    });
+    expect(vmNoDecision.stagedProjection.stageable).toBe(false);
+
+    // With a confirm decision, the dry run is clean -> stageable. Changing decisions
+    // re-derives the staged projection (it is a pure function of the inputs).
+    const rowId = vmNoDecision.rosterReview.available
+      ? vmNoDecision.rosterReview.rows[0].sourceRowId!
+      : '';
+    const vmConfirmed = buildScrapedJsonImportPreviewViewModel(selected, {
+      existingTeams: [team],
+      reviewDecisions: { [rowId]: 'confirm-match' },
+    });
+    expect(vmConfirmed.stagedProjection.stageable).toBe(true);
+  });
 });
