@@ -829,6 +829,23 @@ Import commit happens only after collision review.
   `docs/ui-workflow.md`, and `docs/build-roadmap.md` (all "Scraped JSON import session
   review decisions (Phase 5 slice 15)").
 
+- **Slice 16 (done): read-only scraped JSON import UI shell.** The first visible import
+  UI — a read-only preview shell (`src/components/ScrapedImportPreview.tsx`) reachable
+  from a top-level view toggle in `src/app/App.tsx`. It is a thin renderer over the
+  existing engine via a pure, unit-tested view model
+  (`src/app/scrapedImportPreviewViewModel.ts`,
+  `src/test/scrapedImportPreviewViewModel.test.ts`): it builds a slice 14 session from a
+  chosen demo source (existing scraped JSON test fixtures plus two small inline payloads
+  for the blocked and invalid-source states), lets the user select a target, and renders
+  the source/readiness summary, selectable targets, blocked/empty targets (marked not
+  importable), canonical context, and a read-only player-row table. React holds only the
+  chosen source and selected target in memory; the components contain no
+  readiness/mapping/matching logic beyond calling engine helpers. No file upload,
+  drag/drop, persistence, browser storage, apply/commit, or roster mutation. Component
+  (DOM) tests were intentionally not added because the test environment is `node` with
+  no `@testing-library`/`jsdom`; the pure view model is tested instead. See
+  `docs/ui-workflow.md` ("Read-only scraped JSON import UI shell (Phase 5 slice 16)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
