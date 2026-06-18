@@ -420,6 +420,22 @@ roster matches the context, a clear unavailable message is shown instead of a pr
 All safety wording ("Preview only", "Dry run only · nothing applied") remains, and there
 are no Save / Apply / Commit controls — no roster data is written or mutated.
 
+### Staged in-memory roster projection (Phase 5 slice 19)
+
+Slice 19 adds a **Staged projection** section below the dry run. When the dry run is
+clean (every imported row resolved), a **Stage preview** action builds an in-memory
+projected roster the user can inspect; otherwise the section explains why staging is
+unavailable (resolve the remaining rows / missing roster context). The staged view shows
+the **actual roster** and the **projected roster** side by side and visually distinct:
+the actual roster annotates players that a confirmed import links to, and the projected
+roster lists existing players (tagged "existing") plus projected new imported players
+(tagged "new"), with counts ("N current + M new = P projected"). Deferred rows are listed
+separately as not added. A **Clear staged preview** action removes only the staged view
+from memory, and changing the source, target, or any identity decision automatically
+invalidates it. It is labelled "Preview only · in memory only · nothing has been
+applied"; there are no Save / Apply / Commit / Import-now / Finalize controls, and no
+roster data is written, mutated, or persisted.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

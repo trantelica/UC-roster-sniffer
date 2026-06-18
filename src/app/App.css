@@ -537,3 +537,78 @@ h1 {
   background-color: var(--color-steel-blue);
   color: white;
 }
+
+/* Staged projection panel */
+.import-staged {
+  border: 2px solid var(--color-bronze-spice);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  background-color: white;
+}
+
+.import-roster-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.import-roster-column {
+  flex: 1;
+  min-width: 200px;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 3px;
+  padding: 0.5rem 0.75rem;
+}
+
+.import-roster-actual {
+  background-color: var(--color-alabaster-grey);
+}
+
+.import-roster-projected {
+  background-color: var(--color-mint-cream);
+}
+
+.import-roster-column h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-steel-blue);
+}
+
+.import-roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.import-roster-list li {
+  padding: 0.15rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.import-roster-new {
+  font-weight: bold;
+}
+
+.import-roster-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #666;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 0.3rem;
+}
+
+.import-roster-new-tag {
+  color: var(--color-bronze-spice);
+}
+
+.import-roster-linked {
+  color: var(--color-steel-blue);
+}

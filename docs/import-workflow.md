@@ -935,6 +935,27 @@ context, a deterministic **unavailable** state is shown rather than pretending e
 is new. Raw imported and existing names are preserved exactly; nothing is applied,
 committed, persisted, or mutated, and prior seasons are untouched.
 
+## Staged in-memory roster projection (Phase 5 slice 19)
+
+Slice 19 adds an in-memory **staged projection**: once the slice 18 dry run is clean
+(available, no unresolved/blocked rows), the user can "Stage preview" a projected
+post-import roster to inspect the result before any permanent import exists. The pure
+engine helper (`src/engine/uteConferenceScrapedJsonImportStagedProjection.ts`) consumes
+the slice 18 review (itself built on the slice 2/3/5/6/8 pipeline) plus the located
+existing roster team, and assembles: the actual roster (existing players, source order,
+with linked players annotated), the projected roster (existing + projected-new imported
+players in source order), counts (actual + new = projected; links do not grow the
+roster), and any deferred rows (listed but not added). Staging is gated — unresolved
+ambiguity, blocked rows, a missing existing-roster context, or a non-player target all
+yield a deterministic unavailable state. The workbench shows a **Stage preview** action
+(only when stageable) and a **Clear staged preview** action; changing the source,
+target, or any identity decision automatically invalidates the staged projection.
+
+This is preview / in-memory only: nothing is applied, saved, committed, written, or
+persisted; the review, existing roster, payload, preview rows, and prior seasons are
+never mutated; and raw imported and existing names are preserved exactly. There are no
+Save / Apply / Commit / Import-now / Finalize controls.
+
 ## Roster import stages
 
 ### 1. Parse source data

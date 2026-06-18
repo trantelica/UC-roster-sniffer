@@ -107,6 +107,8 @@ export type ScrapedImportReviewRow = {
   outcome: ScrapedImportReviewRowOutcome;
   /** The slice 6 commit-plan status this row resolves to under current decisions. */
   planStatus: RosterImportCommitPreviewPlanStatus;
+  /** The existing record id a confirmed match would link to, or null. */
+  linkTargetExistingRecordId: string | null;
   /** The existing record a confirmed match would link to (raw name preserved). */
   linkTargetExistingName: string | null;
   /** The raw name a projected create would add (provisional; never written). */
@@ -405,6 +407,7 @@ export function buildScrapedJsonImportRosterAwareReview(
       decision: userDecision,
       outcome: outcomeFromPlanStatus(planStatus),
       planStatus,
+      linkTargetExistingRecordId: planRow?.targetExistingRecordId ?? null,
       linkTargetExistingName,
       projectedNewPlayerName,
     };

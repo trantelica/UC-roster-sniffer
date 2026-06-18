@@ -896,6 +896,25 @@ Import commit happens only after collision review.
   `docs/import-workflow.md`, `docs/derived-logic.md`, and `docs/ui-workflow.md`
   ("Roster-aware ... (Phase 5 slice 18)").
 
+- **Slice 19 (done): staged in-memory import application and post-import roster
+  projection.** Lets the user take a clean slice 18 dry run and "Stage preview" an
+  in-memory projected roster. A new pure engine helper
+  (`src/engine/uteConferenceScrapedJsonImportStagedProjection.ts`,
+  `src/test/uteConferenceScrapedJsonImportStagedProjection.test.ts`) composes the slice 18
+  review (built on slice 2/3/5/6/8) plus the located existing team into the projected
+  roster: actual players (source order, linked players annotated via the row's
+  `linkTargetExistingRecordId`), projected-new imported players (imported source order),
+  deferred rows (listed, not added), and counts (actual + new = projected; links do not
+  grow the roster). Stageable only when the review is available, a team is found, and the
+  dry run is clean; otherwise a deterministic unavailable reason. The view model gained a
+  `stagedProjection` field (slice 18 review row also gained `linkTargetExistingRecordId`);
+  the workbench gained Stage preview / Clear staged preview actions and an
+  actual-vs-projected roster view, with staging auto-invalidated on any source / target /
+  decision change. No apply/commit/save/persist, no roster or prior-season mutation, raw
+  names preserved exactly; the roster viewer is unchanged. See `docs/import-workflow.md`,
+  `docs/derived-logic.md`, and `docs/ui-workflow.md` ("Staged in-memory roster projection
+  (Phase 5 slice 19)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
