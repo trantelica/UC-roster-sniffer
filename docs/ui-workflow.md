@@ -366,6 +366,22 @@ and they are auto-isolated to the currently selected target (re-validated on rea
 screen switching targets cannot show stale decisions. Any commit/apply remains a
 separate, later, explicitly approved slice.
 
+### Read-only scraped JSON import UI shell (Phase 5 slice 16)
+
+Slice 16 adds the **first visible import UI**: a read-only scraped JSON import preview
+shell (`src/components/ScrapedImportPreview.tsx`), reachable from a top-level
+"Import preview (read-only)" view toggle in `App.tsx` alongside the existing roster
+view. It is a thin renderer over the existing engine: it builds a slice 14 import
+session from a chosen **demo source** (the existing scraped JSON test fixtures, plus
+two small inline payloads so the blocked and invalid-source states are visible), lets
+the user select one target, and renders the readiness/preview/review state via a pure
+view model (`src/app/scrapedImportPreviewViewModel.ts`). It shows the source/readiness
+summary, selectable targets, blocked and empty targets (clearly marked not importable),
+and — for a selected player target — the canonical context and a read-only player-row
+table. All selection lives in component memory; there is no file upload, drag/drop,
+persistence, or any apply/commit control. A future slice replaces the demo-source
+picker with real source loading.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

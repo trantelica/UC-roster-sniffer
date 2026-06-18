@@ -5,10 +5,14 @@ import { getDistinctSeasons } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
+import ScrapedImportPreview from '../components/ScrapedImportPreview';
 
 const appData = loadSampleData();
 
+type AppView = 'roster' | 'import';
+
 export default function App() {
+  const [view, setView] = useState<AppView>('roster');
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [selectedAgeDivision, setSelectedAgeDivision] = useState<string | null>(null);
@@ -53,9 +57,8 @@ export default function App() {
     ? findPriorSeasonTeam(appData.teams, selectedTeam)
     : null;
 
-  return (
-    <div>
-      <h1>UC Roster Sniffer</h1>
+  const rosterContent = (
+    <>
       <FilterBar
         teams={appData.teams}
         districts={appData.districts}
@@ -79,6 +82,32 @@ export default function App() {
       ) : (
         <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
       )}
+    </>
+  );
+
+  return (
+    <div>
+      <h1>UC Roster Sniffer</h1>
+      <nav className="app-nav">
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'roster' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'roster'}
+          onClick={() => setView('roster')}
+        >
+          Roster
+        </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'import' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'import'}
+          onClick={() => setView('import')}
+        >
+          Import preview (read-only)
+        </button>
+      </nav>
+
+      {view === 'import' ? <ScrapedImportPreview /> : rosterContent}
     </div>
   );
 }

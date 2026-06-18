@@ -216,3 +216,249 @@ h1 {
   font-style: italic;
   padding: 1rem 0;
 }
+
+/* App view navigation */
+.app-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.app-nav-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: white;
+  color: var(--color-steel-blue);
+  cursor: pointer;
+}
+
+.app-nav-button-active {
+  background-color: var(--color-steel-blue);
+  color: white;
+}
+
+/* Read-only import preview shell */
+.import-preview {
+  background-color: white;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 4px;
+  padding: 1.5rem;
+}
+
+.import-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.import-title {
+  color: var(--color-steel-blue);
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.import-tag {
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
+.import-note {
+  font-size: 0.85rem;
+  color: #555;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  font-size: 0.85rem;
+  background-color: var(--color-alabaster-grey);
+  padding: 0.5rem 0.75rem;
+  border-radius: 3px;
+  margin: 0.75rem 0;
+}
+
+.import-summary-line span {
+  color: #555;
+  margin-right: 0.35rem;
+}
+
+.import-summary-line strong {
+  color: var(--color-carbon-black);
+}
+
+.import-section {
+  margin-top: 1.25rem;
+}
+
+.import-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.import-section h3 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-bronze-spice);
+  margin: 0 0 0.5rem;
+}
+
+.import-target-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.import-target {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 3px;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-mint-cream);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.import-target-selected {
+  border-color: var(--color-steel-blue);
+  box-shadow: inset 0 0 0 1px var(--color-steel-blue);
+}
+
+.import-target-readonly {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.import-target-name {
+  font-weight: bold;
+  color: var(--color-carbon-black);
+}
+
+.import-target-meta {
+  flex: 1;
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.import-badge {
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.import-badge-ready {
+  color: var(--color-steel-blue);
+}
+
+.import-badge-ready-with-warnings {
+  color: var(--color-bronze-spice);
+}
+
+.import-badge-needs-review {
+  color: var(--color-bronze-spice);
+}
+
+.import-badge-blocked {
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
+.import-badge-empty {
+  color: #888;
+}
+
+.import-link-button {
+  background: none;
+  border: none;
+  color: var(--color-steel-blue);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.import-selected {
+  border-top: 1px solid var(--color-alabaster-grey);
+  padding-top: 1rem;
+}
+
+.import-warn {
+  font-size: 0.85rem;
+  color: var(--color-bronze-spice);
+  font-weight: bold;
+}
+
+.import-reasons,
+.import-review {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.import-issues {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.import-issue {
+  padding: 0.2rem 0;
+}
+
+.import-issue-error {
+  color: var(--color-bronze-spice);
+}
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.import-table th,
+.import-table td {
+  text-align: left;
+  border-bottom: 1px solid var(--color-alabaster-grey);
+  padding: 0.35rem 0.5rem;
+}
+
+.import-table th {
+  color: var(--color-bronze-spice);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.import-empty {
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
