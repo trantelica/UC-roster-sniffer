@@ -404,6 +404,22 @@ Import-now controls. Everything stays in component memory — nothing is written
 persisted, or committed, and switching source resets the selected target so no stale
 preview/projection leaks.
 
+### Roster-aware identity review (Phase 5 slice 18)
+
+Slice 18 makes the dry run **roster-aware** for player targets. The workbench compares
+the selected target's imported rows against the existing local roster for that context
+and shows, per row, the identity match status (`likely-new`, `likely-existing`,
+`ambiguous`, `needs-review`, `blocked`), the candidate existing name(s), and what the
+import **would** do. The reviewer resolves each match-bearing row in memory with explicit
+controls — **Confirm match** (only when a single candidate exists), **Create new**,
+**Needs review**, and **Clear** — and the dry-run summary updates live (would create /
+would link / deferred / unresolved, and whether the dry run is clean). Confirm is never
+offered for an ambiguous (duplicate) row, so nothing is auto-linked. Decisions live only
+in component memory and are reset when the target or source changes. When no existing
+roster matches the context, a clear unavailable message is shown instead of a projection.
+All safety wording ("Preview only", "Dry run only · nothing applied") remains, and there
+are no Save / Apply / Commit controls — no roster data is written or mutated.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

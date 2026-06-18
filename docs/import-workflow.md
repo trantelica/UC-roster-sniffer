@@ -909,6 +909,32 @@ Nothing in this workflow applies, commits, persists, or mutates roster data; the
 payload and preview rows are never mutated, and raw player/coach names and titles are
 preserved exactly. There are no save/apply/commit controls.
 
+## Roster-aware import matching, review, and decision-aware dry run (Phase 5 slice 18)
+
+Slice 18 makes the dry-run **roster-aware**. For the selected player target, the
+workbench locates the existing local roster team for the target's canonical context
+(matched by season + district + age division + team code/classification against the same
+static roster the viewer uses) and compares the imported preview rows against that team's
+players. The pure engine helper
+(`src/engine/uteConferenceScrapedJsonImportRosterAwareReview.ts`) composes the existing
+Phase 5 helpers end to end — slice 2 identity matching, slice 3 review actions/decisions,
+slice 5 decision application, slice 6 commit-preview plan, slice 8 application projection
+— and classifies each imported row as `likely-new`, `likely-existing`, `ambiguous`,
+`needs-review`, or `blocked`.
+
+The reviewer can resolve rows in memory (confirm an existing match, create new, or mark
+needs-review) and clear a decision; decisions are a per-row in-memory map (slice 4's
+append-only repository is not needed for a stateless-per-render dry run). The dry-run
+reflects those decisions, distinguishing **projected create**, **projected link**,
+**deferred**, and **blocked-unresolved** rows, and is only "clean" (committable) when no
+rows remain unresolved. Guardrails hold: a high-confidence single candidate is never
+auto-linked (a match-bearing row stays unresolved until the reviewer decides); only an
+unambiguous no-match row defaults to a projected create; ambiguous/collision rows
+(duplicate existing names) block a clean dry run. If no existing roster is found for the
+context, a deterministic **unavailable** state is shown rather than pretending every row
+is new. Raw imported and existing names are preserved exactly; nothing is applied,
+committed, persisted, or mutated, and prior seasons are untouched.
+
 ## Roster import stages
 
 ### 1. Parse source data

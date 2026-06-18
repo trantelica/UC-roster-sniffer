@@ -11,9 +11,11 @@ import {
   getUteScrapedJsonEmptyTargets,
 } from '../engine/uteConferenceScrapedJsonReadinessReport';
 import {
-  buildScrapedJsonImportDryRunProjection,
-  type ScrapedImportDryRunProjection,
-} from '../engine/uteConferenceScrapedJsonImportDryRunProjection';
+  buildScrapedJsonImportRosterAwareReview,
+  type ScrapedImportRosterAwareReview,
+  type ScrapedImportReviewDecisionMap,
+} from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
+import type { Team } from '../domain/types';
 import type {
   UteScrapedJsonImportSession,
   UteScrapedJsonImportSessionStatus,
@@ -141,8 +143,19 @@ export type ScrapedImportPreviewViewModel = {
   emptyTargets: ScrapedImportTargetOption[];
   hasSelection: boolean;
   selected: ScrapedImportSelectedView | null;
-  /** Deterministic dry-run projection for the selected target (preview only). */
-  dryRun: ScrapedImportDryRunProjection;
+  /**
+   * Roster-aware identity review + decision-aware dry-run for the selected target
+   * (preview only). Reflects the existing roster for the target context and the
+   * reviewer's in-memory decisions.
+   */
+  rosterReview: ScrapedImportRosterAwareReview;
+};
+
+export type ScrapedImportPreviewViewModelOptions = {
+  /** Existing local roster teams to compare imported rows against. */
+  existingTeams?: Team[];
+  /** In-memory per-row identity review decisions. */
+  reviewDecisions?: ScrapedImportReviewDecisionMap;
 };
 
 function toTargetOption(
@@ -160,10 +173,13 @@ function toTargetOption(
 
 /** Builds the read-only view model from a session. Pure; never mutates the session. */
 export function buildScrapedJsonImportPreviewViewModel(
-  session: UteScrapedJsonImportSession
+  session: UteScrapedJsonImportSession,
+  options?: ScrapedImportPreviewViewModelOptions
 ): ScrapedImportPreviewViewModel {
   const summary = session.summary;
   const report = session.readinessReport;
+  const existingTeams = options?.existingTeams ?? [];
+  const reviewDecisions = options?.reviewDecisions ?? {};
 
   const selectableTargets = getUteScrapedJsonImportSessionSelectableTargets(
     session
@@ -215,7 +231,11 @@ export function buildScrapedJsonImportPreviewViewModel(
     emptyTargets,
     hasSelection: selected !== null,
     selected,
-    dryRun: buildScrapedJsonImportDryRunProjection(session),
+    rosterReview: buildScrapedJsonImportRosterAwareReview(
+      session,
+      existingTeams,
+      reviewDecisions
+    ),
   };
 }
 

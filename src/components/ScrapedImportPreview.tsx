@@ -10,18 +10,26 @@ import {
   type ScrapedImportSelectedView,
 } from '../app/scrapedImportPreviewViewModel';
 import { parseScrapedJsonImportFileText } from '../app/scrapedImportFileParse';
+import type {
+  ScrapedImportReviewDecisionMap,
+  ScrapedImportReviewDecisionKind,
+  ScrapedImportReviewRow,
+  ScrapedImportRosterAwareReview,
+} from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
+import { loadSampleData } from '../data/loadSampleData';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
 
 /**
- * Phase 5 slice 17: a local-first scraped JSON import preview workbench.
+ * Phase 5 slice 17–18: a local-first, roster-aware scraped JSON import workbench.
  *
  * This component is a thin renderer over the existing engine. It lets the user choose a
  * REAL local scraped JSON file (read in-browser via FileReader — no upload, no backend,
- * no storage) or fall back to a bundled demo fixture, parses it with a pure helper,
- * creates a slice 14 import session, lets the user select a target, and renders the
- * readiness / preview / review / dry-run state via the pure slice 16/17 view model.
+ * no storage) or a bundled demo source, parses it with a pure helper, creates a slice
+ * 14 import session, and (slice 18) compares the selected player target's rows against
+ * the existing local roster, lets the user resolve identity review cases in memory, and
+ * shows a decision-aware dry-run — all via pure view-model / engine helpers.
  *
  * Everything is in component memory only. There are deliberately no save/apply/commit
  * controls. The dry-run projection is preview-only and clearly labelled.
@@ -29,8 +37,43 @@ import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.j
 
 type DemoSource = { id: string; label: string; payload: unknown };
 
+// The existing local roster the import is compared against (same static data the
+// roster viewer uses). Loaded once; never mutated.
+const EXISTING_TEAMS = loadSampleData().teams;
+
+// A demo source whose canonical context (2026 / alta / GR / B1) matches an existing
+// roster team, so roster-aware matching is visible: an exact match, a duplicate-name
+// collision, and a brand-new player.
+const rosterAwareDemoPayload = {
+  metadata: {
+    organization: 'Ute Conference',
+    event: '2026 Fall Season',
+    age_division: 'GR League 9',
+    age_division_alias: 'GR',
+    year: 2026,
+    record_type: 'players',
+    source_url: 'https://ute.example/demo/2026-gr',
+  },
+  districts: [
+    {
+      district: 'Alta',
+      league: 'GR League 9',
+      teams_count: 1,
+      teams: [
+        {
+          team_name: 'Gremlin B1',
+          source_url: 'https://ute.example/demo/2026-gr/b1',
+          players_count: 3,
+          players: [{ name: 'Jordan Smith' }, { name: 'Jamie Park' }, { name: 'New Recruit' }],
+        },
+      ],
+    },
+  ],
+};
+
 const DEMO_SOURCES: DemoSource[] = [
-  { id: 'players-2023-pw', label: 'Players — PeeWee, 2023 (demo fixture)', payload: playersPw },
+  { id: 'roster-aware-2026', label: 'Players — 2026 alta GR B1 (matches existing roster)', payload: rosterAwareDemoPayload },
+  { id: 'players-2023-pw', label: 'Players — PeeWee, 2023 (no existing roster)', payload: playersPw },
   { id: 'coaches-2022-pw', label: 'Coaches — PeeWee, 2022 (demo fixture)', payload: coachesPw },
 ];
 
@@ -62,6 +105,8 @@ export default function ScrapedImportPreview() {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [reviewDecisions, setReviewDecisions] =
+    useState<ScrapedImportReviewDecisionMap>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const baseSession = useMemo(
@@ -76,12 +121,42 @@ export default function ScrapedImportPreview() {
   }, [baseSession, selectedTargetId]);
 
   const vm = useMemo(
-    () => (session ? buildScrapedJsonImportPreviewViewModel(session) : null),
-    [session]
+    () =>
+      session
+        ? buildScrapedJsonImportPreviewViewModel(session, {
+            existingTeams: EXISTING_TEAMS,
+            reviewDecisions,
+          })
+        : null,
+    [session, reviewDecisions]
   );
+
+  // Selecting / switching a target isolates identity decisions to that target.
+  function selectTarget(id: string) {
+    setSelectedTargetId(id);
+    setReviewDecisions({});
+  }
+
+  function clearTarget() {
+    setSelectedTargetId(null);
+    setReviewDecisions({});
+  }
+
+  function setRowDecision(
+    sourceRowId: string,
+    kind: ScrapedImportReviewDecisionKind | null
+  ) {
+    setReviewDecisions((prev) => {
+      const next = { ...prev };
+      if (kind === null) delete next[sourceRowId];
+      else next[sourceRowId] = kind;
+      return next;
+    });
+  }
 
   function resetSelection() {
     setSelectedTargetId(null);
+    setReviewDecisions({});
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -185,8 +260,9 @@ export default function ScrapedImportPreview() {
           sourceName={loaded.name}
           sourceKind={loaded.sourceKind}
           selectedTargetId={selectedTargetId}
-          onSelect={setSelectedTargetId}
-          onClearTarget={resetSelection}
+          onSelect={selectTarget}
+          onClearTarget={clearTarget}
+          onSetRowDecision={setRowDecision}
         />
       )}
     </div>
@@ -204,6 +280,7 @@ function Workbench({
   selectedTargetId,
   onSelect,
   onClearTarget,
+  onSetRowDecision,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -211,6 +288,7 @@ function Workbench({
   selectedTargetId: string | null;
   onSelect: (id: string) => void;
   onClearTarget: () => void;
+  onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
 }) {
   return (
     <>
@@ -271,7 +349,11 @@ function Workbench({
           />
           <ReadonlyTargetSection title="Blocked targets — not importable" targets={vm.blockedTargets} />
           <ReadonlyTargetSection title="Empty targets — no rows" targets={vm.emptyTargets} />
-          <SelectedTargetDetail selected={vm.selected} dryRun={vm.dryRun} />
+          <SelectedTargetDetail
+            selected={vm.selected}
+            rosterReview={vm.rosterReview}
+            onSetRowDecision={onSetRowDecision}
+          />
         </>
       )}
     </>
@@ -366,10 +448,12 @@ function ReadonlyTargetSection({
 
 function SelectedTargetDetail({
   selected,
-  dryRun,
+  rosterReview,
+  onSetRowDecision,
 }: {
   selected: ScrapedImportSelectedView | null;
-  dryRun: ScrapedImportPreviewViewModel['dryRun'];
+  rosterReview: ScrapedImportRosterAwareReview;
+  onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
 }) {
   if (!selected) {
     return (
@@ -501,51 +585,152 @@ function SelectedTargetDetail({
         </div>
       )}
 
-      <DryRunPanel dryRun={dryRun} />
+      {selected.recordType === 'players' && (
+        <RosterReviewPanel rosterReview={rosterReview} onSetRowDecision={onSetRowDecision} />
+      )}
     </div>
   );
 }
 
-function DryRunPanel({ dryRun }: { dryRun: ScrapedImportPreviewViewModel['dryRun'] }) {
+const MATCH_STATUS_LABELS: Record<string, string> = {
+  'likely-new': 'Likely new',
+  'likely-existing': 'Likely existing',
+  ambiguous: 'Ambiguous',
+  'needs-review': 'Needs review',
+  blocked: 'Blocked',
+};
+
+const OUTCOME_LABELS: Record<string, string> = {
+  'projected-create': 'Would create',
+  'projected-link': 'Would link',
+  deferred: 'Deferred',
+  'blocked-unresolved': 'Unresolved',
+  blocked: 'Blocked',
+};
+
+function RosterReviewPanel({
+  rosterReview,
+  onSetRowDecision,
+}: {
+  rosterReview: ScrapedImportRosterAwareReview;
+  onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+}) {
   return (
     <div className="import-section import-dryrun">
       <div className="import-section-head">
-        <h3>Dry-run projection</h3>
+        <h3>Roster-aware review &amp; dry run</h3>
         <span className="import-tag">Dry run only · nothing applied</span>
       </div>
-      {!dryRun.available ? (
-        <p className="import-empty">{dryRun.message}</p>
+      {!rosterReview.available ? (
+        <p className="import-empty">{rosterReview.message}</p>
       ) : (
         <>
           <p className="import-reasons">
-            Assumes a new import with no existing roster to match against. This is a
-            preview of what an import would do — nothing has been written.
+            Compared against existing roster {rosterReview.existingTeamId} (
+            {rosterReview.existingPlayerCount} players). Resolve matches below — nothing has
+            been applied.
           </p>
           <p className="import-review">
-            Would create {dryRun.summary.projectedCreateRows} · would link{' '}
-            {dryRun.summary.projectedLinkRows} · deferred {dryRun.summary.projectedDeferRows} ·{' '}
-            rejected {dryRun.summary.projectedRejectRows} · blocked {dryRun.summary.blockedRows}
+            Would create {rosterReview.summary.projectedCreateRows} · would link{' '}
+            {rosterReview.summary.projectedLinkRows} · deferred{' '}
+            {rosterReview.summary.deferredRows} · unresolved{' '}
+            {rosterReview.summary.unresolvedRows} ·{' '}
+            {rosterReview.summary.canCommit
+              ? 'dry run is clean'
+              : 'dry run not clean (unresolved rows remain)'}
           </p>
           <table className="import-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Player name (raw)</th>
+                <th>Imported name (raw)</th>
+                <th>Match</th>
+                <th>Candidate(s)</th>
                 <th>Would</th>
+                <th>Decision</th>
               </tr>
             </thead>
             <tbody>
-              {dryRun.rows.map((row) => (
-                <tr key={row.rowIndex}>
-                  <td>{row.rowIndex + 1}</td>
-                  <td>{row.projectedNewPlayerName ?? row.playerName ?? '(missing)'}</td>
-                  <td>{row.projectionStatus}</td>
-                </tr>
+              {rosterReview.rows.map((row) => (
+                <ReviewRow
+                  key={`${row.sourceRowId}:${row.rowIndex}`}
+                  row={row}
+                  onSetRowDecision={onSetRowDecision}
+                />
               ))}
             </tbody>
           </table>
         </>
       )}
     </div>
+  );
+}
+
+function ReviewRow({
+  row,
+  onSetRowDecision,
+}: {
+  row: ScrapedImportReviewRow;
+  onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+}) {
+  const rowId = row.sourceRowId;
+  const candidateText =
+    row.candidates.length === 0
+      ? '—'
+      : row.candidates.map((c) => c.existingPlayerName ?? '(unnamed)').join(', ');
+  const outcomeText =
+    row.outcome === 'projected-link' && row.linkTargetExistingName
+      ? `Would link → ${row.linkTargetExistingName}`
+      : OUTCOME_LABELS[row.outcome] ?? row.outcome;
+  return (
+    <tr>
+      <td>{row.playerName ?? '(missing)'}</td>
+      <td>
+        <span className={`import-match import-match-${row.matchStatus}`}>
+          {MATCH_STATUS_LABELS[row.matchStatus] ?? row.matchStatus}
+        </span>
+      </td>
+      <td>{candidateText}</td>
+      <td>{outcomeText}</td>
+      <td>
+        {rowId === null ? (
+          <span className="import-empty">—</span>
+        ) : (
+          <span className="import-decision-controls">
+            {row.confirmable && (
+              <button
+                type="button"
+                className={`import-decision-button ${row.decision === 'confirm-match' ? 'import-decision-active' : ''}`}
+                onClick={() => onSetRowDecision(rowId, 'confirm-match')}
+              >
+                Confirm match
+              </button>
+            )}
+            <button
+              type="button"
+              className={`import-decision-button ${row.decision === 'create-new' ? 'import-decision-active' : ''}`}
+              onClick={() => onSetRowDecision(rowId, 'create-new')}
+            >
+              Create new
+            </button>
+            <button
+              type="button"
+              className={`import-decision-button ${row.decision === 'needs-review' ? 'import-decision-active' : ''}`}
+              onClick={() => onSetRowDecision(rowId, 'needs-review')}
+            >
+              Needs review
+            </button>
+            {row.decision !== null && (
+              <button
+                type="button"
+                className="import-link-button"
+                onClick={() => onSetRowDecision(rowId, null)}
+              >
+                Clear
+              </button>
+            )}
+          </span>
+        )}
+      </td>
+    </tr>
   );
 }

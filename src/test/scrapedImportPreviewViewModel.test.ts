@@ -165,11 +165,11 @@ describe('scraped JSON import preview view model', () => {
     expect(vm.selected?.coachPreviewSummary?.totalRows).toBe(2);
   });
 
-  it('coach target dry run is unavailable (player-roster projection only)', () => {
+  it('coach target roster review is unavailable (player identity review only)', () => {
     const session = createUteScrapedJsonImportSessionFromPayload(coachesPw);
     const selected = selectUteScrapedJsonImportSessionTarget(session, firstSelectableId(session));
     const vm = buildScrapedJsonImportPreviewViewModel(selected);
-    expect(vm.dryRun.available).toBe(false);
+    expect(vm.rosterReview.available).toBe(false);
   });
 
   it('selected blocked target is shown as not importable', () => {
@@ -186,21 +186,22 @@ describe('scraped JSON import preview view model', () => {
     expect(vm.blockedTargets.length).toBe(1);
   });
 
-  it('selected ready player target exposes an available dry-run projection', () => {
+  it('roster review is unavailable when no existing roster matches the context', () => {
+    // playersPw is a 2023 PW source; no matching static team exists.
     const session = createUteScrapedJsonImportSessionFromPayload(playersPw);
     const selected = selectUteScrapedJsonImportSessionTarget(session, firstSelectableId(session));
-    const vm = buildScrapedJsonImportPreviewViewModel(selected);
-    expect(vm.dryRun.available).toBe(true);
-    if (vm.dryRun.available) {
-      expect(vm.dryRun.summary.projectedCreateRows).toBe(2);
+    const vm = buildScrapedJsonImportPreviewViewModel(selected, { existingTeams: [] });
+    expect(vm.rosterReview.available).toBe(false);
+    if (!vm.rosterReview.available) {
+      expect(vm.rosterReview.reason).toBe('missing-existing-roster-context');
     }
   });
 
-  it('with no selection the dry run is unavailable', () => {
+  it('with no selection the roster review is unavailable', () => {
     const vm = buildScrapedJsonImportPreviewViewModel(
       createUteScrapedJsonImportSessionFromPayload(playersPw)
     );
-    expect(vm.dryRun.available).toBe(false);
+    expect(vm.rosterReview.available).toBe(false);
   });
 
   it('separates ready, needs-review, blocked, and empty targets distinctly', () => {
