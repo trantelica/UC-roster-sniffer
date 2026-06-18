@@ -484,3 +484,56 @@ h1 {
   padding: 0.75rem 1rem;
   background-color: var(--color-mint-cream);
 }
+
+/* Identity match status chips */
+.import-match {
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.import-match-likely-new {
+  color: var(--color-steel-blue);
+}
+
+.import-match-likely-existing {
+  color: #2e7d32;
+}
+
+.import-match-ambiguous,
+.import-match-needs-review {
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
+.import-match-blocked {
+  color: #888;
+}
+
+/* Per-row identity review decision controls */
+.import-decision-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.import-decision-button {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: white;
+  color: var(--color-steel-blue);
+  cursor: pointer;
+}
+
+.import-decision-active {
+  background-color: var(--color-steel-blue);
+  color: white;
+}

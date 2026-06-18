@@ -869,6 +869,32 @@ Import commit happens only after collision review.
   automatic identity merge; raw player/coach names and titles are preserved exactly. The
   existing roster viewer is unchanged. See `docs/import-workflow.md` and
   `docs/ui-workflow.md` ("Local scraped JSON import preview workflow (Phase 5 slice 17)").
+  (The slice-17 create-new-only dry-run helper was superseded by the slice 18 roster-aware
+  helper below and removed.)
+
+- **Slice 18 (done): roster-aware import matching, identity review, and decision-aware
+  dry run.** Makes the dry run compare the selected player target's imported rows against
+  the existing local roster. A new pure engine helper
+  (`src/engine/uteConferenceScrapedJsonImportRosterAwareReview.ts`,
+  `src/test/uteConferenceScrapedJsonImportRosterAwareReview.test.ts`) locates the existing
+  roster team by decomposed canonical context (season + district + age division + team
+  code = classification) and composes the existing Phase 5 helpers — slice 2 matching,
+  slice 3 review actions/decisions, slice 5 application, slice 6 commit-preview plan,
+  slice 8 projection — to classify each row (`likely-new` / `likely-existing` /
+  `ambiguous` / `needs-review` / `blocked`) and produce a decision-aware dry run
+  (`projected-create` / `projected-link` / `deferred` / `blocked-unresolved`). The
+  reviewer resolves rows in memory (confirm match / create new / needs review / clear);
+  decisions are a per-row in-memory map (slice 4's repository not needed). A
+  high-confidence single candidate is never auto-linked, ambiguous rows block a clean dry
+  run, only unambiguous no-match rows default to create, and a missing existing-roster
+  context yields a deterministic unavailable state (never "all new"). The view model
+  gained an options arg (`existingTeams`, `reviewDecisions`) and a `rosterReview` field;
+  the workbench gained per-row identity status, candidate details, and decision controls.
+  No apply/commit, persistence, browser storage, backend, auth, roster mutation,
+  automatic identity merge, duplicate suppression, or prior-season change; raw imported
+  and existing names are preserved exactly; the roster viewer is unchanged. See
+  `docs/import-workflow.md`, `docs/derived-logic.md`, and `docs/ui-workflow.md`
+  ("Roster-aware ... (Phase 5 slice 18)").
 
 ### Phase 5 checkpoint
 

@@ -1900,6 +1900,43 @@ every helper returns a new object and never mutates its inputs; output is determ
 and there is no import apply/commit, roster mutation, persistence, browser storage,
 file upload, movement derivation, coach analytics, or UI.
 
+### Roster-aware import review + decision-aware dry run (Phase 5 slice 18)
+
+Phase 5 slice 18 adds a pure, deterministic roster-aware review for a selected scraped
+JSON player target (`src/engine/uteConferenceScrapedJsonImportRosterAwareReview.ts`). It
+COMPOSES the existing helpers and duplicates none of their logic:
+
+1. **Locate context** — `findExistingRosterTeamForContext` matches the selected target's
+   canonical context to an existing roster team by decomposed fields (season + district +
+   age division + team code = classification). The scraped `teamId` is not used directly
+   because its casing differs from the static team ids. No match → deterministic
+   `missing-existing-roster-context` unavailable state.
+2. **Match** — slice 2 `createRosterImportPreviewIdentityMatches` compares imported
+   preview rows against that team's players (existing records built with raw names
+   preserved).
+3. **Classify** — each row becomes `likely-new` (no-match), `likely-existing`
+   (single-candidate), `ambiguous` (multiple candidates / existing-duplicate name),
+   `needs-review` (preview-duplicate / warning issues), or `blocked` (skipped row).
+4. **Decide** — the reviewer's in-memory per-row decision (`confirm-match` →
+   `accept-candidate`, `create-new`, `needs-review` → `defer`) is turned into a canonical
+   slice 3 decision via `applyRosterImportIdentityReviewAction` +
+   `createRosterImportIdentityReviewDecision`. Only an unambiguous no-match row defaults
+   to `create-new`; every match-bearing row stays unresolved until the reviewer decides,
+   so a high-confidence single candidate is never auto-linked.
+5. **Project** — slice 5 application, slice 6 commit-preview plan, and slice 8 projection
+   produce the per-row dry-run outcome (`projected-create` / `projected-link` /
+   `deferred` / `blocked-unresolved`). Per-row outcomes come from the slice 6 plan (which
+   represents partial/mixed states); the slice 8 projection is composed for the
+   committable case. `canCommit` is true only when no row is unresolved/blocked.
+
+Slice 4's append-only decision repository is intentionally not used — decisions are a
+per-row in-memory map resolved fresh on each call. Determinism: decision ids derive from
+stable preview-row keys and timestamps are fixed sentinels. Nothing is applied,
+committed, written, linked, created, merged, persisted, or mutated; the session,
+payload, preview rows, existing roster, and prior seasons are never mutated; and raw
+imported and existing player names are preserved exactly. Coach targets have no player
+identity review (out of scope).
+
 ## Coach lifetime record
 
 Coach lifetime record accumulates all team wins and losses for teams where the coach was assigned.
