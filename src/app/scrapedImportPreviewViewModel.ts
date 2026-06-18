@@ -5,9 +5,15 @@ import type {
   UteScrapedJsonReadinessTarget,
 } from '../engine/uteConferenceScrapedJsonReadinessReport';
 import {
+  getUteScrapedJsonImportReadyTargets,
+  getUteScrapedJsonTargetsNeedingReview,
   getUteScrapedJsonBlockedTargets,
   getUteScrapedJsonEmptyTargets,
 } from '../engine/uteConferenceScrapedJsonReadinessReport';
+import {
+  buildScrapedJsonImportDryRunProjection,
+  type ScrapedImportDryRunProjection,
+} from '../engine/uteConferenceScrapedJsonImportDryRunProjection';
 import type {
   UteScrapedJsonImportSession,
   UteScrapedJsonImportSessionStatus,
@@ -82,8 +88,26 @@ export type ScrapedImportSelectedView = {
   readinessReasons: string[];
   /** Player preview rows (empty for coach targets). Read-only; order preserved. */
   playerPreviewRows: ScrapedImportPreviewRowView[];
+  /** Coach preview rows (empty for player targets). Read-only; raw names/titles preserved. */
+  coachPreviewRows: ScrapedImportCoachRowView[];
+  /** Coach preview summary (present only for coach targets). */
+  coachPreviewSummary: ScrapedImportCoachSummaryView | null;
   /** Present only when player preview rows exist. */
   reviewSummary: ScrapedImportReviewSummaryView | null;
+};
+
+export type ScrapedImportCoachRowView = {
+  rowIndex: number;
+  rawName: string | null;
+  rawTitle: string | null;
+};
+
+export type ScrapedImportCoachSummaryView = {
+  totalRows: number;
+  withName: number;
+  missingName: number;
+  withTitle: number;
+  missingTitle: number;
 };
 
 export type ScrapedImportPreviewViewModel = {
@@ -107,11 +131,18 @@ export type ScrapedImportPreviewViewModel = {
     canProceedToPreview: boolean;
     canProceedWithoutReview: boolean;
   };
+  /** All selectable targets (ready, ready-with-warnings, and needs-review). */
   selectableTargets: ScrapedImportTargetOption[];
+  /** Ready / ready-with-warnings targets only (selectable, no review required). */
+  readyTargets: ScrapedImportTargetOption[];
+  /** Needs-review targets (selectable, but flagged for review). */
+  needsReviewTargets: ScrapedImportTargetOption[];
   blockedTargets: ScrapedImportTargetOption[];
   emptyTargets: ScrapedImportTargetOption[];
   hasSelection: boolean;
   selected: ScrapedImportSelectedView | null;
+  /** Deterministic dry-run projection for the selected target (preview only). */
+  dryRun: ScrapedImportDryRunProjection;
 };
 
 function toTargetOption(
@@ -137,6 +168,12 @@ export function buildScrapedJsonImportPreviewViewModel(
   const selectableTargets = getUteScrapedJsonImportSessionSelectableTargets(
     session
   ).map(toTargetOption);
+  const readyTargets = report
+    ? getUteScrapedJsonImportReadyTargets(report).map(toTargetOption)
+    : [];
+  const needsReviewTargets = report
+    ? getUteScrapedJsonTargetsNeedingReview(report).map(toTargetOption)
+    : [];
   const blockedTargets = report
     ? getUteScrapedJsonBlockedTargets(report).map(toTargetOption)
     : [];
@@ -172,10 +209,13 @@ export function buildScrapedJsonImportPreviewViewModel(
       canProceedWithoutReview: summary.canProceedWithoutReview,
     },
     selectableTargets,
+    readyTargets,
+    needsReviewTargets,
     blockedTargets,
     emptyTargets,
     hasSelection: selected !== null,
     selected,
+    dryRun: buildScrapedJsonImportDryRunProjection(session),
   };
 }
 
@@ -210,6 +250,24 @@ function buildSelectedView(
       ? toReviewSummary(session)
       : null;
 
+  const coachResult = session.selectedCoachPreviewResult;
+  const coachPreviewRows: ScrapedImportCoachRowView[] = (
+    coachResult?.rows ?? []
+  ).map((row) => ({
+    rowIndex: row.rowIndex,
+    rawName: row.rawName,
+    rawTitle: row.rawTitle,
+  }));
+  const coachPreviewSummary: ScrapedImportCoachSummaryView | null = coachResult
+    ? {
+        totalRows: coachResult.summary.totalRows,
+        withName: coachResult.summary.withName,
+        missingName: coachResult.summary.missingName,
+        withTitle: coachResult.summary.withTitle,
+        missingTitle: coachResult.summary.missingTitle,
+      }
+    : null;
+
   return {
     sourceTargetId: selectedTarget.sourceTargetId,
     recordType: selectedTarget.recordType,
@@ -228,6 +286,8 @@ function buildSelectedView(
     })),
     readinessReasons: [...selectedTarget.readinessTarget.readinessReasons],
     playerPreviewRows,
+    coachPreviewRows,
+    coachPreviewSummary,
     reviewSummary,
   };
 }

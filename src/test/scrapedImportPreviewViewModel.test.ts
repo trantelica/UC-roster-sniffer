@@ -40,6 +40,36 @@ function blockedPlayerPayload() {
   };
 }
 
+function needsReviewPlayerPayload() {
+  // Two identical player names within one team -> duplicate group -> needs-review.
+  return {
+    metadata: {
+      organization: 'Ute Conference',
+      event: 'Fall',
+      age_division: 'PW League 10',
+      age_division_alias: 'PW',
+      year: 2025,
+      record_type: 'players',
+      source_url: 'https://ute.example/needs-review',
+    },
+    districts: [
+      {
+        district: 'Alta',
+        league: 'PW League 10',
+        teams_count: 1,
+        teams: [
+          {
+            team_name: 'PeeWee C1',
+            source_url: 'https://ute.example/alta/c1',
+            players_count: 2,
+            players: [{ name: 'Sam Lee' }, { name: 'Sam Lee' }],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function firstSelectableId(session: ReturnType<typeof createUteScrapedJsonImportSessionFromPayload>) {
   return getUteScrapedJsonImportSessionSelectableTargets(session)[0].sourceTargetId;
 }
@@ -114,7 +144,7 @@ describe('scraped JSON import preview view model', () => {
     expect(vm.selected?.reviewSummary?.reviewedRowCount).toBe(0);
   });
 
-  it('selected coach target has no player preview rows or review summary', () => {
+  it('selected coach target exposes coach preview rows with raw names/titles, no player rows', () => {
     const session = createUteScrapedJsonImportSessionFromPayload(coachesPw);
     const selected = selectUteScrapedJsonImportSessionTarget(session, firstSelectableId(session));
     const vm = buildScrapedJsonImportPreviewViewModel(selected);
@@ -122,6 +152,24 @@ describe('scraped JSON import preview view model', () => {
     expect(vm.selected?.recordType).toBe('coaches');
     expect(vm.selected?.playerPreviewRows).toEqual([]);
     expect(vm.selected?.reviewSummary).toBeNull();
+    // Coach preview rows preserve raw names (incl. a non-breaking space) and titles.
+    const NBSP = ' ';
+    expect(vm.selected?.coachPreviewRows.map((r) => r.rawName)).toEqual([
+      `John${NBSP}Smith`,
+      'Dana Park',
+    ]);
+    expect(vm.selected?.coachPreviewRows.map((r) => r.rawTitle)).toEqual([
+      'Head Coach',
+      'Asst Coach',
+    ]);
+    expect(vm.selected?.coachPreviewSummary?.totalRows).toBe(2);
+  });
+
+  it('coach target dry run is unavailable (player-roster projection only)', () => {
+    const session = createUteScrapedJsonImportSessionFromPayload(coachesPw);
+    const selected = selectUteScrapedJsonImportSessionTarget(session, firstSelectableId(session));
+    const vm = buildScrapedJsonImportPreviewViewModel(selected);
+    expect(vm.dryRun.available).toBe(false);
   });
 
   it('selected blocked target is shown as not importable', () => {
@@ -136,6 +184,48 @@ describe('scraped JSON import preview view model', () => {
     expect(vm.selected?.importable).toBe(false);
     expect(vm.summary.canProceedToPreview).toBe(false);
     expect(vm.blockedTargets.length).toBe(1);
+  });
+
+  it('selected ready player target exposes an available dry-run projection', () => {
+    const session = createUteScrapedJsonImportSessionFromPayload(playersPw);
+    const selected = selectUteScrapedJsonImportSessionTarget(session, firstSelectableId(session));
+    const vm = buildScrapedJsonImportPreviewViewModel(selected);
+    expect(vm.dryRun.available).toBe(true);
+    if (vm.dryRun.available) {
+      expect(vm.dryRun.summary.projectedCreateRows).toBe(2);
+    }
+  });
+
+  it('with no selection the dry run is unavailable', () => {
+    const vm = buildScrapedJsonImportPreviewViewModel(
+      createUteScrapedJsonImportSessionFromPayload(playersPw)
+    );
+    expect(vm.dryRun.available).toBe(false);
+  });
+
+  it('separates ready, needs-review, blocked, and empty targets distinctly', () => {
+    const blockedVm = buildScrapedJsonImportPreviewViewModel(
+      createUteScrapedJsonImportSessionFromPayload(blockedPlayerPayload())
+    );
+    expect(blockedVm.readyTargets.length).toBe(0);
+    expect(blockedVm.needsReviewTargets.length).toBe(0);
+    expect(blockedVm.blockedTargets.length).toBe(1);
+
+    const reviewVm = buildScrapedJsonImportPreviewViewModel(
+      createUteScrapedJsonImportSessionFromPayload(needsReviewPlayerPayload())
+    );
+    expect(reviewVm.needsReviewTargets.length).toBe(1);
+    expect(reviewVm.readyTargets.length).toBe(0);
+    // Needs-review targets remain selectable.
+    expect(reviewVm.selectableTargets.map((t) => t.sourceTargetId)).toContain(
+      reviewVm.needsReviewTargets[0].sourceTargetId
+    );
+
+    const readyVm = buildScrapedJsonImportPreviewViewModel(
+      createUteScrapedJsonImportSessionFromPayload(playersPw)
+    );
+    expect(readyVm.readyTargets.length).toBe(2);
+    expect(readyVm.needsReviewTargets.length).toBe(0);
   });
 
   it('is deterministic across repeated builds', () => {

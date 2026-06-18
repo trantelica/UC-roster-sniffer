@@ -846,6 +846,30 @@ Import commit happens only after collision review.
   no `@testing-library`/`jsdom`; the pure view model is tested instead. See
   `docs/ui-workflow.md` ("Read-only scraped JSON import UI shell (Phase 5 slice 16)").
 
+- **Slice 17 (done): local scraped JSON import preview workflow with dry-run
+  projection.** Makes real local file loading the primary import workflow. The user
+  chooses a Ute Conference scraped JSON file; React reads it in-browser with `FileReader`
+  (local only — no upload, backend, storage, or persistence) and a pure helper
+  (`src/app/scrapedImportFileParse.ts`, `src/test/scrapedImportFileParse.test.ts`) parses
+  it into a payload or a clean invalid-file error. The payload feeds the existing slice
+  14 session engine; the workbench (`src/components/ScrapedImportPreview.tsx`) shows the
+  filename/type, readiness, targets grouped as ready / needs-review / blocked / empty,
+  canonical context, blocking issues, read-only review state, and player or coach preview
+  rows. A new pure engine helper
+  (`src/engine/uteConferenceScrapedJsonImportDryRunProjection.ts`,
+  `src/test/uteConferenceScrapedJsonImportDryRunProjection.test.ts`) composes the existing
+  slice 2/3/5/6/8 helpers into a deterministic **dry-run projection** ("Dry run only ·
+  nothing applied") showing what a ready player target would create; blocked / empty /
+  needs-review / coach / missing-context targets yield a deterministic unavailable state
+  (readiness is never bypassed). The view model
+  (`src/app/scrapedImportPreviewViewModel.ts`) was extended with distinct ready /
+  needs-review target lists, coach preview rows, and the dry-run projection; React holds
+  only the loaded file and selected target in memory and contains no business logic. No
+  apply/commit, persistence, browser storage, backend, auth, roster mutation, or
+  automatic identity merge; raw player/coach names and titles are preserved exactly. The
+  existing roster viewer is unchanged. See `docs/import-workflow.md` and
+  `docs/ui-workflow.md` ("Local scraped JSON import preview workflow (Phase 5 slice 17)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
