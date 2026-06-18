@@ -877,6 +877,38 @@ decisions") for the full rationale. There is no persistence, browser storage, fi
 upload, import apply/commit, roster mutation, movement derivation, coach analytics, or
 UI.
 
+## Local scraped JSON import preview workflow (Phase 5 slice 16–17)
+
+The import preview screen is a local-first **read-only workbench**. Slice 16 added the
+read-only UI shell; slice 17 made real local file loading the primary workflow and added
+a dry-run projection. The user can:
+
+- **Choose a local JSON file** with the browser file picker. The file is read in-browser
+  with `FileReader` only — never uploaded, sent to a server, or stored (no backend, no
+  localStorage/IndexedDB, no persistence). A pure helper
+  (`src/app/scrapedImportFileParse.ts`) turns the text into a payload or a clean
+  invalid-file error; invalid JSON and empty files are reported without throwing. Bundled
+  demo fixtures remain available as a fallback.
+- The parsed payload is fed into the existing slice 14 import session engine, which
+  produces the readiness report. The workbench shows the source filename/type, status,
+  readiness summary, and the targets grouped distinctly as ready, needs-review, blocked,
+  and empty.
+- Selecting a target shows its canonical context, import-blocking issues/warnings, the
+  read-only review state (reviewed/unreviewed), and the preview rows: player rows for
+  player targets, coach rows (raw names + titles) for coach targets.
+- A **dry-run projection** panel (`src/engine/uteConferenceScrapedJsonImportDryRunProjection.ts`)
+  composes the existing slice 2/3/5/6/8 helpers end to end to show, for a ready player
+  target, what an import **would** create — in memory only, clearly labelled "Dry run
+  only · nothing applied". Because the scraped pipeline has no existing-roster registry
+  yet, every row is a `no-match` whose canonical resolution is `create-new`, so the
+  projection only ever creates new entries; it never links or merges. The projection
+  never bypasses readiness — blocked, empty, needs-review, coach, or missing-context
+  targets yield a deterministic unavailable state instead of a forced projection.
+
+Nothing in this workflow applies, commits, persists, or mutates roster data; the parsed
+payload and preview rows are never mutated, and raw player/coach names and titles are
+preserved exactly. There are no save/apply/commit controls.
+
 ## Roster import stages
 
 ### 1. Parse source data

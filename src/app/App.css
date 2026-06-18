@@ -462,3 +462,25 @@ h1 {
   font-style: italic;
   margin: 0.5rem 0;
 }
+
+/* Local file / demo source controls */
+.import-source-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.import-source-controls input[type='file'] {
+  font-size: 0.85rem;
+  padding: 0.3rem 0;
+}
+
+/* Dry-run projection panel */
+.import-dryrun {
+  border: 1px dashed var(--color-steel-blue);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-mint-cream);
+}

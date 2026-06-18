@@ -382,6 +382,28 @@ table. All selection lives in component memory; there is no file upload, drag/dr
 persistence, or any apply/commit control. A future slice replaces the demo-source
 picker with real source loading.
 
+### Local scraped JSON import preview workflow (Phase 5 slice 17)
+
+Slice 17 turns the shell into a usable **local-first import workbench**. The primary
+action is **Choose JSON file**: a real Ute Conference scraped JSON file is read in the
+browser with `FileReader` (local only — never uploaded, stored, or persisted), parsed by
+a pure helper, and loaded into the existing import session engine. The bundled demo
+fixtures remain as a fallback. The workbench shows the source filename/type, readiness
+status and summary; groups targets distinctly as ready / needs-review / blocked / empty;
+and for a selected target shows canonical context, blocking issues/warnings, the
+read-only review state, and preview rows (player rows, or coach rows with raw names and
+titles).
+
+It adds a **dry-run projection** panel, clearly labelled "Dry run only · nothing
+applied", that shows what an import of a ready player target **would** create (composing
+the existing Phase 5 dry-run plan / projection helpers). Blocked, empty, needs-review,
+coach, or missing-context targets show a deterministic unavailable state rather than a
+forced projection. Primary actions are Choose JSON file, Clear loaded file, Select
+target, and Clear selected target; there are deliberately no Save / Apply / Commit /
+Import-now controls. Everything stays in component memory — nothing is written,
+persisted, or committed, and switching source resets the selected target so no stale
+preview/projection leaks.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.
