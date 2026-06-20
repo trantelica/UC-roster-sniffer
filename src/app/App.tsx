@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { loadSampleData } from '../data/loadSampleData';
 import { getDistinctSeasons } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
+import {
+  buildWorkspaceSnapshot,
+  parseWorkspaceSnapshotJson,
+  restoreWorkspaceFromSnapshot,
+  type WorkspaceData,
+  type WorkspaceSnapshotSummary,
+  type WorkspaceSnapshotValidationError,
+} from '../engine/workspaceSnapshot';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
 import ScrapedImportPreview, {
   type InMemoryImportAppState,
 } from '../components/ScrapedImportPreview';
 
-const appData = loadSampleData();
-
-// The baseline roster is the loaded sample data, never mutated. An explicit in-memory
-// import execution (slice 22) produces a separate live roster value; undo / reset returns
-// to this baseline. Reloading the app always starts from the baseline — the in-memory
-// execution is deliberately NOT durable.
-const baselineTeams = appData.teams;
+const initialAppData = loadSampleData();
 
 type AppView = 'roster' | 'import';
+
+type SnapshotNotice =
+  | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
+  | { kind: 'error'; fileName: string; errors: WorkspaceSnapshotValidationError[] };
 
 export default function App() {
   const [view, setView] = useState<AppView>('roster');
@@ -25,20 +31,28 @@ export default function App() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [selectedAgeDivision, setSelectedAgeDivision] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // The current local workspace (districts / age divisions / teams). Starts from the
+  // bundled sample data; a workspace-snapshot import REPLACES it (slice 23).
+  const [workspace, setWorkspace] = useState<WorkspaceData>(initialAppData);
   // Non-durable, in-memory import execution state (null = showing the baseline roster).
   const [inMemoryImport, setInMemoryImport] =
     useState<InMemoryImportAppState | null>(null);
+  // Bumped on a snapshot restore to force-remount the import workbench, clearing its
+  // transient state (loaded source, review decisions, staged preview, execution/undo).
+  const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
+  const [snapshotNotice, setSnapshotNotice] = useState<SnapshotNotice | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
-  const liveTeams = inMemoryImport ? inMemoryImport.teams : baselineTeams;
+  const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
 
   // Auto-select the most recent available season on load, so a season that can
   // show prior-season roster comparison is the default view.
   useEffect(() => {
-    const seasons = getDistinctSeasons(appData.teams);
+    const seasons = getDistinctSeasons(workspace.teams);
     if (seasons.length > 0 && selectedSeason === null) {
       setSelectedSeason(seasons[seasons.length - 1]);
     }
-  }, [selectedSeason]);
+  }, [selectedSeason, workspace]);
 
   function handleSeasonChange(seasonId: string) {
     setSelectedSeason(seasonId);
@@ -60,6 +74,76 @@ export default function App() {
 
   function handleTeamChange(teamId: string) {
     setSelectedTeamId(teamId);
+  }
+
+  // --- Slice 23: portable workspace snapshot export / import ---------------
+
+  function handleExportSnapshot() {
+    const snapshot = buildWorkspaceSnapshot({
+      workspace: {
+        districts: workspace.districts,
+        ageDivisions: workspace.ageDivisions,
+        // The CURRENT in-memory roster, including any executed in-memory import additions.
+        teams: liveTeams,
+        selection: {
+          seasonId: selectedSeason,
+          districtId: selectedDistrict,
+          ageDivisionId: selectedAgeDivision,
+          teamId: selectedTeamId,
+        },
+      },
+      generatedAt: new Date().toISOString(),
+    });
+    const json = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `uc-roster-sniffer-workspace-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      const result = parseWorkspaceSnapshotJson(text);
+      if (!result.ok) {
+        // Invalid snapshot: current workspace state is left completely unchanged.
+        setSnapshotNotice({ kind: 'error', fileName: file.name, errors: result.errors });
+      } else {
+        // Valid snapshot: REPLACE the workspace (never merge) and clear all transient
+        // import-execution / workbench state.
+        const restored = restoreWorkspaceFromSnapshot(result.snapshot);
+        setWorkspace(restored.workspace);
+        setInMemoryImport(null);
+        setSelectedSeason(restored.selection.seasonId);
+        setSelectedDistrict(restored.selection.districtId);
+        setSelectedAgeDivision(restored.selection.ageDivisionId);
+        setSelectedTeamId(restored.selection.teamId);
+        setWorkspaceEpoch((epoch) => epoch + 1);
+        setSnapshotNotice({
+          kind: 'restored',
+          fileName: file.name,
+          summary: restored.summary,
+        });
+      }
+      if (importInputRef.current) importInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      setSnapshotNotice({
+        kind: 'error',
+        fileName: file.name,
+        errors: [{ code: 'invalid-json', message: 'The file could not be read locally.' }],
+      });
+      if (importInputRef.current) importInputRef.current.value = '';
+    };
+    reader.readAsText(file);
   }
 
   const selectedTeam = selectedTeamId
@@ -84,8 +168,8 @@ export default function App() {
       )}
       <FilterBar
         teams={liveTeams}
-        districts={appData.districts}
-        ageDivisions={appData.ageDivisions}
+        districts={workspace.districts}
+        ageDivisions={workspace.ageDivisions}
         selectedSeason={selectedSeason}
         selectedDistrict={selectedDistrict}
         selectedAgeDivision={selectedAgeDivision}
@@ -98,8 +182,8 @@ export default function App() {
       {selectedTeam ? (
         <TeamView
           team={selectedTeam}
-          districts={appData.districts}
-          ageDivisions={appData.ageDivisions}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
           priorPlayers={priorTeam?.players ?? null}
         />
       ) : (
@@ -130,6 +214,15 @@ export default function App() {
         </button>
       </nav>
 
+      <WorkspaceToolbar
+        importInputRef={importInputRef}
+        notice={snapshotNotice}
+        onExport={handleExportSnapshot}
+        onImportFileChange={handleImportFileChange}
+        onDismissNotice={() => setSnapshotNotice(null)}
+        inMemoryImportActive={inMemoryImport !== null}
+      />
+
       {/*
         Both views stay mounted (visibility toggled) so an in-memory import execution and
         its Undo control are never lost by switching tabs while an execution is active.
@@ -137,10 +230,87 @@ export default function App() {
       <div hidden={view !== 'roster'}>{rosterContent}</div>
       <div hidden={view !== 'import'}>
         <ScrapedImportPreview
-          baselineTeams={baselineTeams}
+          key={workspaceEpoch}
+          baselineTeams={workspace.teams}
           onInMemoryImportChange={setInMemoryImport}
         />
       </div>
+    </div>
+  );
+}
+
+function WorkspaceToolbar({
+  importInputRef,
+  notice,
+  onExport,
+  onImportFileChange,
+  onDismissNotice,
+  inMemoryImportActive,
+}: {
+  importInputRef: React.RefObject<HTMLInputElement>;
+  notice: SnapshotNotice | null;
+  onExport: () => void;
+  onImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onDismissNotice: () => void;
+  inMemoryImportActive: boolean;
+}) {
+  return (
+    <div className="workspace-toolbar">
+      <div className="workspace-toolbar-actions">
+        <button type="button" className="workspace-button" onClick={onExport}>
+          Export Workspace Snapshot
+        </button>
+        <label className="workspace-button workspace-import-label">
+          Import Workspace Snapshot
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={onImportFileChange}
+            className="workspace-import-input"
+          />
+        </label>
+        <span className="workspace-toolbar-note">
+          Portable JSON · replaces current in-memory workspace · no browser storage is used
+        </span>
+      </div>
+      <p className="workspace-toolbar-warning">
+        Importing a snapshot <strong>replaces</strong> the current in-memory workspace after
+        validation and clears any active in-memory import (including undo).
+        {inMemoryImportActive
+          ? ' An in-memory import is currently active — importing will discard it.'
+          : ''}{' '}
+        Export saves a portable JSON file only; nothing is written to a database or browser
+        storage.
+      </p>
+
+      {notice && notice.kind === 'restored' && (
+        <div className="workspace-notice workspace-notice-ok">
+          <strong>Workspace restored from “{notice.fileName}”.</strong>{' '}
+          {notice.summary.seasonCount} seasons · {notice.summary.districtCount} districts ·{' '}
+          {notice.summary.teamCount} teams · {notice.summary.playerCount} players. The
+          current in-memory workspace was replaced (no browser/database persistence).
+          <button type="button" className="import-link-button" onClick={onDismissNotice}>
+            Dismiss
+          </button>
+        </div>
+      )}
+      {notice && notice.kind === 'error' && (
+        <div className="workspace-notice workspace-notice-error">
+          <strong>Could not import “{notice.fileName}”.</strong> The current workspace was
+          left unchanged.
+          <ul className="import-issues">
+            {notice.errors.map((e, index) => (
+              <li key={`${e.code}-${index}`} className="import-issue import-issue-error">
+                <strong>{e.code}</strong>: {e.message}
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="import-link-button" onClick={onDismissNotice}>
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   );
 }

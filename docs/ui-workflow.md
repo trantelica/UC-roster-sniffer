@@ -459,6 +459,21 @@ mounted so the Undo control is never lost by switching tabs. The export artifact
 `persisted: false`). No durable save / finalize / persist / write-to-roster control exists;
 the write is to runtime/session state only and does not survive a reload.
 
+### Portable workspace snapshot toolbar (Phase 5 slice 23)
+
+A persistent **workspace toolbar** in the app shell offers **Export Workspace Snapshot** and
+**Import Workspace Snapshot**, labelled "Portable JSON · replaces current in-memory workspace
+· no browser storage is used". Export downloads `uc-roster-sniffer-workspace-YYYY-MM-DD.json`
+capturing the current in-memory roster (including any executed in-memory import additions)
+and does not change app state. Import validates a chosen JSON file: a valid snapshot
+**replaces** the workspace (never merges), clears the active in-memory import and the import
+workbench's transient state, restores the season/team, and shows a green "Workspace restored"
+summary; an invalid file shows a red error notice with the validation reason and leaves the
+current workspace unchanged. The toolbar warns that importing replaces the workspace and
+clears any active in-memory import (including undo), and that nothing is written to a database
+or browser storage. This is explicit file durability only — no auto-save, sync, or
+browser/cloud persistence — and is separate from the import preview artifact.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

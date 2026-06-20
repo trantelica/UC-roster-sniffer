@@ -765,3 +765,72 @@ h1 {
 .in-memory-import-banner strong {
   color: var(--color-bronze-spice);
 }
+
+/* Workspace snapshot toolbar (portable JSON export/import) */
+.workspace-toolbar {
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 4px;
+  background-color: var(--color-alabaster-grey);
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.workspace-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.workspace-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: white;
+  color: var(--color-steel-blue);
+  cursor: pointer;
+}
+
+.workspace-import-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.workspace-import-input {
+  display: none;
+}
+
+.workspace-toolbar-note {
+  font-size: 0.75rem;
+  color: #555;
+}
+
+.workspace-toolbar-warning {
+  font-size: 0.78rem;
+  color: #555;
+  margin: 0.5rem 0 0;
+}
+
+.workspace-notice {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+.workspace-notice-ok {
+  border: 1px solid #2e7d32;
+  background-color: #eaf5ea;
+  color: var(--color-carbon-black);
+}
+
+.workspace-notice-error {
+  border: 1px solid var(--color-bronze-spice);
+  background-color: #fbeee4;
+  color: var(--color-carbon-black);
+}
+
+.workspace-notice .import-link-button {
+  margin-left: 0.5rem;
+}

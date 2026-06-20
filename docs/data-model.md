@@ -1492,6 +1492,42 @@ invalid-payload
 - **Caller overrides** (per `sourceTargetId`) flow through to the slice 11 mapping and
   can raise a provisional target to `ready`. The payload is never mutated.
 
+## Portable Workspace Snapshot (Phase 5 slice 23)
+
+The portable workspace snapshot (`src/engine/workspaceSnapshot.ts`) is a versioned,
+JSON-serializable capture of the current local workspace that the user can explicitly
+export to a file and later import to restore. It is distinct from the import preview
+artifact (which documents an import workflow); a workspace snapshot restores the whole app
+workspace.
+
+Shape (schemaVersion 1):
+
+```text
+appName: "uc-roster-sniffer"
+snapshotKind: "workspace"
+schemaVersion: 1
+generatedAt: ISO string (caller-supplied)
+source: "user-exported-json"
+note: explanatory string
+selection: { seasonId, districtId, ageDivisionId, teamId } (each string | null)
+workspace: { districts: District[], ageDivisions: AgeDivision[], teams: Team[] }
+summary: { schemaVersion, generatedAt, seasonCount, districtCount,
+           ageDivisionCount, teamCount, playerCount }
+```
+
+- The snapshot reuses the existing `District` / `AgeDivision` / `Team` / `Player` / `Coach`
+  domain shapes (no competing model). `workspace.teams` is the CURRENT in-memory roster,
+  including any slice-22 executed additions.
+- Validation rejects with stable reason codes (`invalid-json`, `not-an-object`,
+  `missing-schema-version`, `unsupported-schema-version`, `wrong-snapshot-kind`,
+  `invalid-workspace` / `invalid-districts` / `invalid-age-divisions` / `invalid-teams`,
+  `empty-workspace`) and preserves valid data exactly.
+- Restore REPLACES the workspace (never merges) and resolves the active selection (the
+  snapshot's team if it still exists, else the most recent season).
+- This is explicit user-controlled **file** durability only — not automatic persistence, and
+  not `localStorage` / `IndexedDB` / backend / cloud. See `docs/import-workflow.md`
+  ("Portable workspace snapshot export / import (Phase 5 slice 23)").
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
