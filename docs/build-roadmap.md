@@ -86,9 +86,12 @@ documentation/spec-alignment checkpoint):
   documentation/spec-alignment checkpoint; see `docs/derived-logic.md` ("Phase 5
   checkpoint"). Slice 8 adds a pure in-memory import application / projection from a
   committable plan (the link / create / reject / defer outcomes a future apply would
-  produce), still with no persistence and no apply. Phase 5 so far has no file
-  parsing, no file upload, no persistence, no browser storage, no `localStorage` /
-  `IndexedDB`, no React/UI wiring, no sample-data mutation, no roster mutation, and
+  produce), still with no persistence and no apply. Later Phase 5 slices wire a
+  read-only import workbench (slices 16–18), an in-memory staged roster projection
+  (slice 19), and a future-import-commit readiness report plus an exportable
+  preview-only artifact (slice 20) — all preview-only, with no import
+  apply/commit/save and no persistence. Phase 5 has no browser storage, no
+  `localStorage` / `IndexedDB`, no sample-data mutation, no roster mutation, and
   no import apply/commit.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived

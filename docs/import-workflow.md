@@ -956,6 +956,47 @@ persisted; the review, existing roster, payload, preview rows, and prior seasons
 never mutated; and raw imported and existing names are preserved exactly. There are no
 Save / Apply / Commit / Import-now / Finalize controls.
 
+## Future import readiness and preview artifact (Phase 5 slice 20)
+
+Slice 20 adds **future-import-commit readiness reporting** and a **preview-only export
+artifact** on top of slices 18–19. It introduces no new import model: it composes the
+slice 18 review (per-row outcomes) and the slice 19 staged projection (projected roster
+totals).
+
+The readiness gate (`src/engine/uteConferenceScrapedJsonImportFutureReadiness.ts`,
+`buildScrapedJsonImportFutureCommitReadiness`) answers a single question: *given the
+current staged preview and review state, what — if anything — would prevent this from
+being safe to commit in a future, explicitly approved import slice?* It produces a
+stable, deterministic result distinguishing:
+
+- `readyAdditions` — rows that would be added as new roster records in a future commit
+- `readyLinks` — rows linked to an existing record (not added as new)
+- `deferredRows` — rows intentionally deferred (not added yet)
+- `unresolvedRows` — match-bearing rows still awaiting a reviewer decision
+- `blockedRows` — structurally invalid / skipped rows that cannot proceed
+- `totalIncomingRows` and `totalProjectedRosterRows` (the latter from the staged projection, or null when not stageable)
+- `isReadyForFutureCommit` and stable `blockingReasons` (reason codes + messages), plus a plain-language `explanation`
+
+A future commit is "ready" only when the review is available, no rows are unresolved or
+blocked, there is at least one incoming row, and the staged projection is stageable.
+Unresolved and blocked rows are reported directly; the "dry-run-not-clean" staged-projection
+blocker is not double-reported when per-row blockers already explain it.
+
+The preview artifact builder
+(`src/engine/uteConferenceScrapedJsonImportPreviewArtifact.ts`,
+`buildScrapedJsonImportPreviewArtifact`) assembles a single inspectable JSON snapshot of
+current in-memory state — source/target summary, readiness summary, staged-projection
+summary, and per-row statuses — stamped with a caller-supplied `generatedAt` so it is
+fully deterministic. The workbench exposes a **Future import readiness** panel (ready /
+linked / deferred / unresolved / blocked counts plus the plain-language explanation) and
+an **Export preview artifact** button that downloads that JSON locally in the browser.
+
+This remains preview-only. There is no actual import commit, apply, save, or persistence;
+the export is a local client-side download only (no `localStorage`, no `IndexedDB`, no
+backend); the review, staged projection, existing roster, and prior seasons are never
+mutated; and raw imported and existing names are preserved exactly. **Permanent import
+application remains a future, explicitly approved slice.**
+
 ## Roster import stages
 
 ### 1. Parse source data

@@ -20,6 +20,14 @@ import {
   buildScrapedJsonImportStagedProjection,
   type ScrapedImportStagedProjection,
 } from '../engine/uteConferenceScrapedJsonImportStagedProjection';
+import {
+  buildScrapedJsonImportFutureCommitReadiness,
+  type ScrapedImportFutureCommitReadiness,
+} from '../engine/uteConferenceScrapedJsonImportFutureReadiness';
+import type {
+  ScrapedImportPreviewArtifactSource,
+  ScrapedImportPreviewArtifactTarget,
+} from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
 import type { Team } from '../domain/types';
 import type {
   UteScrapedJsonImportSession,
@@ -159,6 +167,15 @@ export type ScrapedImportPreviewViewModel = {
    * only when the dry run is clean; otherwise carries the reason it is unavailable.
    */
   stagedProjection: ScrapedImportStagedProjection;
+  /**
+   * Future-import-commit readiness gate (slice 20, preview only). Summarizes whether the
+   * current staged projection would be safe to commit in a future approved slice.
+   */
+  futureReadiness: ScrapedImportFutureCommitReadiness;
+  /** Source descriptor for an exportable preview artifact (slice 20). */
+  artifactSource: ScrapedImportPreviewArtifactSource;
+  /** Target descriptor for an exportable preview artifact (slice 20). */
+  artifactTarget: ScrapedImportPreviewArtifactTarget;
 };
 
 export type ScrapedImportPreviewViewModelOptions = {
@@ -239,6 +256,28 @@ export function buildScrapedJsonImportPreviewViewModel(
     rosterReview,
     existingTeam
   );
+  const futureReadiness = buildScrapedJsonImportFutureCommitReadiness(
+    rosterReview,
+    stagedProjection
+  );
+
+  // `name` (the chosen file/demo label) is known only to the component; it fills it in
+  // when building the artifact. Organization/event/year come from the parsed source.
+  const artifactSource: ScrapedImportPreviewArtifactSource = {
+    name: null,
+    kind: session.recordType,
+    organization: source?.organization ?? null,
+    event: source?.event ?? null,
+    year: source?.year ?? null,
+  };
+  const artifactTarget: ScrapedImportPreviewArtifactTarget = {
+    teamName: selected?.teamName ?? null,
+    existingTeamId: rosterReview.available ? rosterReview.existingTeamId : null,
+    seasonId: selected?.canonicalContext?.seasonId ?? null,
+    districtId: selected?.canonicalContext?.districtId ?? null,
+    ageDivisionId: selected?.canonicalContext?.ageDivisionId ?? null,
+    teamClassification: selected?.canonicalContext?.teamClassification ?? null,
+  };
 
   return {
     status: session.status,
@@ -263,6 +302,9 @@ export function buildScrapedJsonImportPreviewViewModel(
     selected,
     rosterReview,
     stagedProjection,
+    futureReadiness,
+    artifactSource,
+    artifactTarget,
   };
 }
 

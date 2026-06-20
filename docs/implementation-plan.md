@@ -915,6 +915,30 @@ Import commit happens only after collision review.
   `docs/derived-logic.md`, and `docs/ui-workflow.md` ("Staged in-memory roster projection
   (Phase 5 slice 19)").
 
+- **Slice 20 (done): import workbench hardening + future-commit readiness gate +
+  exportable preview artifact.** Adds two pure engine helpers over slices 18–19:
+  `src/engine/uteConferenceScrapedJsonImportFutureReadiness.ts`
+  (`buildScrapedJsonImportFutureCommitReadiness`,
+  `src/test/uteConferenceScrapedJsonImportFutureReadiness.test.ts`) composes the slice 18
+  review and slice 19 staged projection into a deterministic readiness result —
+  `readyAdditions` / `readyLinks` / `deferredRows` / `unresolvedRows` / `blockedRows`,
+  `totalIncomingRows` / `totalProjectedRosterRows`, `isReadyForFutureCommit`, stable
+  `blockingReasons`, and a plain-language `explanation`; and
+  `src/engine/uteConferenceScrapedJsonImportPreviewArtifact.ts`
+  (`buildScrapedJsonImportPreviewArtifact`,
+  `src/test/uteConferenceScrapedJsonImportPreviewArtifact.test.ts`) builds a deterministic,
+  preview-only JSON snapshot (source/target summary, readiness summary, staged-projection
+  summary, per-row statuses, caller-supplied `generatedAt`). The view model gained
+  `futureReadiness` / `artifactSource` / `artifactTarget`; the workbench gained a **Future
+  import readiness** panel (ready / linked / deferred / unresolved / blocked counts + the
+  explanation), an **Export preview artifact** button (local client-side JSON download
+  only), a row-state legend, and clearer per-row outcome labels/chips. Preview-only: no
+  import apply/commit/save, no persistence, no `localStorage` / `IndexedDB`, no backend, no
+  roster or prior-season mutation; loaded roster records stay authoritative and raw names
+  are preserved exactly. Permanent import application remains a future, explicitly approved
+  slice. See `docs/import-workflow.md` ("Future import readiness and preview artifact
+  (Phase 5 slice 20)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /
