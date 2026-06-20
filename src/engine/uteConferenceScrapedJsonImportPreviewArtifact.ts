@@ -7,6 +7,10 @@ import type {
 import type { ScrapedImportStagedProjection } from './uteConferenceScrapedJsonImportStagedProjection';
 import type { ScrapedImportFutureCommitReadiness } from './uteConferenceScrapedJsonImportFutureReadiness';
 import type { ScrapedImportTransactionPlanResult } from './uteConferenceScrapedJsonImportTransactionPlan';
+import type {
+  ScrapedImportExecutionResult,
+  ScrapedImportUndoResult,
+} from './uteConferenceScrapedJsonImportExecution';
 
 /**
  * Phase 5 slice 20: PURE, deterministic PREVIEW ARTIFACT builder — ENGINE ONLY.
@@ -98,7 +102,40 @@ export type ScrapedImportPreviewArtifact = {
    * marked `executed: false` — the plan is never run by building this artifact.
    */
   transactionPlan: ScrapedImportPreviewArtifactTransactionPlan | null;
+  /**
+   * Slice 22 in-memory execution state. `notExecuted` before any execution; `executed`
+   * after an explicit in-memory execution; `undone` after an undo. Always `durable: false`
+   * / `persisted: false` — this artifact never implies a durable save.
+   */
+  inMemoryExecution: ScrapedImportPreviewArtifactInMemoryExecution;
 };
+
+export type ScrapedImportPreviewArtifactInMemoryExecution =
+  | { status: 'notExecuted'; durable: false; persisted: false }
+  | {
+      status: 'executed';
+      durable: false;
+      persisted: false;
+      transactionId: string;
+      executedAt: string;
+      appliedAdditionCount: number;
+      noOpLinkCount: number;
+      skippedDeferredCount: number;
+      skippedRejectedCount: number;
+      beforeRosterCount: number;
+      afterRosterCount: number;
+      netRosterRecordChange: number;
+      undoSummary: { removableAdditionCount: number; restoresToPlayerCount: number };
+    }
+  | {
+      status: 'undone';
+      durable: false;
+      persisted: false;
+      transactionId: string;
+      undoneAt: string;
+      removedAdditionCount: number;
+      restoredRosterCount: number;
+    };
 
 export type ScrapedImportPreviewArtifactTransactionPlan = {
   status: 'planned' | 'rejected';
@@ -127,7 +164,49 @@ export type BuildScrapedImportPreviewArtifactInput = {
   readiness: ScrapedImportFutureCommitReadiness;
   /** Optional slice 21 transaction plan to summarize in the artifact (never executed). */
   transactionPlan?: ScrapedImportTransactionPlanResult;
+  /** Optional slice 22 in-memory execution result (in-memory only; never durable). */
+  execution?: ScrapedImportExecutionResult;
+  /** Optional slice 22 undo result; when `undone`, supersedes the execution status. */
+  undo?: ScrapedImportUndoResult;
 };
+
+function summarizeInMemoryExecution(
+  execution: ScrapedImportExecutionResult | undefined,
+  undo: ScrapedImportUndoResult | undefined
+): ScrapedImportPreviewArtifactInMemoryExecution {
+  if (undo && undo.status === 'undone') {
+    return {
+      status: 'undone',
+      durable: false,
+      persisted: false,
+      transactionId: undo.transactionId,
+      undoneAt: undo.undoneAt,
+      removedAdditionCount: undo.removedAdditionCount,
+      restoredRosterCount: undo.afterUndoRosterSummary.playerCount,
+    };
+  }
+  if (execution && execution.status === 'executed') {
+    return {
+      status: 'executed',
+      durable: false,
+      persisted: false,
+      transactionId: execution.transactionId,
+      executedAt: execution.executedAt,
+      appliedAdditionCount: execution.appliedAdditions.length,
+      noOpLinkCount: execution.noOpLinks.length,
+      skippedDeferredCount: execution.skippedDeferredRows.length,
+      skippedRejectedCount: execution.skippedRejectedRows.length,
+      beforeRosterCount: execution.beforeRosterSummary.playerCount,
+      afterRosterCount: execution.afterRosterSummary.playerCount,
+      netRosterRecordChange: execution.rosterDeltaSummary.netRosterRecordChange,
+      undoSummary: {
+        removableAdditionCount: execution.undoPlan.removableAdditionCount,
+        restoresToPlayerCount: execution.undoPlan.restoresToPlayerCount,
+      },
+    };
+  }
+  return { status: 'notExecuted', durable: false, persisted: false };
+}
 
 function summarizeTransactionPlan(
   plan: ScrapedImportTransactionPlanResult | undefined
@@ -194,11 +273,19 @@ export function buildScrapedJsonImportPreviewArtifact(
         }
       : { stageable: false, reason: stagedProjection.reason };
 
+  const inMemoryExecution = summarizeInMemoryExecution(input.execution, input.undo);
+  const note =
+    inMemoryExecution.status === 'executed'
+      ? 'In-memory only. An import was executed into the current runtime/session roster view but is NOT durable: nothing was saved, persisted, or committed to any store, and it will not survive a reload. It can be undone in memory.'
+      : inMemoryExecution.status === 'undone'
+        ? 'In-memory only. A prior in-memory execution was undone; the runtime/session roster view was restored. Nothing durable was ever written.'
+        : PREVIEW_NOTE;
+
   return {
     artifactKind: SCRAPED_JSON_IMPORT_PREVIEW_ARTIFACT_KIND,
     logicVersion: UTE_CONFERENCE_SCRAPED_JSON_IMPORT_PREVIEW_ARTIFACT_LOGIC_VERSION,
     previewOnly: true,
-    note: PREVIEW_NOTE,
+    note,
     generatedAt,
     reviewAvailable: review.available,
     source,
@@ -218,5 +305,6 @@ export function buildScrapedJsonImportPreviewArtifact(
     stagedProjection: stagedProjectionSummary,
     rows,
     transactionPlan: summarizeTransactionPlan(input.transactionPlan),
+    inMemoryExecution,
   };
 }

@@ -21,10 +21,32 @@ import {
   buildScrapedJsonImportTransactionPlan,
   type ScrapedImportTransactionPlanResult,
 } from '../engine/uteConferenceScrapedJsonImportTransactionPlan';
-import { loadSampleData } from '../data/loadSampleData';
+import {
+  executeUteConferenceScrapedJsonImportTransaction,
+  undoUteConferenceScrapedJsonImportExecution,
+  evaluateScrapedJsonImportExecutionAvailability,
+  type ScrapedImportExecutionResult,
+} from '../engine/uteConferenceScrapedJsonImportExecution';
+import type { Team } from '../domain/types';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
+
+/**
+ * Shared app state for a non-durable, in-memory import execution. The roster view renders
+ * `teams` (the baseline with the executed additions applied) while this is non-null, and a
+ * banner reminds the user it is in-memory only. Cleared (set to null) on undo / reset.
+ */
+export type InMemoryImportAppState = {
+  teams: Team[];
+  banner: {
+    teamId: string;
+    teamName: string | null;
+    addedCount: number;
+    beforeCount: number;
+    afterCount: number;
+  };
+};
 
 /**
  * Phase 5 slice 17–18: a local-first, roster-aware scraped JSON import workbench.
@@ -41,10 +63,6 @@ import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.j
  */
 
 type DemoSource = { id: string; label: string; payload: unknown };
-
-// The existing local roster the import is compared against (same static data the
-// roster viewer uses). Loaded once; never mutated.
-const EXISTING_TEAMS = loadSampleData().teams;
 
 // A demo source whose canonical context (2026 / alta / GR / B1) matches an existing
 // roster team, so roster-aware matching is visible: an exact match, a duplicate-name
@@ -106,7 +124,13 @@ function ReadinessBadge({ status }: { status: string }) {
   );
 }
 
-export default function ScrapedImportPreview() {
+export default function ScrapedImportPreview({
+  baselineTeams,
+  onInMemoryImportChange,
+}: {
+  baselineTeams: Team[];
+  onInMemoryImportChange: (state: InMemoryImportAppState | null) => void;
+}) {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
@@ -115,7 +139,14 @@ export default function ScrapedImportPreview() {
   // Staged projection is an explicit in-memory action; it is invalidated by any change
   // to the loaded source, the selected target, or the identity decisions.
   const [staged, setStaged] = useState(false);
+  // Slice 22: the explicit in-memory execution result (null = not executed). While this is
+  // non-null the workflow is LOCKED — execution-affecting inputs must be undone first.
+  const [executionResult, setExecutionResult] =
+    useState<ScrapedImportExecutionResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const executed =
+    executionResult !== null && executionResult.status === 'executed';
 
   const baseSession = useMemo(
     () => (loaded ? createUteScrapedJsonImportSessionFromPayload(loaded.payload) : null),
@@ -128,26 +159,31 @@ export default function ScrapedImportPreview() {
     return selectUteScrapedJsonImportSessionTarget(baseSession, selectedTargetId);
   }, [baseSession, selectedTargetId]);
 
+  // The view model always derives against the immutable baseline roster, never the live
+  // (possibly executed) roster, so staging / readiness / the transaction plan are stable
+  // and re-running them after an execution cannot duplicate additions.
   const vm = useMemo(
     () =>
       session
         ? buildScrapedJsonImportPreviewViewModel(session, {
-            existingTeams: EXISTING_TEAMS,
+            existingTeams: baselineTeams,
             reviewDecisions,
           })
         : null,
-    [session, reviewDecisions]
+    [session, reviewDecisions, baselineTeams]
   );
 
   // Selecting / switching a target isolates identity decisions to that target and
-  // invalidates any staged projection.
+  // invalidates any staged projection. Locked while an in-memory import is executed.
   function selectTarget(id: string) {
+    if (executed) return;
     setSelectedTargetId(id);
     setReviewDecisions({});
     setStaged(false);
   }
 
   function clearTarget() {
+    if (executed) return;
     setSelectedTargetId(null);
     setReviewDecisions({});
     setStaged(false);
@@ -157,6 +193,7 @@ export default function ScrapedImportPreview() {
     sourceRowId: string,
     kind: ScrapedImportReviewDecisionKind | null
   ) {
+    if (executed) return;
     setStaged(false);
     setReviewDecisions((prev) => {
       const next = { ...prev };
@@ -172,7 +209,66 @@ export default function ScrapedImportPreview() {
     setStaged(false);
   }
 
+  // Explicit in-memory execution: builds a fresh transaction plan with a real id/timestamp,
+  // executes it against the baseline target team, updates the live roster, and locks the
+  // workflow until undo. No durable write occurs.
+  function executeInMemory() {
+    if (!vm || executed) return;
+    const targetTeamId = vm.artifactTarget.existingTeamId;
+    if (!targetTeamId) return;
+    const existingTeam = baselineTeams.find((t) => t.teamId === targetTeamId) ?? null;
+    const generatedAt = new Date().toISOString();
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: `import-transaction:${Date.now()}`,
+      generatedAt,
+      source: { ...vm.artifactSource },
+      target: vm.artifactTarget,
+      review: vm.rosterReview,
+      stagedProjection: vm.stagedProjection,
+      readiness: vm.futureReadiness,
+    });
+    const result = executeUteConferenceScrapedJsonImportTransaction({
+      transactionPlan,
+      existingTeam,
+      executedAt: generatedAt,
+    });
+    if (result.status !== 'executed') {
+      setExecutionResult(result);
+      return;
+    }
+    setExecutionResult(result);
+    const nextTeams = baselineTeams.map((t) =>
+      t.teamId === result.executedTeam.teamId ? result.executedTeam : t
+    );
+    onInMemoryImportChange({
+      teams: nextTeams,
+      banner: {
+        teamId: result.afterRosterSummary.teamId,
+        teamName: vm.artifactTarget.teamName,
+        addedCount: result.rosterDeltaSummary.addedCount,
+        beforeCount: result.beforeRosterSummary.playerCount,
+        afterCount: result.afterRosterSummary.playerCount,
+      },
+    });
+  }
+
+  // Explicit in-memory undo: restores the baseline roster and unlocks the workflow.
+  function undoInMemory() {
+    if (!executionResult || executionResult.status !== 'executed') return;
+    undoUteConferenceScrapedJsonImportExecution({
+      executionResult,
+      undoneAt: new Date().toISOString(),
+    });
+    setExecutionResult(null);
+    onInMemoryImportChange(null);
+  }
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (executed) {
+      // Re-sync the input value so a locked change is not silently swallowed.
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
     resetSelection();
@@ -196,6 +292,7 @@ export default function ScrapedImportPreview() {
   }
 
   function handleDemoChange(id: string) {
+    if (executed) return;
     resetSelection();
     setFileError(null);
     if (id === '') {
@@ -207,6 +304,7 @@ export default function ScrapedImportPreview() {
   }
 
   function handleClearFile() {
+    if (executed) return;
     resetSelection();
     setLoaded(null);
     setFileError(null);
@@ -226,6 +324,13 @@ export default function ScrapedImportPreview() {
         do.
       </p>
 
+      {executed && (
+        <p className="import-warn">
+          An in-memory import is executed. Undo it below before changing the source, target,
+          review decisions, or staged preview. (In-memory only — no durable commit occurs.)
+        </p>
+      )}
+
       <div className="import-source-controls">
         <div className="filter-group">
           <label htmlFor="import-file-input">Choose JSON file (local only)</label>
@@ -235,6 +340,7 @@ export default function ScrapedImportPreview() {
             type="file"
             accept="application/json,.json"
             onChange={handleFileChange}
+            disabled={executed}
           />
         </div>
         <div className="filter-group">
@@ -243,6 +349,7 @@ export default function ScrapedImportPreview() {
             id="import-demo-select"
             value={loaded?.sourceKind === 'demo' ? demoIdForLabel(loaded.name) : ''}
             onChange={(e) => handleDemoChange(e.target.value)}
+            disabled={executed}
           >
             <option value="">Select a demo source</option>
             {DEMO_SOURCES.map((s) => (
@@ -251,7 +358,12 @@ export default function ScrapedImportPreview() {
           </select>
         </div>
         {(loaded || fileError) && (
-          <button type="button" className="import-link-button" onClick={handleClearFile}>
+          <button
+            type="button"
+            className="import-link-button"
+            onClick={handleClearFile}
+            disabled={executed}
+          >
             Clear loaded file
           </button>
         )}
@@ -277,8 +389,11 @@ export default function ScrapedImportPreview() {
           onClearTarget={clearTarget}
           onSetRowDecision={setRowDecision}
           staged={staged}
-          onStage={() => setStaged(true)}
-          onClearStaged={() => setStaged(false)}
+          onStage={() => !executed && setStaged(true)}
+          onClearStaged={() => !executed && setStaged(false)}
+          executionResult={executionResult}
+          onExecute={executeInMemory}
+          onUndo={undoInMemory}
         />
       )}
     </div>
@@ -300,6 +415,9 @@ function Workbench({
   staged,
   onStage,
   onClearStaged,
+  executionResult,
+  onExecute,
+  onUndo,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -311,7 +429,11 @@ function Workbench({
   staged: boolean;
   onStage: () => void;
   onClearStaged: () => void;
+  executionResult: ScrapedImportExecutionResult | null;
+  onExecute: () => void;
+  onUndo: () => void;
 }) {
+  const executed = executionResult !== null && executionResult.status === 'executed';
   return (
     <>
       <div className="import-summary">
@@ -360,6 +482,7 @@ function Workbench({
             onSelect={onSelect}
             onClearTarget={onClearTarget}
             emptyMessage="No ready targets in this source."
+            locked={executed}
           />
           <TargetSection
             title="Targets needing review"
@@ -368,6 +491,7 @@ function Workbench({
             onSelect={onSelect}
             onClearTarget={onClearTarget}
             emptyMessage={null}
+            locked={executed}
           />
           <ReadonlyTargetSection title="Blocked targets — not importable" targets={vm.blockedTargets} />
           <ReadonlyTargetSection title="Empty targets — no rows" targets={vm.emptyTargets} />
@@ -379,6 +503,10 @@ function Workbench({
             onSetRowDecision={onSetRowDecision}
             onStage={onStage}
             onClearStaged={onClearStaged}
+            executionResult={executionResult}
+            executed={executed}
+            onExecute={onExecute}
+            onUndo={onUndo}
           />
         </>
       )}
@@ -393,6 +521,7 @@ function TargetSection({
   onSelect,
   onClearTarget,
   emptyMessage,
+  locked,
 }: {
   title: string;
   targets: ScrapedImportTargetOption[];
@@ -400,6 +529,7 @@ function TargetSection({
   onSelect: (id: string) => void;
   onClearTarget: () => void;
   emptyMessage: string | null;
+  locked: boolean;
 }) {
   if (targets.length === 0 && emptyMessage === null) return null;
   const anySelectedHere = targets.some((t) => t.sourceTargetId === selectedTargetId);
@@ -408,7 +538,12 @@ function TargetSection({
       <div className="import-section-head">
         <h3>{title}</h3>
         {anySelectedHere && (
-          <button type="button" className="import-link-button" onClick={onClearTarget}>
+          <button
+            type="button"
+            className="import-link-button"
+            onClick={onClearTarget}
+            disabled={locked}
+          >
             Clear selected target
           </button>
         )}
@@ -426,6 +561,7 @@ function TargetSection({
                   className={`import-target ${isSelected ? 'import-target-selected' : ''}`}
                   aria-pressed={isSelected}
                   onClick={() => onSelect(target.sourceTargetId)}
+                  disabled={locked && !isSelected}
                 >
                   <span className="import-target-name">
                     {target.teamName ?? '(unnamed team)'}
@@ -480,6 +616,10 @@ function SelectedTargetDetail({
   onSetRowDecision,
   onStage,
   onClearStaged,
+  executionResult,
+  executed,
+  onExecute,
+  onUndo,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -488,6 +628,10 @@ function SelectedTargetDetail({
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
   onStage: () => void;
   onClearStaged: () => void;
+  executionResult: ScrapedImportExecutionResult | null;
+  executed: boolean;
+  onExecute: () => void;
+  onUndo: () => void;
 }) {
   const selected = vm.selected;
   const rosterReview = vm.rosterReview;
@@ -623,7 +767,11 @@ function SelectedTargetDetail({
       )}
 
       {selected.recordType === 'players' && (
-        <RosterReviewPanel rosterReview={rosterReview} onSetRowDecision={onSetRowDecision} />
+        <RosterReviewPanel
+          rosterReview={rosterReview}
+          onSetRowDecision={onSetRowDecision}
+          locked={executed}
+        />
       )}
 
       {selected.recordType === 'players' && (
@@ -632,6 +780,7 @@ function SelectedTargetDetail({
           staged={staged}
           onStage={onStage}
           onClearStaged={onClearStaged}
+          locked={executed}
         />
       )}
 
@@ -640,11 +789,111 @@ function SelectedTargetDetail({
           vm={vm}
           sourceName={sourceName}
           sourceKind={sourceKind}
+          executionResult={executionResult}
         />
       )}
 
       {selected.recordType === 'players' && (
         <TransactionPlanPanel transactionPlan={vm.transactionPlan} />
+      )}
+
+      {selected.recordType === 'players' && (
+        <InMemoryExecutionPanel
+          vm={vm}
+          executionResult={executionResult}
+          staged={staged}
+          onExecute={onExecute}
+          onUndo={onUndo}
+        />
+      )}
+    </div>
+  );
+}
+
+function InMemoryExecutionPanel({
+  vm,
+  executionResult,
+  staged,
+  onExecute,
+  onUndo,
+}: {
+  vm: ScrapedImportPreviewViewModel;
+  executionResult: ScrapedImportExecutionResult | null;
+  staged: boolean;
+  onExecute: () => void;
+  onUndo: () => void;
+}) {
+  const executed = executionResult !== null && executionResult.status === 'executed';
+  const availability = evaluateScrapedJsonImportExecutionAvailability({
+    transactionPlan: vm.transactionPlan,
+    staged,
+    alreadyExecuted: executed,
+  });
+
+  return (
+    <div className="import-section import-execution">
+      <div className="import-section-head">
+        <h3>In-memory import execution</h3>
+        <span className="import-tag">
+          In-memory only · no durable commit occurs
+        </span>
+      </div>
+
+      {executed && executionResult.status === 'executed' ? (
+        <>
+          <p className="import-readiness-verdict import-execution-done">
+            Executed in memory — the roster view now reflects these additions.
+          </p>
+          <div className="import-readiness-counts">
+            <span className="import-readiness-count">
+              <strong>{executionResult.rosterDeltaSummary.addedCount}</strong> added
+            </span>
+            <span className="import-readiness-count">
+              <strong>{executionResult.rosterDeltaSummary.noOpLinkCount}</strong> linked
+              (no-op)
+            </span>
+            <span className="import-readiness-count">
+              <strong>{executionResult.rosterDeltaSummary.skippedDeferredCount}</strong>{' '}
+              deferred (skipped)
+            </span>
+            <span className="import-readiness-count">
+              <strong>{executionResult.rosterDeltaSummary.skippedRejectedCount}</strong>{' '}
+              rejected (skipped)
+            </span>
+          </div>
+          <p className="import-review">
+            Roster: {executionResult.beforeRosterSummary.playerCount} →{' '}
+            <strong>{executionResult.afterRosterSummary.playerCount}</strong> players (net{' '}
+            {executionResult.rosterDeltaSummary.netRosterRecordChange >= 0 ? '+' : ''}
+            {executionResult.rosterDeltaSummary.netRosterRecordChange})
+          </p>
+          <p className="import-reasons">
+            In-memory only · no saved roster data · this does not persist after reload · no
+            durable commit occurs. Undo to restore the pre-execution roster.
+          </p>
+          <button type="button" className="import-decision-button" onClick={onUndo}>
+            Undo In-Memory Import
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="import-reasons">
+            Execute the staged, ready transaction into the current roster view — in-memory
+            only. No saved roster data; this does not persist after reload; no durable commit
+            occurs.
+          </p>
+          {!availability.canExecute && (
+            <p className="import-empty">{availability.message}</p>
+          )}
+          <button
+            type="button"
+            className="import-decision-button"
+            onClick={onExecute}
+            disabled={!availability.canExecute}
+          >
+            Execute In-Memory Import
+          </button>
+        </>
       )}
     </div>
   );
@@ -771,7 +1020,8 @@ const READINESS_REASON_LABELS: Record<string, string> = {
 function exportPreviewArtifact(
   vm: ScrapedImportPreviewViewModel,
   sourceName: string,
-  sourceKind: 'file' | 'demo'
+  sourceKind: 'file' | 'demo',
+  executionResult: ScrapedImportExecutionResult | null
 ) {
   const generatedAt = new Date().toISOString();
   const source = { ...vm.artifactSource, name: sourceName, kind: sourceKind };
@@ -793,6 +1043,8 @@ function exportPreviewArtifact(
     stagedProjection: vm.stagedProjection,
     readiness: vm.futureReadiness,
     transactionPlan,
+    // Captures the current in-memory execution state (in-memory only; never durable).
+    execution: executionResult ?? undefined,
   });
   const json = JSON.stringify(artifact, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -810,10 +1062,12 @@ function FutureImportReadinessPanel({
   vm,
   sourceName,
   sourceKind,
+  executionResult,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
   sourceKind: 'file' | 'demo';
+  executionResult: ScrapedImportExecutionResult | null;
 }) {
   const readiness = vm.futureReadiness;
   return (
@@ -875,7 +1129,9 @@ function FutureImportReadinessPanel({
           <button
             type="button"
             className="import-decision-button"
-            onClick={() => exportPreviewArtifact(vm, sourceName, sourceKind)}
+            onClick={() =>
+              exportPreviewArtifact(vm, sourceName, sourceKind, executionResult)
+            }
           >
             Export preview artifact
           </button>
@@ -894,11 +1150,13 @@ function StagedProjectionPanel({
   staged,
   onStage,
   onClearStaged,
+  locked,
 }: {
   stagedProjection: ScrapedImportStagedProjection;
   staged: boolean;
   onStage: () => void;
   onClearStaged: () => void;
+  locked: boolean;
 }) {
   return (
     <div className="import-section import-staged">
@@ -915,7 +1173,12 @@ function StagedProjectionPanel({
             The dry run is clean. Stage a preview-only projected roster to inspect the
             result in memory. Nothing is applied, saved, or written.
           </p>
-          <button type="button" className="import-decision-button" onClick={onStage}>
+          <button
+            type="button"
+            className="import-decision-button"
+            onClick={onStage}
+            disabled={locked}
+          >
             Stage preview
           </button>
         </>
@@ -934,7 +1197,12 @@ function StagedProjectionPanel({
                 ? ` · ${stagedProjection.deferredCount} deferred`
                 : ''}
             </p>
-            <button type="button" className="import-link-button" onClick={onClearStaged}>
+            <button
+              type="button"
+              className="import-link-button"
+              onClick={onClearStaged}
+              disabled={locked}
+            >
               Clear staged preview
             </button>
           </div>
@@ -1005,9 +1273,11 @@ const OUTCOME_LABELS: Record<string, string> = {
 function RosterReviewPanel({
   rosterReview,
   onSetRowDecision,
+  locked,
 }: {
   rosterReview: ScrapedImportRosterAwareReview;
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+  locked: boolean;
 }) {
   return (
     <div className="import-section import-dryrun">
@@ -1071,6 +1341,7 @@ function RosterReviewPanel({
                   key={`${row.sourceRowId}:${row.rowIndex}`}
                   row={row}
                   onSetRowDecision={onSetRowDecision}
+                  locked={locked}
                 />
               ))}
             </tbody>
@@ -1084,9 +1355,11 @@ function RosterReviewPanel({
 function ReviewRow({
   row,
   onSetRowDecision,
+  locked,
 }: {
   row: ScrapedImportReviewRow;
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
+  locked: boolean;
 }) {
   const rowId = row.sourceRowId;
   const candidateText =
@@ -1121,6 +1394,7 @@ function ReviewRow({
                 type="button"
                 className={`import-decision-button ${row.decision === 'confirm-match' ? 'import-decision-active' : ''}`}
                 onClick={() => onSetRowDecision(rowId, 'confirm-match')}
+                disabled={locked}
               >
                 Confirm match
               </button>
@@ -1129,6 +1403,7 @@ function ReviewRow({
               type="button"
               className={`import-decision-button ${row.decision === 'create-new' ? 'import-decision-active' : ''}`}
               onClick={() => onSetRowDecision(rowId, 'create-new')}
+              disabled={locked}
             >
               Create new
             </button>
@@ -1136,6 +1411,7 @@ function ReviewRow({
               type="button"
               className={`import-decision-button ${row.decision === 'needs-review' ? 'import-decision-active' : ''}`}
               onClick={() => onSetRowDecision(rowId, 'needs-review')}
+              disabled={locked}
             >
               Needs review
             </button>
@@ -1144,6 +1420,7 @@ function ReviewRow({
                 type="button"
                 className="import-link-button"
                 onClick={() => onSetRowDecision(rowId, null)}
+                disabled={locked}
               >
                 Clear
               </button>

@@ -962,6 +962,30 @@ Import commit happens only after collision review.
   slice. See `docs/import-workflow.md` ("Reversible in-memory transaction plan (Phase 5
   slice 21)").
 
+- **Slice 22 (done): end-to-end in-memory import execution workflow with undo and
+  post-execution roster state.** The first controlled WRITE boundary — but in-memory only.
+  A new pure engine helper (`src/engine/uteConferenceScrapedJsonImportExecution.ts`,
+  `src/test/uteConferenceScrapedJsonImportExecution.test.ts`) exposes
+  `executeUteConferenceScrapedJsonImportTransaction` (executes a `planned` slice 21 plan
+  into a new in-memory team value — adds only `addOperations`, treats links as no-ops,
+  skips deferred/rejected rows, preserves existing records and imported names exactly, and
+  refuses non-`planned` plans / missing or mismatched teams),
+  `undoUteConferenceScrapedJsonImportExecution` (removes only the added records and restores
+  the pre-execution count; rejects non-executed/malformed input), and a pure
+  `evaluateScrapedJsonImportExecutionAvailability` gate. Both carry audits with
+  `executed`/`durable: false`/`persisted: false`. App state lifts the roster into a live
+  value: the roster view renders the executed roster (with an in-memory banner) and undo
+  restores the baseline; both views stay mounted so the Undo control is never lost by a tab
+  switch. The workbench gained **Execute In-Memory Import** / **Undo In-Memory Import**
+  actions, locks all execution-affecting inputs while executed, and derives against the
+  immutable baseline so re-staging cannot duplicate additions. The preview artifact gained
+  an `inMemoryExecution` section (`notExecuted` / `executed` / `undone`, always
+  `durable: false` / `persisted: false`). No durable persistence, `localStorage`,
+  `IndexedDB`, backend, auth, cloud DB, prior-season mutation, identity merge, or automatic
+  execution was added; execution is explicit, in-memory only, and undoable. Durable import
+  persistence remains a future, explicitly approved slice. See `docs/import-workflow.md`
+  ("In-memory import execution and undo (Phase 5 slice 22)") and `docs/ui-workflow.md`.
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /

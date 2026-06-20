@@ -18,6 +18,10 @@ import {
   SCRAPED_JSON_IMPORT_PREVIEW_ARTIFACT_KIND,
 } from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
 import { buildScrapedJsonImportTransactionPlan } from '../engine/uteConferenceScrapedJsonImportTransactionPlan';
+import {
+  executeUteConferenceScrapedJsonImportTransaction,
+  undoUteConferenceScrapedJsonImportExecution,
+} from '../engine/uteConferenceScrapedJsonImportExecution';
 
 function playerPayload(playerNames: string[]) {
   return {
@@ -290,5 +294,151 @@ describe('scraped JSON import preview artifact', () => {
     expect(artifact.transactionPlan?.executed).toBe(false);
     expect(artifact.transactionPlan?.netRosterRecordChange).toBeNull();
     expect(artifact.transactionPlan?.blockingReasonCodes).toContain('review-unavailable');
+  });
+});
+
+describe('preview artifact in-memory execution integration', () => {
+  function planAndTeam(payload: unknown, teams: Team[]) {
+    const loaded = createUteScrapedJsonImportSessionFromPayload(payload);
+    const id = getUteScrapedJsonImportSessionSelectableTargets(loaded)[0].sourceTargetId;
+    const session = selectUteScrapedJsonImportSessionTarget(loaded, id);
+    const review = buildScrapedJsonImportRosterAwareReview(session, teams, {});
+    const ctx = session.selectedCanonicalContextMapping!.canonicalContext;
+    const team = findExistingRosterTeamForContext(teams, {
+      seasonId: ctx.seasonId,
+      districtId: ctx.districtId,
+      ageDivisionId: ctx.ageDivisionId,
+      teamClassification: ctx.teamClassification,
+    });
+    const staged = buildScrapedJsonImportStagedProjection(review, team);
+    const readiness = buildScrapedJsonImportFutureCommitReadiness(review, staged);
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: 'txn-exec',
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+    });
+    return { review, team, staged, readiness, transactionPlan };
+  }
+
+  it('marks inMemoryExecution notExecuted (and transaction plan executed:false) before execution', () => {
+    const { review, staged, readiness } = planAndTeam(playerPayload(['Brand New']), TEAM);
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: 'txn-x',
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+    });
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+    });
+    expect(artifact.transactionPlan?.executed).toBe(false);
+    expect(artifact.inMemoryExecution).toEqual({
+      status: 'notExecuted',
+      durable: false,
+      persisted: false,
+    });
+  });
+
+  it('includes inMemoryExecution executed (durable:false, persisted:false) after execution', () => {
+    const { review, team, staged, readiness, transactionPlan } = planAndTeam(
+      playerPayload(['Brand New', 'Other New']),
+      TEAM
+    );
+    const execution = executeUteConferenceScrapedJsonImportTransaction({
+      transactionPlan,
+      existingTeam: team,
+      executedAt: '2026-06-19T01:00:00.000Z',
+    });
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T01:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+      execution,
+    });
+    expect(artifact.inMemoryExecution.status).toBe('executed');
+    if (artifact.inMemoryExecution.status === 'executed') {
+      expect(artifact.inMemoryExecution.durable).toBe(false);
+      expect(artifact.inMemoryExecution.persisted).toBe(false);
+      expect(artifact.inMemoryExecution.appliedAdditionCount).toBe(2);
+      expect(artifact.inMemoryExecution.beforeRosterCount).toBe(2);
+      expect(artifact.inMemoryExecution.afterRosterCount).toBe(4);
+      expect(artifact.inMemoryExecution.netRosterRecordChange).toBe(2);
+    }
+    expect(artifact.note).toMatch(/not durable/i);
+  });
+
+  it('includes inMemoryExecution undone after undo (durable:false, persisted:false)', () => {
+    const { review, team, staged, readiness, transactionPlan } = planAndTeam(
+      playerPayload(['Brand New']),
+      TEAM
+    );
+    const execution = executeUteConferenceScrapedJsonImportTransaction({
+      transactionPlan,
+      existingTeam: team,
+      executedAt: '2026-06-19T01:00:00.000Z',
+    });
+    const undo = undoUteConferenceScrapedJsonImportExecution({
+      executionResult: execution,
+      undoneAt: '2026-06-19T02:00:00.000Z',
+    });
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T02:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+      execution,
+      undo,
+    });
+    expect(artifact.inMemoryExecution.status).toBe('undone');
+    if (artifact.inMemoryExecution.status === 'undone') {
+      expect(artifact.inMemoryExecution.durable).toBe(false);
+      expect(artifact.inMemoryExecution.persisted).toBe(false);
+      expect(artifact.inMemoryExecution.removedAdditionCount).toBe(1);
+      expect(artifact.inMemoryExecution.restoredRosterCount).toBe(2);
+    }
+  });
+
+  it('does not mutate the execution result when building the artifact', () => {
+    const { review, team, staged, readiness, transactionPlan } = planAndTeam(
+      playerPayload(['Brand New']),
+      TEAM
+    );
+    const execution = executeUteConferenceScrapedJsonImportTransaction({
+      transactionPlan,
+      existingTeam: team,
+      executedAt: '2026-06-19T01:00:00.000Z',
+    });
+    const before = JSON.stringify(execution);
+    buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T01:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+      execution,
+    });
+    expect(JSON.stringify(execution)).toBe(before);
   });
 });

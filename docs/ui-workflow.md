@@ -436,6 +436,29 @@ invalidates it. It is labelled "Preview only · in memory only · nothing has be
 applied"; there are no Save / Apply / Commit / Import-now / Finalize controls, and no
 roster data is written, mutated, or persisted.
 
+### In-memory import execution and undo (Phase 5 slice 22)
+
+Slice 22 adds the first controlled WRITE boundary to the workbench — in-memory only. Below
+the readiness and transaction-plan panels, an **In-memory import execution** panel offers an
+explicit **Execute In-Memory Import** action, available only when the preview is staged, the
+transaction plan is `planned`, and no in-memory import is already executed. Executing applies
+the plan's additions into the current runtime/session roster view: the **roster tab updates**
+to show the added records and displays an "in-memory import active" banner. The execution
+panel then shows the executed counts (added / linked no-op / deferred-skipped /
+rejected-skipped, before → after roster, net change), explanatory copy ("in-memory only", "no
+saved roster data", "this does not persist after reload", "no durable commit occurs"), and an
+**Undo In-Memory Import** action that restores the pre-execution roster.
+
+The five workflow layers stay visually distinct: dry-run preview, staged preview,
+transaction-plan preview, executed in-memory import, and (still nonexistent) durable
+persistence. While an import is executed the workflow is **locked** — the source, target,
+review decisions, and staged-preview controls are disabled until the user undoes the import —
+so additions cannot be duplicated and no phantom records are orphaned; both app views stay
+mounted so the Undo control is never lost by switching tabs. The export artifact records the
+`inMemoryExecution` state (`notExecuted` / `executed` / `undone`, always `durable: false` /
+`persisted: false`). No durable save / finalize / persist / write-to-roster control exists;
+the write is to runtime/session state only and does not survive a reload.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.
