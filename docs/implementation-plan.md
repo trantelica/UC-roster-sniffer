@@ -939,6 +939,29 @@ Import commit happens only after collision review.
   slice. See `docs/import-workflow.md` ("Future import readiness and preview artifact
   (Phase 5 slice 20)").
 
+- **Slice 21 (done): import transaction design contract + reversible in-memory transaction
+  plan.** Adds a pure engine helper
+  (`src/engine/uteConferenceScrapedJsonImportTransactionPlan.ts`,
+  `buildScrapedJsonImportTransactionPlan`,
+  `src/test/uteConferenceScrapedJsonImportTransactionPlan.test.ts`) that composes the slice
+  18 review, slice 19 staged projection, and slice 20 readiness gate into a deterministic,
+  reversible **transaction plan** describing exactly what a future approved import-write
+  would do — without doing it. Planning requires readiness: when `isReadyForFutureCommit`
+  is false it returns a `rejected` result with the readiness `blockingReasons` and no add
+  operations; when ready it returns a `planned` result with `addOperations` /
+  `linkOperations` (no-op) / `deferredRows` / `rejectedRows`, before/after roster summaries,
+  a `rosterDeltaSummary` (only additions change the record count), a `rollbackPlan` (undo
+  preview), and `audit` metadata (`executed: false`, caller-supplied `transactionId` /
+  `generatedAt`). The preview artifact builder gained an optional embedded transaction-plan
+  summary (always `executed: false`); the view model gained a `transactionPlan` field (built
+  with deterministic sentinels for display); the workbench gained a read-only **Future
+  import transaction plan** panel with an **Undo preview**. Preview-only: no import
+  apply/commit/save, no persistence, no `localStorage` / `IndexedDB`, no backend, no roster
+  or prior-season mutation, no identity merge; loaded roster records stay authoritative and
+  raw names are preserved exactly. Durable roster writes remain a future, explicitly approved
+  slice. See `docs/import-workflow.md` ("Reversible in-memory transaction plan (Phase 5
+  slice 21)").
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /

@@ -28,6 +28,10 @@ import type {
   ScrapedImportPreviewArtifactSource,
   ScrapedImportPreviewArtifactTarget,
 } from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
+import {
+  buildScrapedJsonImportTransactionPlan,
+  type ScrapedImportTransactionPlanResult,
+} from '../engine/uteConferenceScrapedJsonImportTransactionPlan';
 import type { Team } from '../domain/types';
 import type {
   UteScrapedJsonImportSession,
@@ -176,6 +180,12 @@ export type ScrapedImportPreviewViewModel = {
   artifactSource: ScrapedImportPreviewArtifactSource;
   /** Target descriptor for an exportable preview artifact (slice 20). */
   artifactTarget: ScrapedImportPreviewArtifactTarget;
+  /**
+   * Reversible in-memory import transaction plan (slice 21, preview only). Built with
+   * deterministic sentinel ids for display; `planned` only when readiness is ready,
+   * otherwise `rejected` with the readiness blocking reasons. Never executed.
+   */
+  transactionPlan: ScrapedImportTransactionPlanResult;
 };
 
 export type ScrapedImportPreviewViewModelOptions = {
@@ -279,6 +289,18 @@ export function buildScrapedJsonImportPreviewViewModel(
     teamClassification: selected?.canonicalContext?.teamClassification ?? null,
   };
 
+  // Deterministic sentinel id/timestamp keep the view model pure and stable for tests and
+  // re-renders. A real timestamp/id is supplied only when an artifact is exported.
+  const transactionPlan = buildScrapedJsonImportTransactionPlan({
+    transactionId: `preview-transaction:${artifactTarget.existingTeamId ?? 'none'}`,
+    generatedAt: 'in-memory-preview',
+    source: artifactSource,
+    target: artifactTarget,
+    review: rosterReview,
+    stagedProjection,
+    readiness: futureReadiness,
+  });
+
   return {
     status: session.status,
     invalidSource: session.status === 'invalid-source',
@@ -305,6 +327,7 @@ export function buildScrapedJsonImportPreviewViewModel(
     futureReadiness,
     artifactSource,
     artifactTarget,
+    transactionPlan,
   };
 }
 
