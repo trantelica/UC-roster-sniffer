@@ -1086,6 +1086,50 @@ database is involved; prior seasons are never mutated and identities are never d
 merged. Reloading or resetting the app must not be treated as preserving the in-memory
 execution. **Durable import persistence remains a future, explicitly approved slice.**
 
+## Portable workspace snapshot export / import (Phase 5 slice 23)
+
+Slice 23 adds **portable workspace snapshots**: the user can explicitly export the current
+local roster workspace to a JSON file and later import that file to validate and restore it.
+This adds practical durability **only because the user moves a file by hand** — it is not a
+database, browser storage, or sync.
+
+A **workspace snapshot is distinct from the import preview artifact**. The preview artifact
+(slices 20–22) documents an import workflow; a workspace snapshot (`snapshotKind:
+"workspace"`) captures and restores the whole app workspace. Validation rejects a preview
+artifact with the `wrong-snapshot-kind` code.
+
+The pure engine module `src/engine/workspaceSnapshot.ts` provides:
+
+- `buildWorkspaceSnapshot` — deep-copies the current workspace (districts, age divisions,
+  teams/rosters) plus the active selection into a versioned, JSON-serializable snapshot
+  (`schemaVersion`, caller-supplied `generatedAt`, `appName`, `source:
+  "user-exported-json"`, and summary counts). It captures the CURRENT in-memory roster,
+  including any slice-22 executed additions. Pure; never mutates input.
+- `parseWorkspaceSnapshotJson` / `validateWorkspaceSnapshot` — parse and validate, never
+  throwing. They reject with stable reason codes: `invalid-json`, `not-an-object`,
+  `missing-schema-version`, `unsupported-schema-version`, `wrong-snapshot-kind`,
+  `invalid-workspace` / `invalid-districts` / `invalid-age-divisions` / `invalid-teams`, and
+  `empty-workspace` (no teams). Valid data is preserved exactly.
+- `restoreWorkspaceFromSnapshot` — returns the workspace to **replace** the current one
+  (never a merge) plus a resolved active selection: the snapshot's selected team if it still
+  exists, otherwise the most recent season with no specific team (the app's default
+  convention).
+
+In the app shell a **workspace toolbar** offers **Export Workspace Snapshot** (downloads
+`uc-roster-sniffer-workspace-YYYY-MM-DD.json`; does not change app state) and **Import
+Workspace Snapshot** (validates a chosen file). A valid import **replaces** the in-memory
+workspace, clears all transient import-execution/workbench state (the import workbench is
+remounted; any active in-memory import and its undo are discarded), restores the
+season/team, and shows a restored summary. An invalid import shows a readable error and
+leaves the current workspace **unchanged**. The toolbar copy states it is portable JSON that
+replaces the current in-memory workspace and that no browser storage is used.
+
+This is explicit, user-controlled **file** durability — **not** automatic persistence. No
+`localStorage`, `IndexedDB`, backend, auth, cloud database, auto-save, or sync exists.
+Prior-season lock rules are unchanged, identities are never merged, and the import preview
+artifact and the workspace snapshot remain separate concepts. **Browser/database persistence
+remains a future, explicitly approved decision.**
+
 ## Roster import stages
 
 ### 1. Parse source data

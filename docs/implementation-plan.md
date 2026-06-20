@@ -986,6 +986,30 @@ Import commit happens only after collision review.
   persistence remains a future, explicitly approved slice. See `docs/import-workflow.md`
   ("In-memory import execution and undo (Phase 5 slice 22)") and `docs/ui-workflow.md`.
 
+- **Slice 23 (done): portable workspace snapshot export / import with validation and
+  restore.** Adds practical durability via explicit user-controlled JSON files — no database
+  or browser storage. A new pure engine module (`src/engine/workspaceSnapshot.ts`,
+  `src/test/workspaceSnapshot.test.ts`) provides `buildWorkspaceSnapshot` (deep-copies the
+  current workspace — districts, age divisions, teams/rosters including any slice-22 executed
+  additions — plus the active selection into a versioned, JSON-serializable snapshot with
+  caller-supplied `generatedAt` and summary counts), `parseWorkspaceSnapshotJson` /
+  `validateWorkspaceSnapshot` (never throw; reject with stable codes — `invalid-json`,
+  `not-an-object`, `missing-schema-version`, `unsupported-schema-version`,
+  `wrong-snapshot-kind`, `invalid-workspace`/`invalid-districts`/`invalid-age-divisions`/
+  `invalid-teams`, `empty-workspace`), and `restoreWorkspaceFromSnapshot` (returns the
+  workspace to REPLACE the current one — never a merge — plus a resolved selection). App
+  state was refactored to hold the workspace in state; a **workspace toolbar** exposes
+  **Export Workspace Snapshot** (downloads `uc-roster-sniffer-workspace-YYYY-MM-DD.json`, no
+  app-state change) and **Import Workspace Snapshot** (valid → replace workspace, clear the
+  in-memory import + remount the workbench to clear its transient state, restore season/team,
+  show a restored summary; invalid → readable error, current state unchanged). The workspace
+  snapshot and the import preview artifact are kept separate concepts. No `localStorage`,
+  `IndexedDB`, backend, auth, cloud DB, auto-save, sync, or automatic persistence was added;
+  prior-season lock rules and identity matching are unchanged. Browser/database persistence
+  remains a future, explicitly approved decision. See `docs/import-workflow.md` ("Portable
+  workspace snapshot export / import (Phase 5 slice 23)"), `docs/ui-workflow.md`, and
+  `docs/data-model.md`.
+
 ### Phase 5 checkpoint
 
 Phase 5 (import preview and identity collision handling) slices 1–6 are **complete /

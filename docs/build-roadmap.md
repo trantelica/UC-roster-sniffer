@@ -95,10 +95,13 @@ documentation/spec-alignment checkpoint):
   WRITE boundary: an explicit, reversible **in-memory** import execution into the
   current runtime/session roster view, with undo. That write is in-memory only and
   is **not durable** — nothing is saved, persisted, or committed, and it does not
-  survive a reload. Phase 5 has no durable persistence, no browser storage, no
-  `localStorage` / `IndexedDB`, no backend/auth/cloud database, no sample-data
-  mutation, and no prior-season mutation; durable import persistence remains a
-  future, explicitly approved slice.
+  survive a reload. Slice 23 then adds practical durability the only safe way so far:
+  explicit, user-controlled **portable JSON workspace snapshots** (export to a file,
+  import to validate and REPLACE the in-memory workspace). That is file durability by
+  hand, not automatic persistence. Phase 5 has no automatic persistence, no browser
+  storage, no `localStorage` / `IndexedDB`, no backend/auth/cloud database, no
+  auto-save/sync, and no prior-season mutation; browser/database persistence remains a
+  future, explicitly approved decision.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
