@@ -7,7 +7,6 @@ import {
   buildScrapedJsonImportPreviewViewModel,
   type ScrapedImportPreviewViewModel,
   type ScrapedImportTargetOption,
-  type ScrapedImportSelectedView,
 } from '../app/scrapedImportPreviewViewModel';
 import { parseScrapedJsonImportFileText } from '../app/scrapedImportFileParse';
 import type {
@@ -17,6 +16,7 @@ import type {
   ScrapedImportRosterAwareReview,
 } from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
 import type { ScrapedImportStagedProjection } from '../engine/uteConferenceScrapedJsonImportStagedProjection';
+import { buildScrapedJsonImportPreviewArtifact } from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
 import { loadSampleData } from '../data/loadSampleData';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
@@ -368,9 +368,9 @@ function Workbench({
           <ReadonlyTargetSection title="Blocked targets — not importable" targets={vm.blockedTargets} />
           <ReadonlyTargetSection title="Empty targets — no rows" targets={vm.emptyTargets} />
           <SelectedTargetDetail
-            selected={vm.selected}
-            rosterReview={vm.rosterReview}
-            stagedProjection={vm.stagedProjection}
+            vm={vm}
+            sourceName={sourceName}
+            sourceKind={sourceKind}
             staged={staged}
             onSetRowDecision={onSetRowDecision}
             onStage={onStage}
@@ -469,22 +469,25 @@ function ReadonlyTargetSection({
 }
 
 function SelectedTargetDetail({
-  selected,
-  rosterReview,
-  stagedProjection,
+  vm,
+  sourceName,
+  sourceKind,
   staged,
   onSetRowDecision,
   onStage,
   onClearStaged,
 }: {
-  selected: ScrapedImportSelectedView | null;
-  rosterReview: ScrapedImportRosterAwareReview;
-  stagedProjection: ScrapedImportStagedProjection;
+  vm: ScrapedImportPreviewViewModel;
+  sourceName: string;
+  sourceKind: 'file' | 'demo';
   staged: boolean;
   onSetRowDecision: (sourceRowId: string, kind: ScrapedImportReviewDecisionKind | null) => void;
   onStage: () => void;
   onClearStaged: () => void;
 }) {
+  const selected = vm.selected;
+  const rosterReview = vm.rosterReview;
+  const stagedProjection = vm.stagedProjection;
   if (!selected) {
     return (
       <div className="import-section">
@@ -627,6 +630,135 @@ function SelectedTargetDetail({
           onClearStaged={onClearStaged}
         />
       )}
+
+      {selected.recordType === 'players' && (
+        <FutureImportReadinessPanel
+          vm={vm}
+          sourceName={sourceName}
+          sourceKind={sourceKind}
+        />
+      )}
+    </div>
+  );
+}
+
+const READINESS_REASON_LABELS: Record<string, string> = {
+  'review-unavailable': 'Roster-aware review unavailable',
+  'no-incoming-rows': 'No incoming rows',
+  'unresolved-rows-remain': 'Unresolved rows remain',
+  'blocked-rows-present': 'Blocked rows present',
+  'staged-projection-unavailable': 'Staged projection unavailable',
+};
+
+/**
+ * Builds the preview artifact from current in-memory state and triggers a local JSON
+ * download. This is a client-side download only — no upload, no localStorage/IndexedDB,
+ * no backend, no roster mutation. Nothing is committed, applied, or saved to the app.
+ */
+function exportPreviewArtifact(
+  vm: ScrapedImportPreviewViewModel,
+  sourceName: string,
+  sourceKind: 'file' | 'demo'
+) {
+  const artifact = buildScrapedJsonImportPreviewArtifact({
+    generatedAt: new Date().toISOString(),
+    source: { ...vm.artifactSource, name: sourceName, kind: sourceKind },
+    target: vm.artifactTarget,
+    review: vm.rosterReview,
+    stagedProjection: vm.stagedProjection,
+    readiness: vm.futureReadiness,
+  });
+  const json = JSON.stringify(artifact, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'import-preview-artifact.json';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function FutureImportReadinessPanel({
+  vm,
+  sourceName,
+  sourceKind,
+}: {
+  vm: ScrapedImportPreviewViewModel;
+  sourceName: string;
+  sourceKind: 'file' | 'demo';
+}) {
+  const readiness = vm.futureReadiness;
+  return (
+    <div className="import-section import-readiness">
+      <div className="import-section-head">
+        <h3>Future import readiness</h3>
+        <span className="import-tag">No commit occurs in this preview</span>
+      </div>
+
+      {!readiness.available ? (
+        <p className="import-empty">{readiness.explanation}</p>
+      ) : (
+        <>
+          <p
+            className={`import-readiness-verdict ${
+              readiness.isReadyForFutureCommit
+                ? 'import-readiness-ready'
+                : 'import-readiness-blocked'
+            }`}
+          >
+            {readiness.isReadyForFutureCommit
+              ? 'Ready for a future import commit'
+              : 'Not ready for a future import commit'}
+          </p>
+
+          <div className="import-readiness-counts">
+            <span className="import-readiness-count">
+              <strong>{readiness.readyAdditions}</strong> ready to add (new)
+            </span>
+            <span className="import-readiness-count">
+              <strong>{readiness.readyLinks}</strong> linked (existing)
+            </span>
+            <span className="import-readiness-count">
+              <strong>{readiness.deferredRows}</strong> deferred
+            </span>
+            <span className="import-readiness-count">
+              <strong>{readiness.unresolvedRows}</strong> unresolved
+            </span>
+            <span className="import-readiness-count">
+              <strong>{readiness.blockedRows}</strong> blocked
+            </span>
+          </div>
+
+          <p className="import-reasons">{readiness.explanation}</p>
+
+          {readiness.blockingReasons.length > 0 && (
+            <ul className="import-issues">
+              {readiness.blockingReasons.map((reason) => (
+                <li key={reason.code} className="import-issue import-issue-warning">
+                  <strong>
+                    {READINESS_REASON_LABELS[reason.code] ?? reason.code}
+                  </strong>
+                  : {reason.message}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            type="button"
+            className="import-decision-button"
+            onClick={() => exportPreviewArtifact(vm, sourceName, sourceKind)}
+          >
+            Export preview artifact
+          </button>
+          <p className="import-reasons">
+            Exports the current preview state as a JSON file (downloaded locally only).
+            Nothing is committed, applied, or saved to the app.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -737,11 +869,11 @@ const MATCH_STATUS_LABELS: Record<string, string> = {
 };
 
 const OUTCOME_LABELS: Record<string, string> = {
-  'projected-create': 'Would create',
-  'projected-link': 'Would link',
-  deferred: 'Deferred',
-  'blocked-unresolved': 'Unresolved',
-  blocked: 'Blocked',
+  'projected-create': 'Add as new roster row',
+  'projected-link': 'Link to existing record',
+  deferred: 'Deferred — not added',
+  'blocked-unresolved': 'Unresolved — needs review',
+  blocked: 'Blocked — cannot proceed',
 };
 
 function RosterReviewPanel({
@@ -767,14 +899,36 @@ function RosterReviewPanel({
             been applied.
           </p>
           <p className="import-review">
-            Would create {rosterReview.summary.projectedCreateRows} · would link{' '}
-            {rosterReview.summary.projectedLinkRows} · deferred{' '}
+            Would add (new) {rosterReview.summary.projectedCreateRows} · would link
+            (existing) {rosterReview.summary.projectedLinkRows} · deferred{' '}
             {rosterReview.summary.deferredRows} · unresolved{' '}
             {rosterReview.summary.unresolvedRows} ·{' '}
             {rosterReview.summary.canCommit
               ? 'dry run is clean'
               : 'dry run not clean (unresolved rows remain)'}
           </p>
+          <ul className="import-row-legend">
+            <li>
+              <span className="import-row-legend-swatch import-row-legend-create" />
+              <strong>Add as new roster row</strong> — a new player added in a future
+              commit
+            </li>
+            <li>
+              <span className="import-row-legend-swatch import-row-legend-link" />
+              <strong>Link to existing record</strong> — matches a current roster player;
+              not added as new
+            </li>
+            <li>
+              <span className="import-row-legend-swatch import-row-legend-defer" />
+              <strong>Deferred — not added</strong> — intentionally held back from this
+              import
+            </li>
+            <li>
+              <span className="import-row-legend-swatch import-row-legend-block" />
+              <strong>Unresolved / blocked</strong> — needs a reviewer decision before a
+              future commit
+            </li>
+          </ul>
           <table className="import-table">
             <thead>
               <tr>
@@ -815,7 +969,7 @@ function ReviewRow({
       : row.candidates.map((c) => c.existingPlayerName ?? '(unnamed)').join(', ');
   const outcomeText =
     row.outcome === 'projected-link' && row.linkTargetExistingName
-      ? `Would link → ${row.linkTargetExistingName}`
+      ? `Link → ${row.linkTargetExistingName}`
       : OUTCOME_LABELS[row.outcome] ?? row.outcome;
   return (
     <tr>
@@ -826,7 +980,11 @@ function ReviewRow({
         </span>
       </td>
       <td>{candidateText}</td>
-      <td>{outcomeText}</td>
+      <td>
+        <span className={`import-outcome import-outcome-${row.outcome}`}>
+          {outcomeText}
+        </span>
+      </td>
       <td>
         {rowId === null ? (
           <span className="import-empty">—</span>
