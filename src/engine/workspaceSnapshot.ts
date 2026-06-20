@@ -1,4 +1,13 @@
-import type { AgeDivision, Coach, District, Player, Team } from '../domain/types';
+import type {
+  AgeDivision,
+  Coach,
+  District,
+  Game,
+  GameStatus,
+  Player,
+  Team,
+} from '../domain/types';
+import { validateScheduleReferences } from './teamScheduleSummary';
 
 /**
  * Phase 5 slice 23: PURE, deterministic PORTABLE WORKSPACE SNAPSHOT — ENGINE ONLY.
@@ -42,12 +51,18 @@ export type WorkspaceSnapshotSummary = {
   ageDivisionCount: number;
   teamCount: number;
   playerCount: number;
+  gameCount: number;
 };
 
 export type WorkspaceData = {
   districts: District[];
   ageDivisions: AgeDivision[];
   teams: Team[];
+  /**
+   * Phase 6 slice 24: schedules/results. Optional on input for backward compatibility
+   * with slice-23 snapshots that predate games; treated as an empty list when absent.
+   */
+  games: Game[];
 };
 
 export type WorkspaceState = WorkspaceData & {
@@ -117,6 +132,24 @@ function copyAgeDivision(ageDivision: AgeDivision): AgeDivision {
   };
 }
 
+function copyGame(game: Game): Game {
+  const copy: Game = {
+    gameId: game.gameId,
+    seasonId: game.seasonId,
+    weekLabel: game.weekLabel,
+    scheduledDate: game.scheduledDate,
+    homeTeamId: game.homeTeamId,
+    awayTeamId: game.awayTeamId,
+    status: game.status,
+  };
+  if (game.ageDivisionId !== undefined) copy.ageDivisionId = game.ageDivisionId;
+  if (game.location !== undefined) copy.location = game.location;
+  if (game.homeScore !== undefined) copy.homeScore = game.homeScore;
+  if (game.awayScore !== undefined) copy.awayScore = game.awayScore;
+  if (game.notes !== undefined) copy.notes = game.notes;
+  return copy;
+}
+
 function distinctSeasonIds(teams: Team[]): string[] {
   const seen = new Set<string>();
   for (const team of teams) seen.add(team.seasonId);
@@ -139,6 +172,7 @@ function summarize(
     ageDivisionCount: workspace.ageDivisions.length,
     teamCount: workspace.teams.length,
     playerCount: countPlayers(workspace.teams),
+    gameCount: workspace.games.length,
   };
 }
 
@@ -165,6 +199,7 @@ export function buildWorkspaceSnapshot(
     districts: workspace.districts.map(copyDistrict),
     ageDivisions: workspace.ageDivisions.map(copyAgeDivision),
     teams: workspace.teams.map(copyTeam),
+    games: (workspace.games ?? []).map(copyGame),
   };
   return {
     appName: WORKSPACE_SNAPSHOT_APP,
@@ -193,6 +228,8 @@ export type WorkspaceSnapshotValidationErrorCode =
   | 'invalid-districts'
   | 'invalid-age-divisions'
   | 'invalid-teams'
+  | 'invalid-games'
+  | 'unresolved-game-reference'
   | 'empty-workspace';
 
 export type WorkspaceSnapshotValidationError = {
@@ -313,6 +350,50 @@ function validTeam(value: unknown): Team | null {
   };
 }
 
+const GAME_STATUSES: GameStatus[] = ['scheduled', 'final', 'cancelled', 'postponed'];
+
+function validGame(value: unknown): Game | null {
+  if (!isObject(value)) return null;
+  if (
+    !isNonEmptyString(value.gameId) ||
+    !isNonEmptyString(value.seasonId) ||
+    typeof value.weekLabel !== 'string' ||
+    !isNonEmptyString(value.homeTeamId) ||
+    !isNonEmptyString(value.awayTeamId)
+  ) {
+    return null;
+  }
+  if (!GAME_STATUSES.includes(value.status as GameStatus)) return null;
+  if (
+    value.scheduledDate !== null &&
+    value.scheduledDate !== undefined &&
+    typeof value.scheduledDate !== 'string'
+  ) {
+    return null;
+  }
+  // A final game must carry usable scores.
+  if (value.status === 'final') {
+    if (!isFiniteNumber(value.homeScore) || !isFiniteNumber(value.awayScore)) {
+      return null;
+    }
+  }
+  const game: Game = {
+    gameId: value.gameId,
+    seasonId: value.seasonId,
+    weekLabel: value.weekLabel,
+    scheduledDate: typeof value.scheduledDate === 'string' ? value.scheduledDate : null,
+    homeTeamId: value.homeTeamId,
+    awayTeamId: value.awayTeamId,
+    status: value.status as GameStatus,
+  };
+  if (typeof value.ageDivisionId === 'string') game.ageDivisionId = value.ageDivisionId;
+  if (typeof value.location === 'string') game.location = value.location;
+  if (isFiniteNumber(value.homeScore)) game.homeScore = value.homeScore;
+  if (isFiniteNumber(value.awayScore)) game.awayScore = value.awayScore;
+  if (typeof value.notes === 'string') game.notes = value.notes;
+  return game;
+}
+
 function validSelection(value: unknown): WorkspaceSnapshotSelection {
   const s = isObject(value) ? value : {};
   const pick = (v: unknown) => (typeof v === 'string' ? v : null);
@@ -424,9 +505,43 @@ export function validateWorkspaceSnapshot(
     };
   }
 
+  // Games are optional (slice-23 snapshots predate them). When present they must be a
+  // valid array, and every game must reference existing teams (opponents are not objects).
+  const games: Game[] = [];
+  if (ws.games !== undefined && ws.games !== null) {
+    if (!Array.isArray(ws.games)) {
+      return {
+        ok: false,
+        errors: [err('invalid-games', 'workspace.games must be an array when present.')],
+      };
+    }
+    for (const raw of ws.games as unknown[]) {
+      const game = validGame(raw);
+      if (!game) {
+        return {
+          ok: false,
+          errors: [err('invalid-games', 'A game entry is structurally invalid.')],
+        };
+      }
+      games.push(game);
+    }
+    const unresolved = validateScheduleReferences(games, teams);
+    if (unresolved.length > 0) {
+      return {
+        ok: false,
+        errors: [
+          err(
+            'unresolved-game-reference',
+            `Game ${unresolved[0].gameId} references team(s) not in the snapshot: ${unresolved[0].missingTeamIds.join(', ')}. Opponents must be existing teams.`
+          ),
+        ],
+      };
+    }
+  }
+
   const generatedAt =
     typeof value.generatedAt === 'string' ? value.generatedAt : '';
-  const workspace: WorkspaceData = { districts, ageDivisions, teams };
+  const workspace: WorkspaceData = { districts, ageDivisions, teams, games };
   const snapshot: WorkspaceSnapshot = {
     appName: typeof value.appName === 'string' ? value.appName : WORKSPACE_SNAPSHOT_APP,
     snapshotKind: WORKSPACE_SNAPSHOT_KIND,
@@ -484,6 +599,7 @@ export function restoreWorkspaceFromSnapshot(
     districts: snapshot.workspace.districts.map(copyDistrict),
     ageDivisions: snapshot.workspace.ageDivisions.map(copyAgeDivision),
     teams: snapshot.workspace.teams.map(copyTeam),
+    games: (snapshot.workspace.games ?? []).map(copyGame),
   };
 
   const selection = resolveSelection(workspace.teams, snapshot.selection);

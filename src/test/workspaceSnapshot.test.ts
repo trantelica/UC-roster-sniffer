@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { AgeDivision, District, Team } from '../domain/types';
+import type { AgeDivision, District, Game, Team } from '../domain/types';
 import {
   buildWorkspaceSnapshot,
   parseWorkspaceSnapshotJson,
@@ -66,6 +66,7 @@ function workspaceState(): WorkspaceState {
       team('2025-alta-GR-B1', '2025', ['Jordan Smith', 'Taylor Johnson']),
       team('2026-alta-GR-B1', '2026', ['Jordan Smith', 'Brand New', 'Cary, Hudson']),
     ],
+    games: [],
     selection: {
       seasonId: '2026',
       districtId: 'alta',
@@ -76,6 +77,36 @@ function workspaceState(): WorkspaceState {
 }
 
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
+
+function sampleGame(overrides: Partial<Game> & Pick<Game, 'gameId'>): Game {
+  return {
+    seasonId: '2026',
+    ageDivisionId: 'GR',
+    weekLabel: 'Week 1',
+    scheduledDate: '2026-08-22',
+    homeTeamId: '2026-alta-GR-B1',
+    awayTeamId: '2025-alta-GR-B1',
+    status: 'scheduled',
+    ...overrides,
+  };
+}
+
+function workspaceWithGames(): WorkspaceState {
+  return {
+    ...workspaceState(),
+    games: [
+      sampleGame({
+        gameId: 'g-final',
+        status: 'final',
+        homeTeamId: '2026-alta-GR-B1',
+        awayTeamId: '2025-alta-GR-B1',
+        homeScore: 21,
+        awayScore: 14,
+      }),
+      sampleGame({ gameId: 'g-scheduled', status: 'scheduled' }),
+    ],
+  };
+}
 
 describe('workspace snapshot builder', () => {
   it('builds a valid snapshot from current workspace state', () => {
@@ -149,6 +180,7 @@ describe('workspace snapshot builder', () => {
       ageDivisionCount: 2,
       teamCount: 2,
       playerCount: 5,
+      gameCount: 0,
     });
   });
 
@@ -335,5 +367,175 @@ describe('workspace snapshot restore', () => {
       'Brand New',
       'Cary, Hudson',
     ]);
+  });
+});
+
+describe('workspace snapshot schedules/results (slice 24)', () => {
+  it('exported snapshot includes schedules/results with a game count', () => {
+    const snapshot = buildWorkspaceSnapshot({
+      workspace: workspaceWithGames(),
+      generatedAt: GENERATED_AT,
+    });
+    expect(snapshot.workspace.games.map((g) => g.gameId)).toEqual([
+      'g-final',
+      'g-scheduled',
+    ]);
+    expect(snapshot.summary.gameCount).toBe(2);
+  });
+
+  it('a valid snapshot with games imports and restores them exactly', () => {
+    const json = JSON.stringify(
+      buildWorkspaceSnapshot({ workspace: workspaceWithGames(), generatedAt: GENERATED_AT })
+    );
+    const parsed = parseWorkspaceSnapshotJson(json);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const restored = restoreWorkspaceFromSnapshot(parsed.snapshot);
+    expect(restored.workspace.games).toHaveLength(2);
+    const final = restored.workspace.games.find((g) => g.gameId === 'g-final')!;
+    expect(final.homeScore).toBe(21);
+    expect(final.awayScore).toBe(14);
+    expect(final.status).toBe('final');
+  });
+
+  it('an older snapshot without a games field imports with an empty schedule', () => {
+    // Simulate a slice-23 snapshot: build then strip the games field from the JSON.
+    const raw = JSON.parse(
+      JSON.stringify(
+        buildWorkspaceSnapshot({ workspace: workspaceState(), generatedAt: GENERATED_AT })
+      )
+    );
+    delete raw.workspace.games;
+    delete raw.summary.gameCount;
+    const result = validateWorkspaceSnapshot(raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.workspace.games).toEqual([]);
+    expect(result.snapshot.summary.gameCount).toBe(0);
+    const restored = restoreWorkspaceFromSnapshot(result.snapshot);
+    expect(restored.workspace.games).toEqual([]);
+  });
+
+  it('rejects structurally invalid game data', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+      snapshotKind: 'workspace',
+      workspace: {
+        districts: [],
+        ageDivisions: [],
+        teams: [
+          {
+            teamId: '2026-alta-GR-B1',
+            seasonId: '2026',
+            districtId: 'alta',
+            ageDivisionId: 'GR',
+            teamCode: 'B1',
+            draftOrder: 1,
+            divisionTeamCount: 1,
+            headCoach: null,
+            assistantCoaches: [],
+            players: [],
+          },
+        ],
+        games: [{ gameId: 'bad', status: 'final' }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('invalid-games');
+  });
+
+  it('rejects a game referencing a team not in the snapshot', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+      snapshotKind: 'workspace',
+      workspace: {
+        districts: [],
+        ageDivisions: [],
+        teams: [
+          {
+            teamId: '2026-alta-GR-B1',
+            seasonId: '2026',
+            districtId: 'alta',
+            ageDivisionId: 'GR',
+            teamCode: 'B1',
+            draftOrder: 1,
+            divisionTeamCount: 1,
+            headCoach: null,
+            assistantCoaches: [],
+            players: [],
+          },
+        ],
+        games: [
+          {
+            gameId: 'g1',
+            seasonId: '2026',
+            weekLabel: 'Week 1',
+            scheduledDate: '2026-08-22',
+            homeTeamId: '2026-alta-GR-B1',
+            awayTeamId: 'ghost-team',
+            status: 'scheduled',
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('unresolved-game-reference');
+  });
+
+  it('rejects a final game missing usable scores', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+      snapshotKind: 'workspace',
+      workspace: {
+        districts: [],
+        ageDivisions: [],
+        teams: [
+          {
+            teamId: '2026-alta-GR-B1',
+            seasonId: '2026',
+            districtId: 'alta',
+            ageDivisionId: 'GR',
+            teamCode: 'B1',
+            draftOrder: 1,
+            divisionTeamCount: 1,
+            headCoach: null,
+            assistantCoaches: [],
+            players: [],
+          },
+        ],
+        games: [
+          {
+            gameId: 'g1',
+            seasonId: '2026',
+            weekLabel: 'Week 1',
+            scheduledDate: '2026-08-22',
+            homeTeamId: '2026-alta-GR-B1',
+            awayTeamId: '2026-alta-GR-B1',
+            status: 'final',
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('invalid-games');
+  });
+
+  it('restore replaces games rather than merging', () => {
+    // Snapshot A has 2 games; restoring it yields exactly those 2, not a union.
+    const restored = restoreWorkspaceFromSnapshot(
+      buildWorkspaceSnapshot({ workspace: workspaceWithGames(), generatedAt: GENERATED_AT })
+    );
+    expect(restored.workspace.games.map((g) => g.gameId)).toEqual([
+      'g-final',
+      'g-scheduled',
+    ]);
+  });
+
+  it('does not mutate input games when building a snapshot', () => {
+    const ws = workspaceWithGames();
+    const before = JSON.stringify(ws.games);
+    const snapshot = buildWorkspaceSnapshot({ workspace: ws, generatedAt: GENERATED_AT });
+    snapshot.workspace.games[0].homeScore = 999;
+    expect(JSON.stringify(ws.games)).toBe(before);
   });
 });

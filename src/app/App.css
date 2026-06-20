@@ -834,3 +834,67 @@ h1 {
 .workspace-notice .import-link-button {
   margin-left: 0.5rem;
 }
+
+/* Schedule & results (read-only, Phase 6 slice 24) */
+.schedule-highlight {
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0;
+  color: var(--color-carbon-black);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.schedule-table th,
+.schedule-table td {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--color-alabaster-grey);
+}
+
+.schedule-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+  color: var(--color-steel-blue);
+}
+
+.schedule-week {
+  color: #777;
+}
+
+.schedule-status {
+  font-size: 0.68rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.schedule-status-final {
+  color: #2e7d32;
+}
+
+.schedule-status-scheduled {
+  color: var(--color-steel-blue);
+}
+
+.schedule-status-postponed {
+  color: var(--color-bronze-spice);
+}
+
+.schedule-status-cancelled {
+  color: #888;
+}
+
+.schedule-unresolved {
+  color: var(--color-bronze-spice);
+  font-style: italic;
+}

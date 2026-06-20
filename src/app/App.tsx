@@ -85,6 +85,8 @@ export default function App() {
         ageDivisions: workspace.ageDivisions,
         // The CURRENT in-memory roster, including any executed in-memory import additions.
         teams: liveTeams,
+        // Schedules/results travel with the workspace snapshot (slice 24).
+        games: workspace.games,
         selection: {
           seasonId: selectedSeason,
           districtId: selectedDistrict,
@@ -185,6 +187,8 @@ export default function App() {
           districts={workspace.districts}
           ageDivisions={workspace.ageDivisions}
           priorPlayers={priorTeam?.players ?? null}
+          teams={liveTeams}
+          games={workspace.games}
         />
       ) : (
         <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
@@ -288,8 +292,9 @@ function WorkspaceToolbar({
         <div className="workspace-notice workspace-notice-ok">
           <strong>Workspace restored from “{notice.fileName}”.</strong>{' '}
           {notice.summary.seasonCount} seasons · {notice.summary.districtCount} districts ·{' '}
-          {notice.summary.teamCount} teams · {notice.summary.playerCount} players. The
-          current in-memory workspace was replaced (no browser/database persistence).
+          {notice.summary.teamCount} teams · {notice.summary.playerCount} players ·{' '}
+          {notice.summary.gameCount} games. The current in-memory workspace was replaced (no
+          browser/database persistence).
           <button type="button" className="import-link-button" onClick={onDismissNotice}>
             Dismiss
           </button>

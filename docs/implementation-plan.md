@@ -1062,6 +1062,40 @@ Playoff wins and losses derive from playoff-flagged games.
 Championship appearance and win derive from championship-flagged games.
 ```
 
+### Slices
+
+- **Slice 24 (done): schedule/results data support with team schedule summaries and UI.**
+  Phase 6 begins. Adds a game-centric schedule/result model (`Game` in
+  `src/domain/types.ts`: `gameId`, `seasonId`, optional `ageDivisionId`, `weekLabel`,
+  `scheduledDate`, `homeTeamId`, `awayTeamId`, optional `location`, `status` of
+  `scheduled` / `final` / `cancelled` / `postponed`, optional `homeScore` / `awayScore` /
+  `notes`). Games reference EXISTING teams as home/away participants — there is no opponent
+  object, and schedules/results are separate from roster imports and never mutate rosters. A
+  small sample (`data-samples/games.sample.json`, loaded by `loadSampleData`) covers final,
+  scheduled, cancelled, and postponed games for a team with multiple games. A pure engine
+  module (`src/engine/teamScheduleSummary.ts`, `src/test/teamScheduleSummary.test.ts`)
+  derives the read-only team summary: `getTeamSchedule`, `deriveTeamGameResult`,
+  `summarizeTeamSchedule` (W-L-T, points for/against/differential, completed/upcoming/
+  cancelled counts, next game, last result, and per-game views with the opponent resolved
+  through team references — only `final` games with usable scores count toward the record;
+  `scheduled`/`postponed` are upcoming and `cancelled` is excluded), and
+  `validateScheduleReferences`. Deterministic ordering (scheduledDate, weekLabel, gameId);
+  unresolved opponent references are reported, never invented. The team view shows a
+  read-only **Schedule & Results** section (record, next game, last result, game list) with
+  a clean empty state. Workspace snapshots now include `games` (schemaVersion stays 1 —
+  games are optional for backward compatibility with slice-23 snapshots, which restore with
+  an empty schedule); snapshot validation rejects structurally invalid games
+  (`invalid-games`) and games referencing unknown teams (`unresolved-game-reference`), and
+  restore replaces (never merges) schedules. No schedule editing, external import, backend,
+  auth, cloud DB, localStorage, IndexedDB, auto-save, sync, opponent objects, or roster
+  mutation was added. See `docs/data-model.md` ("Game / Schedule model (Phase 6 slice 24)")
+  and `docs/ui-workflow.md`.
+
+  > Note: the older `data-samples/schedule-import.sample.json` is a separate, preserved
+  > team-centric **import-row** contract (`importType: "schedule"`) for a future schedule
+  > import workflow; it was intentionally left unchanged. The slice-24 in-app game model is
+  > game-centric (home/away) and distinct from it.
+
 ## Phase 7: Coach analytics
 
 ### Goal
