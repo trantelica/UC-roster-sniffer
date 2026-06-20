@@ -997,6 +997,49 @@ backend); the review, staged projection, existing roster, and prior seasons are 
 mutated; and raw imported and existing names are preserved exactly. **Permanent import
 application remains a future, explicitly approved slice.**
 
+## Reversible in-memory transaction plan (Phase 5 slice 21)
+
+Slice 21 adds a **reversible, in-memory import transaction plan** — a design / safety
+contract describing exactly what a future, explicitly approved import-write slice *would*
+do, without doing it. The pure engine helper
+(`src/engine/uteConferenceScrapedJsonImportTransactionPlan.ts`,
+`buildScrapedJsonImportTransactionPlan`) composes the slice 18 review, slice 19 staged
+projection, and slice 20 readiness gate. It introduces no new import model and re-derives
+no matching/decision logic.
+
+Planning **requires readiness**: when `isReadyForFutureCommit` is false, the helper returns
+a deterministic `rejected` result carrying the readiness `blockingReasons` (and the
+unresolved/blocked rows for inspection) and produces **no add operations**. When readiness
+is ready it returns a `planned` result that distinguishes:
+
+- `addOperations` — incoming rows that would become new roster records (each with a
+  deterministic provisional `projectedRecordRef`; never a real id)
+- `linkOperations` — incoming rows linked to an existing record, marked `rosterMutation:
+  'none'` (no new roster record)
+- `deferredRows` — incoming rows intentionally excluded from addition
+- `rejectedRows` — unresolved/blocked/invalid rows (empty on a ready plan)
+- `beforeRosterSummary` / `afterRosterSummary` / `rosterDeltaSummary` (only additions
+  change the record count: `netRosterRecordChange === addedCount`)
+- `rollbackPlan` (undo preview) — which added records would be removable, which links are
+  no-ops, which deferred/rejected rows were never applied, and the player count the roster
+  restores to after a full undo
+- `audit` metadata — logic versions, caller-supplied `transactionId` / `generatedAt`, and
+  `executed: false`
+
+Caller-supplied `transactionId` / `generatedAt` keep output deterministic; the view model
+uses stable sentinels for on-screen display and a real timestamp/id only at export time.
+The workbench shows a read-only **Future import transaction plan** panel (add / link
+(no-op) / deferred / rejected counts, before → after roster summary, an operations table,
+and an **Undo preview**), and the preview artifact builder optionally embeds a transaction-
+plan summary always marked `executed: false`.
+
+This remains preview-only and is **not** a commit. Building or rendering a plan applies,
+writes, saves, or persists nothing; there is no `localStorage` / `IndexedDB` / backend /
+file / app-state write; the review, staged projection, existing roster, and prior seasons
+are never mutated; loaded roster records stay authoritative; and raw imported and existing
+names are preserved exactly. The transaction plan is a contract for a future, explicitly
+approved import-write slice — **durable roster writes remain out of scope.**
+
 ## Roster import stages
 
 ### 1. Parse source data

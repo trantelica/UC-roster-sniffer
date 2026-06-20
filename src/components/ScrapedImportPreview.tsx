@@ -17,6 +17,10 @@ import type {
 } from '../engine/uteConferenceScrapedJsonImportRosterAwareReview';
 import type { ScrapedImportStagedProjection } from '../engine/uteConferenceScrapedJsonImportStagedProjection';
 import { buildScrapedJsonImportPreviewArtifact } from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
+import {
+  buildScrapedJsonImportTransactionPlan,
+  type ScrapedImportTransactionPlanResult,
+} from '../engine/uteConferenceScrapedJsonImportTransactionPlan';
 import { loadSampleData } from '../data/loadSampleData';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
@@ -638,6 +642,115 @@ function SelectedTargetDetail({
           sourceKind={sourceKind}
         />
       )}
+
+      {selected.recordType === 'players' && (
+        <TransactionPlanPanel transactionPlan={vm.transactionPlan} />
+      )}
+    </div>
+  );
+}
+
+function TransactionPlanPanel({
+  transactionPlan,
+}: {
+  transactionPlan: ScrapedImportTransactionPlanResult;
+}) {
+  return (
+    <div className="import-section import-transaction">
+      <div className="import-section-head">
+        <h3>Future import transaction plan</h3>
+        <span className="import-tag">
+          Not executed · no roster data is written in this preview
+        </span>
+      </div>
+
+      {transactionPlan.status === 'rejected' ? (
+        <>
+          <p className="import-readiness-verdict import-readiness-blocked">
+            No transaction plan — the staged preview is not ready for a future commit.
+          </p>
+          <p className="import-reasons">{transactionPlan.message}</p>
+          {transactionPlan.blockingReasons.length > 0 && (
+            <ul className="import-issues">
+              {transactionPlan.blockingReasons.map((reason) => (
+                <li key={reason.code} className="import-issue import-issue-warning">
+                  <strong>
+                    {READINESS_REASON_LABELS[reason.code] ?? reason.code}
+                  </strong>
+                  : {reason.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="import-readiness-verdict import-readiness-ready">
+            Reversible transaction plan ready (preview only — never executed).
+          </p>
+          <div className="import-readiness-counts">
+            <span className="import-readiness-count">
+              <strong>{transactionPlan.addOperations.length}</strong> add
+            </span>
+            <span className="import-readiness-count">
+              <strong>{transactionPlan.linkOperations.length}</strong> link (no-op)
+            </span>
+            <span className="import-readiness-count">
+              <strong>{transactionPlan.deferredRows.length}</strong> deferred
+            </span>
+            <span className="import-readiness-count">
+              <strong>{transactionPlan.rejectedRows.length}</strong> rejected
+            </span>
+          </div>
+          <p className="import-review">
+            Roster: {transactionPlan.beforeRosterSummary.playerCount} →{' '}
+            <strong>{transactionPlan.afterRosterSummary.playerCount}</strong> (net record
+            change {transactionPlan.rosterDeltaSummary.netRosterRecordChange >= 0 ? '+' : ''}
+            {transactionPlan.rosterDeltaSummary.netRosterRecordChange})
+          </p>
+
+          {transactionPlan.addOperations.length > 0 && (
+            <table className="import-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Imported name (raw)</th>
+                  <th>Operation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactionPlan.addOperations.map((op) => (
+                  <tr key={`add-${op.rowIndex}`}>
+                    <td>{op.rowIndex + 1}</td>
+                    <td>{op.projectedRecordName ?? '(missing)'}</td>
+                    <td>
+                      <span className="import-outcome import-outcome-projected-create">
+                        Add as new roster row
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {transactionPlan.linkOperations.map((op) => (
+                  <tr key={`link-${op.rowIndex}`}>
+                    <td>{op.rowIndex + 1}</td>
+                    <td>{op.importedName ?? '(missing)'}</td>
+                    <td>
+                      <span className="import-outcome import-outcome-projected-link">
+                        Link → {op.linkTargetExistingName ?? '(existing)'} (no-op)
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <div className="import-section-head">
+            <h4>Undo preview</h4>
+          </div>
+          <p className="import-reasons">{transactionPlan.rollbackPlan.summary}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -660,13 +773,26 @@ function exportPreviewArtifact(
   sourceName: string,
   sourceKind: 'file' | 'demo'
 ) {
-  const artifact = buildScrapedJsonImportPreviewArtifact({
-    generatedAt: new Date().toISOString(),
-    source: { ...vm.artifactSource, name: sourceName, kind: sourceKind },
+  const generatedAt = new Date().toISOString();
+  const source = { ...vm.artifactSource, name: sourceName, kind: sourceKind };
+  // A fresh transaction plan with a real (non-sentinel) id/timestamp for the export.
+  const transactionPlan = buildScrapedJsonImportTransactionPlan({
+    transactionId: `import-transaction:${Date.now()}`,
+    generatedAt,
+    source,
     target: vm.artifactTarget,
     review: vm.rosterReview,
     stagedProjection: vm.stagedProjection,
     readiness: vm.futureReadiness,
+  });
+  const artifact = buildScrapedJsonImportPreviewArtifact({
+    generatedAt,
+    source,
+    target: vm.artifactTarget,
+    review: vm.rosterReview,
+    stagedProjection: vm.stagedProjection,
+    readiness: vm.futureReadiness,
+    transactionPlan,
   });
   const json = JSON.stringify(artifact, null, 2);
   const blob = new Blob([json], { type: 'application/json' });

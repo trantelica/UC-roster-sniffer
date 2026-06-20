@@ -6,6 +6,7 @@ import type {
 } from './uteConferenceScrapedJsonImportRosterAwareReview';
 import type { ScrapedImportStagedProjection } from './uteConferenceScrapedJsonImportStagedProjection';
 import type { ScrapedImportFutureCommitReadiness } from './uteConferenceScrapedJsonImportFutureReadiness';
+import type { ScrapedImportTransactionPlanResult } from './uteConferenceScrapedJsonImportTransactionPlan';
 
 /**
  * Phase 5 slice 20: PURE, deterministic PREVIEW ARTIFACT builder — ENGINE ONLY.
@@ -92,6 +93,26 @@ export type ScrapedImportPreviewArtifact = {
         projectedRosterCount: number;
       };
   rows: ScrapedImportPreviewArtifactRow[];
+  /**
+   * Optional slice 21 transaction-plan summary. Null when no plan was supplied. Always
+   * marked `executed: false` — the plan is never run by building this artifact.
+   */
+  transactionPlan: ScrapedImportPreviewArtifactTransactionPlan | null;
+};
+
+export type ScrapedImportPreviewArtifactTransactionPlan = {
+  status: 'planned' | 'rejected';
+  /** Always false: the plan describes a hypothetical commit only. */
+  executed: false;
+  transactionId: string;
+  generatedAt: string;
+  addCount: number;
+  linkCount: number;
+  deferredCount: number;
+  rejectedCount: number;
+  /** Net roster-record change for a planned commit; null when rejected. */
+  netRosterRecordChange: number | null;
+  blockingReasonCodes: string[];
 };
 
 const PREVIEW_NOTE =
@@ -104,7 +125,41 @@ export type BuildScrapedImportPreviewArtifactInput = {
   review: ScrapedImportRosterAwareReview;
   stagedProjection: ScrapedImportStagedProjection;
   readiness: ScrapedImportFutureCommitReadiness;
+  /** Optional slice 21 transaction plan to summarize in the artifact (never executed). */
+  transactionPlan?: ScrapedImportTransactionPlanResult;
 };
+
+function summarizeTransactionPlan(
+  plan: ScrapedImportTransactionPlanResult | undefined
+): ScrapedImportPreviewArtifactTransactionPlan | null {
+  if (!plan) return null;
+  if (plan.status === 'planned') {
+    return {
+      status: 'planned',
+      executed: false,
+      transactionId: plan.transactionId,
+      generatedAt: plan.generatedAt,
+      addCount: plan.addOperations.length,
+      linkCount: plan.linkOperations.length,
+      deferredCount: plan.deferredRows.length,
+      rejectedCount: plan.rejectedRows.length,
+      netRosterRecordChange: plan.rosterDeltaSummary.netRosterRecordChange,
+      blockingReasonCodes: [],
+    };
+  }
+  return {
+    status: 'rejected',
+    executed: false,
+    transactionId: plan.transactionId,
+    generatedAt: plan.generatedAt,
+    addCount: 0,
+    linkCount: 0,
+    deferredCount: 0,
+    rejectedCount: plan.rejectedRows.length,
+    netRosterRecordChange: null,
+    blockingReasonCodes: plan.blockingReasons.map((r) => r.code),
+  };
+}
 
 /**
  * Builds the preview artifact snapshot from current in-memory state. Pure; never mutates
@@ -162,5 +217,6 @@ export function buildScrapedJsonImportPreviewArtifact(
     },
     stagedProjection: stagedProjectionSummary,
     rows,
+    transactionPlan: summarizeTransactionPlan(input.transactionPlan),
   };
 }

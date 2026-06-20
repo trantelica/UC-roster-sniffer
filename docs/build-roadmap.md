@@ -88,8 +88,9 @@ documentation/spec-alignment checkpoint):
   committable plan (the link / create / reject / defer outcomes a future apply would
   produce), still with no persistence and no apply. Later Phase 5 slices wire a
   read-only import workbench (slices 16–18), an in-memory staged roster projection
-  (slice 19), and a future-import-commit readiness report plus an exportable
-  preview-only artifact (slice 20) — all preview-only, with no import
+  (slice 19), a future-import-commit readiness report plus an exportable
+  preview-only artifact (slice 20), and a reversible in-memory transaction-plan
+  contract with an undo preview (slice 21) — all preview-only, with no import
   apply/commit/save and no persistence. Phase 5 has no browser storage, no
   `localStorage` / `IndexedDB`, no sample-data mutation, no roster mutation, and
   no import apply/commit.

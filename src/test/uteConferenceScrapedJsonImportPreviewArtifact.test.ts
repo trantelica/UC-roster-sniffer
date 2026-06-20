@@ -17,6 +17,7 @@ import {
   buildScrapedJsonImportPreviewArtifact,
   SCRAPED_JSON_IMPORT_PREVIEW_ARTIFACT_KIND,
 } from '../engine/uteConferenceScrapedJsonImportPreviewArtifact';
+import { buildScrapedJsonImportTransactionPlan } from '../engine/uteConferenceScrapedJsonImportTransactionPlan';
 
 function playerPayload(playerNames: string[]) {
   return {
@@ -215,5 +216,79 @@ describe('scraped JSON import preview artifact', () => {
     expect(JSON.stringify(review)).toBe(reviewBefore);
     expect(JSON.stringify(staged)).toBe(stagedBefore);
     expect(JSON.stringify(readiness)).toBe(readinessBefore);
+  });
+
+  it('omits the transaction plan (null) when none is supplied', () => {
+    const { review, staged, readiness } = buildAll(playerPayload(['Brand New']), TEAM);
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+    });
+    expect(artifact.transactionPlan).toBeNull();
+  });
+
+  it('includes the transaction plan summary, marked not executed, when supplied', () => {
+    const { review, staged, readiness } = buildAll(playerPayload(['Brand New']), TEAM);
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: 'txn-art-1',
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+    });
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: TARGET,
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+    });
+    expect(artifact.transactionPlan).toEqual({
+      status: 'planned',
+      executed: false,
+      transactionId: 'txn-art-1',
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      addCount: 1,
+      linkCount: 0,
+      deferredCount: 0,
+      rejectedCount: 0,
+      netRosterRecordChange: 1,
+      blockingReasonCodes: [],
+    });
+  });
+
+  it('summarizes a rejected transaction plan with blocking codes and null delta', () => {
+    // No existing roster -> review unavailable -> readiness not ready -> rejected plan.
+    const { review, staged, readiness } = buildAll(playerPayload(['Brand New']), []);
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: 'txn-art-2',
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: { ...TARGET, existingTeamId: null },
+      review,
+      stagedProjection: staged,
+      readiness,
+    });
+    const artifact = buildScrapedJsonImportPreviewArtifact({
+      generatedAt: '2026-06-19T00:00:00.000Z',
+      source: SOURCE,
+      target: { ...TARGET, existingTeamId: null },
+      review,
+      stagedProjection: staged,
+      readiness,
+      transactionPlan,
+    });
+    expect(artifact.transactionPlan?.status).toBe('rejected');
+    expect(artifact.transactionPlan?.executed).toBe(false);
+    expect(artifact.transactionPlan?.netRosterRecordChange).toBeNull();
+    expect(artifact.transactionPlan?.blockingReasonCodes).toContain('review-unavailable');
   });
 });
