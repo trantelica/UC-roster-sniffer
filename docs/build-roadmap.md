@@ -776,6 +776,16 @@ Acceptance criteria:
 - playoff wins/losses derive from flagged games
 - championship appearance/win derive from championship games
 
+Status: **Phase 6 has begun.** Slice 24 adds a game-centric schedule/result model
+(games reference existing teams as home/away participants — opponents are not separate
+objects), pure deterministic team schedule summaries (W-L-T, points for/against/
+differential, next game, last result, per-game opponent-resolved views; only final games
+count toward the record), a read-only **Schedule & Results** team-view section, and
+workspace-snapshot support for schedules/results (optional/backward-compatible at
+schemaVersion 1). Schedules/results are maintained separately from roster imports and never
+mutate rosters. Playoff/championship flags, result-update editing, and external schedule
+import remain future work.
+
 ## Phase 7: Coach analytics
 
 Goal: calculate lifetime and continuous-cohort records.

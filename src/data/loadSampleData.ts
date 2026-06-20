@@ -1,7 +1,8 @@
 import districtConfig from '../../data-samples/district-config.sample.json';
 import rosterImport2026 from '../../data-samples/roster-import.sample.json';
 import rosterImport2025 from '../../data-samples/roster-import-2025.sample.json';
-import type { AppData, Team, Coach } from '../domain/types';
+import gamesSample from '../../data-samples/games.sample.json';
+import type { AppData, Game, Team, Coach } from '../domain/types';
 
 function toCoach(raw: { name: string }): Coach {
   return { name: raw.name };
@@ -54,9 +55,14 @@ export function loadSampleData(): AppData {
     ...teamsFromImport(rosterImport2026 as RosterImportFile),
   ];
 
+  // Phase 6 slice 24: schedules/results are maintained separately from roster imports.
+  // Games reference existing teams as home/away participants (no opponent objects).
+  const games = (gamesSample.games as Game[]).map((g) => ({ ...g }));
+
   return {
     districts: districtConfig.districts,
     ageDivisions: districtConfig.ageDivisions,
     teams,
+    games,
   };
 }

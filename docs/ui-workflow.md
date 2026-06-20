@@ -474,6 +474,20 @@ clears any active in-memory import (including undo), and that nothing is written
 or browser storage. This is explicit file durability only — no auto-save, sync, or
 browser/cloud persistence — and is separate from the import preview artifact.
 
+## Team schedule & results (Phase 6 slice 24)
+
+The selected team view shows a read-only **Schedule & Results** section derived from games
+between existing teams (opponents resolve through team references — there are no opponent
+objects). It displays a record summary (W-L-T, points for, points against, point
+differential, upcoming and cancelled counts), the next game, the last result, and a game
+list (date/week, home/away, opponent, status, score/result, location). Only `final` games
+with scores count toward the record; `scheduled`/`postponed` games are upcoming and
+`cancelled` games are shown but excluded from the record. Team with no games shows "No
+schedule/results loaded for this team." An unresolved opponent reference is shown inline
+("opponent reference could not be resolved") and never crashes the view. This section is
+read-only — schedule editing/import is future work — and schedules/results travel with the
+workspace snapshot.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

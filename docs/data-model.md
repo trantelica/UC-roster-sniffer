@@ -1492,6 +1492,43 @@ invalid-payload
 - **Caller overrides** (per `sourceTargetId`) flow through to the slice 11 mapping and
   can raise a provisional target to `ready`. The payload is never mutated.
 
+## Game / Schedule model (Phase 6 slice 24)
+
+Phase 6 begins schedule/results. A `Game` (`src/domain/types.ts`) is a scheduled or
+completed game between two EXISTING teams:
+
+```text
+gameId: string
+seasonId: string
+ageDivisionId?: string            (optional; for filtering/display)
+weekLabel: string
+scheduledDate: string | null      (ISO date, e.g. "2026-08-22", or null)
+homeTeamId: string                (references Team.teamId)
+awayTeamId: string                (references Team.teamId)
+location?: string
+status: "scheduled" | "final" | "cancelled" | "postponed"
+homeScore?: number                (required in practice only for final games)
+awayScore?: number
+notes?: string
+```
+
+Rules:
+
+- **Opponents are not separate objects.** `homeTeamId` / `awayTeamId` reference existing
+  `Team.teamId` values. An unresolvable reference is reported, never invented.
+- **Schedules/results are separate from roster imports** and never mutate rosters or infer
+  player movement.
+- Only `final` games with usable scores count toward a team's record; `scheduled` /
+  `postponed` are upcoming; `cancelled` is excluded from the record.
+- The read-only team schedule summary (`src/engine/teamScheduleSummary.ts`) derives W-L-T,
+  points for/against/differential, next game, last result, and per-game opponent-resolved
+  views, sorted by scheduledDate, then weekLabel, then gameId.
+- `AppData` gains `games: Game[]`. Sample games live in `data-samples/games.sample.json`
+  (game-centric); the older `data-samples/schedule-import.sample.json` is a separate,
+  preserved team-centric import-row contract and is unchanged.
+- Prior seasons remain locked from mutation; historical schedules/results may still be
+  displayed. Schedule editing/import remains future work.
+
 ## Portable Workspace Snapshot (Phase 5 slice 23)
 
 The portable workspace snapshot (`src/engine/workspaceSnapshot.ts`) is a versioned,
@@ -1510,18 +1547,24 @@ generatedAt: ISO string (caller-supplied)
 source: "user-exported-json"
 note: explanatory string
 selection: { seasonId, districtId, ageDivisionId, teamId } (each string | null)
-workspace: { districts: District[], ageDivisions: AgeDivision[], teams: Team[] }
+workspace: { districts: District[], ageDivisions: AgeDivision[], teams: Team[], games: Game[] }
 summary: { schemaVersion, generatedAt, seasonCount, districtCount,
-           ageDivisionCount, teamCount, playerCount }
+           ageDivisionCount, teamCount, playerCount, gameCount }
 ```
 
 - The snapshot reuses the existing `District` / `AgeDivision` / `Team` / `Player` / `Coach`
-  domain shapes (no competing model). `workspace.teams` is the CURRENT in-memory roster,
-  including any slice-22 executed additions.
+  / `Game` domain shapes (no competing model). `workspace.teams` is the CURRENT in-memory
+  roster, including any slice-22 executed additions; `workspace.games` is the schedule
+  (Phase 6 slice 24).
+- `workspace.games` is OPTIONAL on input: slice-23 snapshots that predate games still import
+  and restore with an empty schedule (schemaVersion stays 1 — optional extension, no
+  migration). Exported snapshots always include `games` and `summary.gameCount`.
 - Validation rejects with stable reason codes (`invalid-json`, `not-an-object`,
   `missing-schema-version`, `unsupported-schema-version`, `wrong-snapshot-kind`,
   `invalid-workspace` / `invalid-districts` / `invalid-age-divisions` / `invalid-teams`,
-  `empty-workspace`) and preserves valid data exactly.
+  `invalid-games`, `unresolved-game-reference`, `empty-workspace`) and preserves valid data
+  exactly. A game referencing a team not in the snapshot is rejected (opponents must be
+  existing teams).
 - Restore REPLACES the workspace (never merges) and resolves the active selection (the
   snapshot's team if it still exists, else the most recent season).
 - This is explicit user-controlled **file** durability only — not automatic persistence, and

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "0.1",
+  "kind": "games",
+  "games": [
+    {
+      "gameId": "2026-GR-B1-week-01",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Week 1",
+      "scheduledDate": "2026-08-22",
+      "homeTeamId": "2026-alta-GR-B1",
+      "awayTeamId": "2026-brighton-GR-B1",
+      "location": "Alta Field",
+      "status": "final",
+      "homeScore": 21,
+      "awayScore": 14
+    },
+    {
+      "gameId": "2026-GR-B1-week-02",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Week 2",
+      "scheduledDate": "2026-08-29",
+      "homeTeamId": "2026-brighton-GR-B1",
+      "awayTeamId": "2026-alta-GR-B1",
+      "location": "Brighton Field",
+      "status": "final",
+      "homeScore": 28,
+      "awayScore": 28
+    },
+    {
+      "gameId": "2026-GR-B1-week-03",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Week 3",
+      "scheduledDate": "2026-09-05",
+      "homeTeamId": "2026-alta-GR-B1",
+      "awayTeamId": "2026-brighton-GR-B1",
+      "location": "Alta Field",
+      "status": "scheduled"
+    },
+    {
+      "gameId": "2026-GR-B1-week-04",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Week 4",
+      "scheduledDate": "2026-09-12",
+      "homeTeamId": "2026-brighton-GR-B1",
+      "awayTeamId": "2026-alta-GR-B1",
+      "location": "Brighton Field",
+      "status": "cancelled",
+      "notes": "Cancelled due to field closure."
+    },
+    {
+      "gameId": "2026-GR-B1-week-05",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Week 5",
+      "scheduledDate": "2026-09-19",
+      "homeTeamId": "2026-alta-GR-B1",
+      "awayTeamId": "2026-brighton-GR-B1",
+      "location": "Alta Field",
+      "status": "postponed",
+      "notes": "Postponed; reschedule pending."
+    }
+  ]
+}
