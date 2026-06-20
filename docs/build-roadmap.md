@@ -91,9 +91,14 @@ documentation/spec-alignment checkpoint):
   (slice 19), a future-import-commit readiness report plus an exportable
   preview-only artifact (slice 20), and a reversible in-memory transaction-plan
   contract with an undo preview (slice 21) — all preview-only, with no import
-  apply/commit/save and no persistence. Phase 5 has no browser storage, no
-  `localStorage` / `IndexedDB`, no sample-data mutation, no roster mutation, and
-  no import apply/commit.
+  apply/commit/save and no persistence. Slice 22 then adds the first controlled
+  WRITE boundary: an explicit, reversible **in-memory** import execution into the
+  current runtime/session roster view, with undo. That write is in-memory only and
+  is **not durable** — nothing is saved, persisted, or committed, and it does not
+  survive a reload. Phase 5 has no durable persistence, no browser storage, no
+  `localStorage` / `IndexedDB`, no backend/auth/cloud database, no sample-data
+  mutation, and no prior-season mutation; durable import persistence remains a
+  future, explicitly approved slice.
 
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,

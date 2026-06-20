@@ -1040,6 +1040,52 @@ are never mutated; loaded roster records stay authoritative; and raw imported an
 names are preserved exactly. The transaction plan is a contract for a future, explicitly
 approved import-write slice — **durable roster writes remain out of scope.**
 
+## In-memory import execution and undo (Phase 5 slice 22)
+
+Slice 22 adds the **first controlled write boundary**: an explicit, user-triggered,
+reversible execution of a `planned` transaction plan into the **current runtime/session
+roster view** — in-memory only. The write is **not durable**: nothing is saved, persisted,
+or committed to any store (no `localStorage`, no `IndexedDB`, no backend, no database) and
+it does not survive a reload.
+
+Two pure engine helpers (`src/engine/uteConferenceScrapedJsonImportExecution.ts`) carry the
+logic:
+
+- `executeUteConferenceScrapedJsonImportTransaction` — executes a `planned` plan into a new
+  in-memory team value. It refuses any plan that is not `planned` (carrying the readiness
+  blocking reasons), a missing team, or a team/plan mismatch. Only `addOperations` change
+  the roster: they are appended as new records after the existing records, which are
+  preserved exactly and never reordered. `linkOperations` are no-ops; `deferredRows` and
+  `rejectedRows` are never applied. The result carries applied additions, no-op links,
+  skipped rows, before/after/delta summaries, an `undoPlan`, and an audit
+  (`executed: true`, `durable: false`, `persisted: false`).
+- `undoUteConferenceScrapedJsonImportExecution` — removes only the records the execution
+  added and restores the team to its pre-execution count. It preserves every surviving
+  record exactly, leaves linked/deferred/rejected rows untouched, and rejects non-executed
+  or malformed execution results.
+
+A pure `evaluateScrapedJsonImportExecutionAvailability` gate decides whether the execution
+action is offered: it requires a staged preview, a `planned` transaction plan, and no
+already-executed in-memory import for the active workflow.
+
+In the workbench the user can: load a local file, resolve identities, stage the preview,
+confirm readiness, see the transaction plan, then **Execute In-Memory Import**. The roster
+view immediately reflects the added records (with an "in-memory import active" banner that
+states it is in-memory only, has no saved roster data, and does not persist after reload),
+and **Undo In-Memory Import** restores the pre-execution roster. While an execution is
+active the workflow is **locked** — the source, target, review decisions, and staged
+preview cannot change until the import is undone — so additions cannot be duplicated and no
+phantom records are orphaned. The view model always derives against the immutable baseline
+roster, so staging/readiness/the plan stay stable and re-running them cannot duplicate
+additions. The preview/export artifact gains an `inMemoryExecution` section
+(`notExecuted` / `executed` / `undone`, always `durable: false` / `persisted: false`).
+
+This is the first write boundary, but the write is to current runtime/session state only.
+**No durable persistence exists**; no `localStorage`, `IndexedDB`, backend, auth, or cloud
+database is involved; prior seasons are never mutated and identities are never destructively
+merged. Reloading or resetting the app must not be treated as preserving the in-memory
+execution. **Durable import persistence remains a future, explicitly approved slice.**
+
 ## Roster import stages
 
 ### 1. Parse source data
