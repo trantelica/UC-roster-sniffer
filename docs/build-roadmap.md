@@ -820,8 +820,14 @@ rosters/games/schedules), deterministic name-based coach identity (ambiguity sur
 merged), team staff history with returning/new/departed continuity, a coach directory, a
 coach import workflow (preview → in-memory execute → undo), and workspace-snapshot support
 for coaches/assignments. Everything is in-memory only and preserved solely through workspace
-snapshot export/import. Coach lifetime / continuous-cohort game-record analytics and the
-Scout-to-Scout exception remain future work.
+snapshot export/import. Slice 28 adds derived **coach performance analytics**: read-only,
+deterministic records connecting coach assignments to final game results across teams,
+seasons, roles, and playoff/championship contexts (overall / regular / playoff / championship
+splits, PF/PA/DIFF, win percentage, head/assistant/unknown role splits, with-this-team vs
+career records). Scheduled/postponed/cancelled games do not count; championship games count
+toward championship and playoff context; analytics never mutate rosters, games, or assignments
+and are recomputed at runtime from snapshot-preserved source data. The continuous-cohort
+Scout-to-Scout exception remains future work.
 
 ## Phase 8: My Team panel
 

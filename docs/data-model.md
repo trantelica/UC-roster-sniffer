@@ -1604,6 +1604,43 @@ TeamCoachAssignment: { assignmentId, seasonId, teamId, coachId,
   Coach data is preserved only through workspace snapshot export/import; no
   browser/cloud/database persistence exists.
 
+## Coach performance analytics (Phase 7 slice 28)
+
+Slice 28 adds **derived coach performance analytics**: it connects coach assignments to game
+results so the app can report how coaches performed across their assigned teams, seasons,
+roles, and playoff/championship contexts. Analytics are **read-only and deterministic**, and
+are derived at runtime from existing source data — they are not a new persisted shape.
+
+Pure helpers (`src/engine/coachPerformanceSummary.ts`):
+
+- `summarizeCoachPerformance` — one coach's overall / regular / playoff / championship records,
+  points for/against/differential, win percentage, role-split records (head / assistant /
+  unknown), latest assignment, plus unresolved assignment/game counts.
+- `summarizeCoachPerformanceDirectory` — one row per coach, ordered by display name then
+  coachId (directory/dashboard).
+- `summarizeTeamCoachPerformance` — for a selected team, each assigned coach's **with-this-team**
+  record (this team's final games, with regular/playoff/championship splits) alongside their
+  **career / all-assignment** record.
+- `summarizeCoachRolePerformance` and `validateCoachPerformanceReferences` (unresolved
+  coach-assignment and game references, surfaced for display).
+
+Derivation rules:
+
+- **Coach performance is derived from coach assignments plus FINAL games** for each assigned
+  team. A coach is credited with the final games of every team they are assigned to.
+- Scheduled, postponed, and cancelled games **do not count** toward records.
+- Championship games count toward **both** the championship record and the playoff-context
+  record; the regular-season record excludes playoff/championship games.
+- If multiple coaches are assigned to one team, each is credited with that team's games.
+- Duplicate same-team assignments and multiple roles on the same team/season **do not
+  double-count** the overall record; role-specific records still reflect each role bucket.
+- Records accumulate across seasons (career / all-assignment record).
+- Coach analytics **do not mutate** rosters, games, or coach assignments. Coach/team names are
+  preserved exactly; unresolved references are surfaced, never invented.
+- Workspace snapshots preserve the source data (coaches, assignments, games); performance
+  analytics are recomputed at runtime after restore. No backend/browser/cloud persistence
+  exists.
+
 ## Portable Workspace Snapshot (Phase 5 slice 23)
 
 The portable workspace snapshot (`src/engine/workspaceSnapshot.ts`) is a versioned,
