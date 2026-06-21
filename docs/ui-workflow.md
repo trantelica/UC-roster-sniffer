@@ -543,6 +543,26 @@ Coach import never modifies rosters or games; while executed, the file controls 
 until undo. Coach data travels with workspace snapshots; importing a snapshot clears
 transient coach-import execution/undo state.
 
+## Coach performance dashboard & team performance (Phase 7 slice 28)
+
+The **Coaches** tab is upgraded from a basic directory to a read-only **coach performance
+dashboard**. Each row shows the coach's latest assignment, seasons active, roles held, overall
+W–L–T, win percentage, points for (PF), points against (PA), differential (DIFF), playoff
+W–L–T, and championship W–L–T. The empty state reads "No coach performance data available." A
+coach with assignments but no final games shows 0–0–0. Selecting a coach opens a detail panel:
+overall / regular / playoff / championship splits, head-coach vs assistant vs unknown-role
+splits, unresolved-reference notes, and the assignment history table.
+
+The team view's **Coaching Staff & History** section gains a **Coach performance** table for
+the selected team's staff. Each row shows role, the **With this team** record (this team's
+final games, with regular / playoff / championship splits), and the coach's **Career / all
+assignments** record. The labels distinguish with-this-team from career so a coach's full
+record is never shown as if it were only this team's. Existing staff continuity (returning /
+new / departed) and role lists are preserved, and teams with no coach data keep their empty
+state. All performance views are read-only — there is no coach editing. Records are derived
+from final games only; scheduled/postponed/cancelled games do not count, and championship
+games count toward both championship and playoff context.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

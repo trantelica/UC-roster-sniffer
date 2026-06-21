@@ -343,6 +343,7 @@ export default function App() {
           ageDivisions={workspace.ageDivisions}
           coaches={workspace.coaches}
           coachAssignments={workspace.coachAssignments}
+          games={workspace.games}
         />
       </div>
     </div>

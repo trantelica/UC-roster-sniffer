@@ -1190,6 +1190,25 @@ Scout-to-Scout exception works.
   durable persistence, or destructive identity merge was added. See `docs/data-model.md`,
   `docs/ui-workflow.md`, and `docs/import-workflow.md`.
 
+- **Slice 28 (done): coach performance analytics.** Connects coach assignments to game results
+  so the app reports how coaches performed across assigned teams, seasons, roles, and
+  playoff/championship contexts. Adds the pure, deterministic, read-only engine
+  `coachPerformanceSummary.ts`: `summarizeCoachPerformance` (overall / regular / playoff /
+  championship records, PF/PA/DIFF, win percentage, head/assistant/unknown role splits, latest
+  assignment, unresolved assignment/game counts), `summarizeCoachPerformanceDirectory`,
+  `summarizeTeamCoachPerformance` (with-this-team vs career/all-assignment records),
+  `summarizeCoachRolePerformance`, and `validateCoachPerformanceReferences`. Records derive
+  **only from final games** of assigned teams; scheduled/postponed/cancelled games do not
+  count; championship games count toward both championship and playoff context; the
+  regular-season record excludes both. Duplicate same-team assignments and multiple roles on
+  the same team/season do not double-count the overall record, but role buckets reflect each
+  role. UI: the **Coaches** tab becomes a performance dashboard with a per-coach detail panel,
+  and the TeamView **Coaching Staff & History** section gains a with-this-team vs career
+  performance table. Snapshot behavior is unchanged — analytics are recomputed at runtime from
+  preserved source data. No backend, auth, cloud DB, `localStorage`, `IndexedDB`, auto-save,
+  sync, external coach service, roster/game/assignment mutation, durable persistence, or
+  destructive identity merge was added. See `docs/data-model.md` and `docs/ui-workflow.md`.
+
 ## Phase 8: My Team panel
 
 ### Goal

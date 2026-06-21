@@ -17,6 +17,10 @@ import type {
   GameResultUpdateResult,
 } from '../engine/gameResultUpdate';
 import { summarizeTeamCoachStaff } from '../engine/coachHistorySummary';
+import {
+  summarizeTeamCoachPerformance,
+  type CoachPerformanceRecord,
+} from '../engine/coachPerformanceSummary';
 import type { StaffCoach, TeamCoachAssignment } from '../domain/types';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
@@ -51,6 +55,12 @@ const GAME_STATUS_LABELS: Record<string, string> = {
 
 const EDITABLE_STATUSES: GameStatus[] = ['scheduled', 'final', 'cancelled', 'postponed'];
 
+const ROLE_LABELS: Record<string, string> = {
+  headCoach: 'Head Coach',
+  assistantCoach: 'Assistant Coach',
+  unknown: 'Unknown role',
+};
+
 export default function TeamView({
   team,
   districts,
@@ -72,6 +82,16 @@ export default function TeamView({
     coaches,
     coachAssignments,
     priorSeasonTeamId,
+  });
+  const coachPerformance = summarizeTeamCoachPerformance({
+    teamId: team.teamId,
+    seasonId: team.seasonId,
+    coaches,
+    coachAssignments,
+    teams: teams.length > 0 ? teams : [team],
+    games,
+    districts,
+    ageDivisions,
   });
   const district = districts.find((d) => d.districtId === team.districtId);
   const ageDivision = ageDivisions.find((a) => a.ageDivisionId === team.ageDivisionId);
@@ -358,6 +378,56 @@ export default function TeamView({
                 workspace.
               </p>
             )}
+
+            <h4 className="staff-performance-heading">Coach performance</h4>
+            {coachPerformance.hasFinalGames ? (
+              <p className="import-reasons">
+                “With this team” covers this team’s final games only. “Career” covers all of the
+                coach’s assignments. Derived from final games — read-only.
+              </p>
+            ) : (
+              <p className="import-reasons">
+                No final games for this team yet — with-this-team records show 0–0–0. Career
+                records reflect the coach’s other assigned teams. Read-only.
+              </p>
+            )}
+            <table className="schedule-table">
+              <thead>
+                <tr>
+                  <th>Coach</th>
+                  <th>Role</th>
+                  <th>With this team</th>
+                  <th>Regular</th>
+                  <th>Playoff</th>
+                  <th>Championship</th>
+                  <th>Career / all assignments</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coachPerformance.members.map((m) => (
+                  <tr key={m.assignmentId}>
+                    <td>
+                      {m.displayName}
+                      {m.unresolvedCoach && (
+                        <span className="schedule-unresolved"> (unresolved)</span>
+                      )}
+                    </td>
+                    <td>{ROLE_LABELS[m.role] ?? m.role}</td>
+                    <td>{formatPerfRecord(m.withTeamRecord)}</td>
+                    <td>{formatRecord(m.withTeamRegularSeasonRecord)}</td>
+                    <td>{formatRecord(m.withTeamPlayoffRecord)}</td>
+                    <td>{formatRecord(m.withTeamChampionshipRecord)}</td>
+                    <td>{formatPerfRecord(m.careerRecord)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {coachPerformance.unresolvedGameReferenceCount > 0 && (
+              <p className="schedule-unresolved">
+                {coachPerformance.unresolvedGameReferenceCount} credited game(s) reference an
+                unresolved opponent.
+              </p>
+            )}
           </>
         )}
       </section>
@@ -497,6 +567,12 @@ function GameResultEditor({
 /** Formats a context record as "W–L–T". */
 function formatRecord(record: ContextRecord): string {
   return `${record.wins}–${record.losses}–${record.ties}`;
+}
+
+/** Formats a coach performance record as "W–L–T (.pct)"; pct omitted when no games. */
+function formatPerfRecord(record: CoachPerformanceRecord): string {
+  const base = `${record.wins}–${record.losses}–${record.ties}`;
+  return record.gamesPlayed === 0 ? base : `${base} (${record.winPercentage.toFixed(3)})`;
 }
 
 function StaffRoleList({
