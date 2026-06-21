@@ -22,10 +22,18 @@ import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
 import CoachDirectoryView from '../components/CoachDirectoryView';
+import MyTeamView from '../components/MyTeamView';
 
 const initialAppData = loadSampleData();
 
-type AppView = 'roster' | 'import' | 'schedule' | 'standings' | 'coach-import' | 'coaches';
+type AppView =
+  | 'roster'
+  | 'my-team'
+  | 'import'
+  | 'schedule'
+  | 'standings'
+  | 'coach-import'
+  | 'coaches';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -47,6 +55,9 @@ export default function App() {
   // transient state (loaded source, review decisions, staged preview, execution/undo).
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
   const [snapshotNotice, setSnapshotNotice] = useState<SnapshotNotice | null>(null);
+  // True once the current workspace has been replaced by an imported snapshot. Used only as a
+  // read-only durability cue in the My Team command center; not persisted anywhere.
+  const [workspaceFromImport, setWorkspaceFromImport] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
@@ -80,6 +91,25 @@ export default function App() {
 
   function handleTeamChange(teamId: string) {
     setSelectedTeamId(teamId);
+  }
+
+  // My Team selection: set the team and sync the season/district/age-division cascade to that
+  // team's slot, so switching to the Roster tab stays consistent. Reuses existing selection
+  // state — no separate My Team data model.
+  function handleSelectMyTeam(teamId: string) {
+    if (teamId === '') {
+      setSelectedTeamId(null);
+      return;
+    }
+    const team = liveTeams.find((t) => t.teamId === teamId);
+    if (!team) {
+      setSelectedTeamId(teamId);
+      return;
+    }
+    setSelectedSeason(team.seasonId);
+    setSelectedDistrict(team.districtId);
+    setSelectedAgeDivision(team.ageDivisionId);
+    setSelectedTeamId(team.teamId);
   }
 
   // --- Slice 25: in-memory games (schedule import execution/undo + result edits) ---
@@ -156,6 +186,7 @@ export default function App() {
         // import-execution / workbench state.
         const restored = restoreWorkspaceFromSnapshot(result.snapshot);
         setWorkspace(restored.workspace);
+        setWorkspaceFromImport(true);
         setInMemoryImport(null);
         setSelectedSeason(restored.selection.seasonId);
         setSelectedDistrict(restored.selection.districtId);
@@ -247,6 +278,14 @@ export default function App() {
         </button>
         <button
           type="button"
+          className={`app-nav-button ${view === 'my-team' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'my-team'}
+          onClick={() => setView('my-team')}
+        >
+          My Team
+        </button>
+        <button
+          type="button"
           className={`app-nav-button ${view === 'import' ? 'app-nav-button-active' : ''}`}
           aria-pressed={view === 'import'}
           onClick={() => setView('import')}
@@ -301,6 +340,20 @@ export default function App() {
         its Undo control are never lost by switching tabs while an execution is active.
       */}
       <div hidden={view !== 'roster'}>{rosterContent}</div>
+      <div hidden={view !== 'my-team'}>
+        <MyTeamView
+          teams={liveTeams}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
+          games={workspace.games}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
+          selectedTeamId={selectedTeamId}
+          onSelectTeam={handleSelectMyTeam}
+          onNavigate={(target) => setView(target)}
+          importedWorkspace={workspaceFromImport}
+        />
+      </div>
       <div hidden={view !== 'import'}>
         <ScrapedImportPreview
           key={workspaceEpoch}

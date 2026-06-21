@@ -829,6 +829,14 @@ toward championship and playoff context; analytics never mutate rosters, games, 
 and are recomputed at runtime from snapshot-preserved source data. The continuous-cohort
 Scout-to-Scout exception remains future work.
 
+**Phase 8 has begun.** Slice 29 adds a read-only **My Team command center**: a new tab that
+consolidates one selected team's identity, roster intelligence, schedule/results, standings
+position, coaching staff, and a deterministic attention-items list (info/warning/blocker) into
+one place. It is derived at runtime by `buildMyTeamSummary`, composing the existing roster,
+schedule, standings, and coach helpers; it does not duplicate authoritative data, add
+persistence, or include editing, and it renders from restored source data after a workspace
+snapshot import. Favorites persistence and opponent profile linking remain future Phase 8 work.
+
 ## Phase 8: My Team panel
 
 Goal: support season-specific favorite team workflows.
