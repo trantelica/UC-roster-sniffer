@@ -596,6 +596,36 @@ Every card is read-only and links to the existing detailed tab rather than dupli
 whole view is derived at runtime by `buildMyTeamSummary`; nothing new is persisted, and it
 renders from restored source data after a workspace snapshot import.
 
+## Multi-year analytics dashboard (Phase 9 slice 30)
+
+A new **Analytics** tab provides a read-only, season-over-season dashboard derived at runtime by
+`buildMultiYearAnalyticsSummary`. It does not duplicate authoritative data and is not persisted.
+
+Layout:
+
+- **Dashboard header** — season range, season count, districts, teams, players, games, final
+  games, and coaches for the current filter scope.
+- **Filters** — season, district, age division, team, and coach selectors, each with an "All"
+  option. Filters live in component state only and are not saved; the team selector narrows to
+  the active season/district/age-division scope. Standings ranks are always computed within the
+  true (season, age-division) group regardless of filters.
+- **Team trends** — per team: roster count, returning/new/unknown movement, retention rate,
+  season-wide y-up/z-down candidate counts, record + differential, standings rank, and coach
+  continuity. Each row can open the team in My Team. Unavailable values (no prior-season team,
+  no final games) render as "—", not fabricated zeros.
+- **District trends** — seasons represented, teams, players, aggregate record, and differential.
+- **Age division trends** — seasons, teams, players, average roster size, and aggregate record.
+- **Coach trends** — seasons active, assignments, career record, playoff/championship splits, and
+  latest assignment; rows can open the Coaches tab.
+- **Attention summary** — aggregated, stable-code review cues with a severity chip
+  (`Info`/`Review`/`Blocker`), an affected-entity count, and a plain-language message (missing
+  prior-team comparisons, roster identity ambiguity, unresolved schedule/coach references, teams
+  without schedule/coach data, sparse seasons).
+
+The whole view is read-only and recomputes from the in-memory workspace — it reflects roster /
+schedule / coach import execution, result edits, and workspace snapshot restore, and shows clean
+empty/unavailable states for older snapshots that lack games or coaches.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

@@ -837,6 +837,17 @@ schedule, standings, and coach helpers; it does not duplicate authoritative data
 persistence, or include editing, and it renders from restored source data after a workspace
 snapshot import. Favorites persistence and opponent profile linking remain future Phase 8 work.
 
+**Phase 9 has begun.** Slice 30 adds a read-only **multi-year analytics dashboard**: a new
+Analytics tab showing season-over-season trends for teams (roster retention, returning/new
+movement, y-up/z-down candidates, record, standings rank, coach continuity), districts, age
+divisions, and coaches (per-season + career overall/playoff/championship records), plus an
+aggregate attention summary (info/warning/blocker). It is derived at runtime by
+`buildMultiYearAnalyticsSummary`, composing the existing roster, schedule, standings, cohort,
+and coach helpers; unavailable values are surfaced (never fabricated). Analytics do not
+duplicate authoritative data, are not persisted into workspace snapshots, and reflect in-memory
+roster/schedule/coach changes and snapshot restore. No charting library was added. District
+branding and visual-language polish remain future Phase 9 work.
+
 ## Phase 8: My Team panel
 
 Goal: support season-specific favorite team workflows.

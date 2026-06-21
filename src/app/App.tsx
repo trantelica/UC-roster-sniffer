@@ -23,6 +23,7 @@ import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
 import CoachDirectoryView from '../components/CoachDirectoryView';
 import MyTeamView from '../components/MyTeamView';
+import AnalyticsView from '../components/AnalyticsView';
 
 const initialAppData = loadSampleData();
 
@@ -33,7 +34,8 @@ type AppView =
   | 'schedule'
   | 'standings'
   | 'coach-import'
-  | 'coaches';
+  | 'coaches'
+  | 'analytics';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -324,6 +326,14 @@ export default function App() {
         >
           Coaches
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'analytics' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'analytics'}
+          onClick={() => setView('analytics')}
+        >
+          Analytics
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -397,6 +407,22 @@ export default function App() {
           coaches={workspace.coaches}
           coachAssignments={workspace.coachAssignments}
           games={workspace.games}
+        />
+      </div>
+      <div hidden={view !== 'analytics'}>
+        <AnalyticsView
+          key={workspaceEpoch}
+          teams={liveTeams}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
+          games={workspace.games}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
+          onOpenTeam={(teamId) => {
+            handleSelectMyTeam(teamId);
+            setView('my-team');
+          }}
+          onOpenCoaches={() => setView('coaches')}
         />
       </div>
     </div>
