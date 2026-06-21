@@ -898,3 +898,82 @@ h1 {
   color: var(--color-bronze-spice);
   font-style: italic;
 }
+
+/* Schedule import preview outcome chips (Phase 6 slice 25) */
+.schedule-outcome {
+  font-size: 0.68rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.schedule-outcome-add {
+  color: #2e7d32;
+}
+
+.schedule-outcome-update {
+  color: var(--color-steel-blue);
+}
+
+.schedule-outcome-skip {
+  color: #888;
+}
+
+.schedule-outcome-error {
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
+.schedule-reason {
+  font-size: 0.78rem;
+  color: #555;
+}
+
+/* In-memory game result editor */
+.game-result-editor {
+  margin-top: 0.75rem;
+  border: 1px solid var(--color-steel-blue);
+  border-radius: 4px;
+  padding: 0.75rem;
+  background-color: var(--color-mint-cream);
+}
+
+.game-result-editor h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-steel-blue);
+}
+
+.game-result-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.game-result-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--color-carbon-black);
+}
+
+.game-result-fields input,
+.game-result-fields select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--color-carbon-black);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  min-width: 6rem;
+}
+
+.game-result-notes input {
+  min-width: 14rem;
+}

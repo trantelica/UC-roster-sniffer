@@ -1,4 +1,5 @@
-import type { Team, District, AgeDivision, Player, Game } from '../domain/types';
+import { useState } from 'react';
+import type { Team, District, AgeDivision, Player, Game, GameStatus } from '../domain/types';
 import { countPlayers, countHeadCoaches, countAssistantCoaches } from '../engine/summaries';
 import { summarizeTeamRosterStatus } from '../engine/teamRosterStatusSummary';
 import { summarizeTeamPriorSeasonComparison } from '../engine/priorSeasonRosterComparisonSummary';
@@ -10,6 +11,10 @@ import {
   summarizeTeamSchedule,
   type TeamScheduleGameView,
 } from '../engine/teamScheduleSummary';
+import type {
+  GameResultPatch,
+  GameResultUpdateResult,
+} from '../engine/gameResultUpdate';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
 
@@ -22,6 +27,11 @@ interface TeamViewProps {
   teams?: Team[];
   /** All games in the workspace; the team's schedule is derived from these. */
   games?: Game[];
+  /**
+   * Optional in-memory result/status update handler (slice 25). When provided, each game
+   * row gets an Edit Result control. Returns the update result (errors are shown inline).
+   */
+  onUpdateGameResult?: (gameId: string, patch: GameResultPatch) => GameResultUpdateResult;
 }
 
 const GAME_STATUS_LABELS: Record<string, string> = {
@@ -31,6 +41,8 @@ const GAME_STATUS_LABELS: Record<string, string> = {
   postponed: 'Postponed',
 };
 
+const EDITABLE_STATUSES: GameStatus[] = ['scheduled', 'final', 'cancelled', 'postponed'];
+
 export default function TeamView({
   team,
   districts,
@@ -38,7 +50,11 @@ export default function TeamView({
   priorPlayers,
   teams = [],
   games = [],
+  onUpdateGameResult,
 }: TeamViewProps) {
+  const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [editErrors, setEditErrors] = useState<string[]>([]);
+  const gamesById = new Map(games.map((g) => [g.gameId, g]));
   const district = districts.find((d) => d.districtId === team.districtId);
   const ageDivision = ageDivisions.find((a) => a.ageDivisionId === team.ageDivisionId);
 
@@ -198,6 +214,7 @@ export default function TeamView({
                   <th>Status</th>
                   <th>Score / Result</th>
                   <th>Location</th>
+                  {onUpdateGameResult && <th>Result (in memory)</th>}
                 </tr>
               </thead>
               <tbody>
@@ -228,10 +245,46 @@ export default function TeamView({
                         : '—'}
                     </td>
                     <td>{game.location ?? '—'}</td>
+                    {onUpdateGameResult && (
+                      <td>
+                        <button
+                          type="button"
+                          className="import-link-button"
+                          onClick={() => {
+                            setEditingGameId(
+                              editingGameId === game.gameId ? null : game.gameId
+                            );
+                            setEditErrors([]);
+                          }}
+                        >
+                          {editingGameId === game.gameId ? 'Close' : 'Edit Result'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
+
+            {onUpdateGameResult && editingGameId && gamesById.has(editingGameId) && (
+              <GameResultEditor
+                game={gamesById.get(editingGameId)!}
+                errors={editErrors}
+                onCancel={() => {
+                  setEditingGameId(null);
+                  setEditErrors([]);
+                }}
+                onSave={(patch) => {
+                  const result = onUpdateGameResult(editingGameId, patch);
+                  if (result.ok) {
+                    setEditingGameId(null);
+                    setEditErrors([]);
+                  } else {
+                    setEditErrors(result.errors.map((e) => e.message));
+                  }
+                }}
+              />
+            )}
           </>
         )}
       </section>
@@ -275,6 +328,95 @@ export default function TeamView({
           <p className="empty-state">No players</p>
         )}
       </section>
+    </div>
+  );
+}
+
+function GameResultEditor({
+  game,
+  errors,
+  onSave,
+  onCancel,
+}: {
+  game: Game;
+  errors: string[];
+  onSave: (patch: GameResultPatch) => void;
+  onCancel: () => void;
+}) {
+  const [status, setStatus] = useState<GameStatus>(game.status);
+  const [homeScore, setHomeScore] = useState<string>(
+    game.homeScore === undefined ? '' : String(game.homeScore)
+  );
+  const [awayScore, setAwayScore] = useState<string>(
+    game.awayScore === undefined ? '' : String(game.awayScore)
+  );
+  const [notes, setNotes] = useState<string>(game.notes ?? '');
+
+  function save() {
+    onSave({
+      status,
+      homeScore: homeScore.trim() === '' ? null : Number(homeScore),
+      awayScore: awayScore.trim() === '' ? null : Number(awayScore),
+      notes: notes.trim() === '' ? null : notes,
+    });
+  }
+
+  return (
+    <div className="game-result-editor">
+      <h4>Edit result — {game.gameId} (in memory only)</h4>
+      <div className="game-result-fields">
+        <label>
+          Status
+          <select value={status} onChange={(e) => setStatus(e.target.value as GameStatus)}>
+            {EDITABLE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {GAME_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Home score
+          <input
+            type="number"
+            value={homeScore}
+            onChange={(e) => setHomeScore(e.target.value)}
+            placeholder="—"
+          />
+        </label>
+        <label>
+          Away score
+          <input
+            type="number"
+            value={awayScore}
+            onChange={(e) => setAwayScore(e.target.value)}
+            placeholder="—"
+          />
+        </label>
+        <label className="game-result-notes">
+          Notes
+          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </label>
+      </div>
+      {errors.length > 0 && (
+        <ul className="import-issues">
+          {errors.map((message, i) => (
+            <li key={i} className="import-issue import-issue-error">
+              {message}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="import-reasons">
+        Final games require both scores. Saved in memory only — export a workspace snapshot to
+        keep it.
+      </p>
+      <button type="button" className="import-decision-button" onClick={save}>
+        Save Result In Memory
+      </button>
+      <button type="button" className="import-link-button" onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   );
 }

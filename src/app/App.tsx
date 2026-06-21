@@ -11,15 +11,18 @@ import {
   type WorkspaceSnapshotSummary,
   type WorkspaceSnapshotValidationError,
 } from '../engine/workspaceSnapshot';
+import { updateGameResult, type GameResultPatch } from '../engine/gameResultUpdate';
+import type { Game } from '../domain/types';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
 import ScrapedImportPreview, {
   type InMemoryImportAppState,
 } from '../components/ScrapedImportPreview';
+import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 
 const initialAppData = loadSampleData();
 
-type AppView = 'roster' | 'import';
+type AppView = 'roster' | 'import' | 'schedule';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -74,6 +77,22 @@ export default function App() {
 
   function handleTeamChange(teamId: string) {
     setSelectedTeamId(teamId);
+  }
+
+  // --- Slice 25: in-memory games (schedule import execution/undo + result edits) ---
+
+  // Replaces the in-memory games array (used by schedule import execute/undo and result
+  // edits). In-memory only — durability comes solely from a workspace snapshot export.
+  function handleApplyGames(games: Game[]) {
+    setWorkspace((current) => ({ ...current, games }));
+  }
+
+  function handleUpdateGameResult(gameId: string, patch: GameResultPatch) {
+    const result = updateGameResult({ games: workspace.games, gameId, patch });
+    if (result.ok) {
+      setWorkspace((current) => ({ ...current, games: result.games }));
+    }
+    return result;
   }
 
   // --- Slice 23: portable workspace snapshot export / import ---------------
@@ -189,6 +208,7 @@ export default function App() {
           priorPlayers={priorTeam?.players ?? null}
           teams={liveTeams}
           games={workspace.games}
+          onUpdateGameResult={handleUpdateGameResult}
         />
       ) : (
         <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
@@ -216,6 +236,14 @@ export default function App() {
         >
           Import preview (read-only)
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'schedule' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'schedule'}
+          onClick={() => setView('schedule')}
+        >
+          Schedule import
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -237,6 +265,14 @@ export default function App() {
           key={workspaceEpoch}
           baselineTeams={workspace.teams}
           onInMemoryImportChange={setInMemoryImport}
+        />
+      </div>
+      <div hidden={view !== 'schedule'}>
+        <ScheduleImportWorkbench
+          key={workspaceEpoch}
+          teams={liveTeams}
+          games={workspace.games}
+          onApplyGames={handleApplyGames}
         />
       </div>
     </div>

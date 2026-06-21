@@ -1096,6 +1096,33 @@ Championship appearance and win derive from championship-flagged games.
   > import workflow; it was intentionally left unchanged. The slice-24 in-app game model is
   > game-centric (home/away) and distinct from it.
 
+- **Slice 25 (done): schedule import preview/execution/undo + in-memory result updates.**
+  Makes schedule/results a working local feature (separate from roster import). Four pure
+  engine modules: `scheduleImportAdapter.ts` maps the preserved team-centric
+  `schedule-import.sample.json` rows (`teamId` / `opponentTeamId` / `homeAway` /
+  team-relative scores; `neutral` → listed team is home by convention) into the slice-24
+  `Game` model, resolving home/away through EXISTING `Team.teamId` references (no opponent
+  object) and rejecting rows with stable codes (`invalid-row-shape`, `unresolved-home-team`
+  / `unresolved-away-team`, `invalid-final-scores`, `invalid-status`, …);
+  `scheduleImportPreview.ts` classifies every row as add / update / skip / error, matching
+  existing games by `gameId` then by the natural key (seasonId + scheduledDate + homeTeamId
+  + awayTeamId), blocking ambiguous or duplicate matches and never silently overwriting;
+  `scheduleImportExecution.ts` executes an executable preview into a new games array
+  (adds appended, updates in place keeping the existing gameId, skips/errors not applied)
+  and undoes it (removing added games, restoring updated games to captured prior state),
+  with `durable:false` / `persisted:false` audits and caller-supplied
+  `transactionId`/`executedAt`/`undoneAt`; `gameResultUpdate.ts` applies a validated
+  status/score/notes patch to one game (final requires numeric scores). A new **Schedule
+  import** tab (`ScheduleImportWorkbench.tsx`) previews, executes, and undoes in memory;
+  `TeamView` gained an in-memory **Edit Result** control per game; `App` wires both into
+  `workspace.games`. Imported games and result edits travel with the workspace snapshot
+  (already game-aware since slice 24); a snapshot restore remounts both workbenches,
+  clearing transient schedule-import execution/undo state. Everything is in-memory only —
+  durability comes only from a workspace snapshot export. No backend, auth, cloud DB,
+  `localStorage`, `IndexedDB`, auto-save, sync, external schedule service, roster mutation,
+  or opponent object model was added. See `docs/import-workflow.md` ("Schedule import
+  workflow (Phase 6 slice 25)"), `docs/data-model.md`, and `docs/ui-workflow.md`.
+
 ## Phase 7: Coach analytics
 
 ### Goal

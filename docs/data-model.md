@@ -1526,8 +1526,33 @@ Rules:
 - `AppData` gains `games: Game[]`. Sample games live in `data-samples/games.sample.json`
   (game-centric); the older `data-samples/schedule-import.sample.json` is a separate,
   preserved team-centric import-row contract and is unchanged.
-- Prior seasons remain locked from mutation; historical schedules/results may still be
-  displayed. Schedule editing/import remains future work.
+- Prior seasons remain locked from roster/import mutation; historical schedules/results may
+  still be displayed.
+
+### Schedule import + in-memory result updates (Phase 6 slice 25)
+
+Slice 25 makes schedule/results editable in memory (separate from roster import):
+
+- **Schedule import adapter** (`src/engine/scheduleImportAdapter.ts`) maps the preserved
+  team-centric `schedule-import.sample.json` rows (`teamId` / `opponentTeamId` / `homeAway`
+  / team-relative scores) into `Game` records, resolving home/away through existing
+  `Team.teamId` references only (`neutral` → listed team is home by convention). Row errors
+  use stable codes (`invalid-row-shape`, `missing-season`, `invalid-home-away`,
+  `unresolved-home-team` / `unresolved-away-team`, `invalid-status`, `invalid-scores`,
+  `invalid-final-scores`).
+- **Preview** (`src/engine/scheduleImportPreview.ts`) classifies rows add / update / skip /
+  error. Update matching prefers `gameId`, else the deterministic natural key
+  (`seasonId + scheduledDate + homeTeamId + awayTeamId`) when it matches exactly one
+  existing game; ambiguous or duplicate matches block execution (never silent overwrite).
+- **Execution / undo** (`src/engine/scheduleImportExecution.ts`) apply an executable preview
+  into a new games array and reverse it; in-memory only (`durable:false` / `persisted:false`).
+- **Result update** (`src/engine/gameResultUpdate.ts`) applies a validated status/score/notes
+  patch to one game (final requires numeric scores). Result/status editing only — not full
+  schedule construction.
+
+All of this is in-memory only and never mutates rosters; imported games and result edits are
+preserved through workspace snapshot export/import (games are snapshot-aware since slice 24).
+No browser/cloud/database persistence exists.
 
 ## Portable Workspace Snapshot (Phase 5 slice 23)
 
