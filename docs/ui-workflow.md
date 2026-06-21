@@ -563,6 +563,39 @@ state. All performance views are read-only — there is no coach editing. Record
 from final games only; scheduled/postponed/cancelled games do not count, and championship
 games count toward both championship and playoff context.
 
+## My Team command center (Phase 8 slice 29)
+
+A new **My Team** tab consolidates one selected team's intelligence into a read-only command
+center, so a user can see roster movement, schedule/results, standings position, coaching staff,
+and attention items without hunting across tabs. A team picker (grouped by season) selects the
+team; if a team is already selected elsewhere it is reused, and choosing a team here syncs the
+season/district/age-division selection so the Roster tab stays consistent.
+
+Cards:
+
+- **Header** — team name, season, district, age division, classification/team code, mascot, and
+  a record summary (overall W–L–T, win%, differential, standings position).
+- **Roster Intelligence** — total players, duplicate-name groups, and (when a prior-season
+  same-slot team exists) returning / new / not-returning / unknown / identity-review counts; a
+  clean unavailable state otherwise.
+- **Schedule & Results** — overall / regular / playoff / championship records, PF/PA/DIFF,
+  upcoming/cancelled counts, next game, and last result; empty state when no schedule is loaded.
+- **Standings** — rank, total teams, win%, and differential, or a provisional note when the
+  season/age-division group has no final games.
+- **Coaching Staff** — head coach, assistants, the staff record with this team, and
+  returning/new/departed continuity; empty state when no coach data exists.
+- **Attention Items** — a deterministic list of review cues, each with a severity chip
+  (`Info` / `Review` / `Blocker`) and a plain-language message (e.g. no prior team, roster
+  duplicates, ambiguous movement, low-confidence identity, unresolved schedule/coach references,
+  no schedule, no final games, provisional standings, no coach data, imported-workspace).
+- **Workspace** — a reminder that the view is recomputed from the in-memory workspace and that
+  workspace snapshot export/import is the durability path (no auto-save / browser / cloud
+  storage).
+
+Every card is read-only and links to the existing detailed tab rather than duplicating it. The
+whole view is derived at runtime by `buildMyTeamSummary`; nothing new is persisted, and it
+renders from restored source data after a workspace snapshot import.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

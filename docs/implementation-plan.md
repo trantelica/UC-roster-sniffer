@@ -1230,6 +1230,25 @@ Panel shows the selected My Team schedule.
 Opponent links navigate to opponent team profiles.
 ```
 
+- **Slice 29 (done): My Team command center.** Phase 8 begins. Adds a read-only **My Team**
+  tab that consolidates one selected team's intelligence in one place: team identity, roster
+  intelligence (returning / new / not-returning / unknown / identity-review + duplicate-name
+  groups), schedule & results (overall / regular / playoff / championship records, PF/PA/DIFF,
+  next game, last result), standings position (rank / total teams / win% / differential),
+  coaching staff (head/assistants, continuity, staff record with this team), and a deterministic
+  **attention-items** list (stable codes + `info`/`warning`/`blocker` severity + plain-language
+  messages). The pure engine `myTeamSummary.ts` (`buildMyTeamSummary`) composes the existing
+  helpers (`teamScheduleSummary`, `standingsSummary`, `priorSeasonRosterComparisonSummary`,
+  `currentRosterPlayerStatus`, `playerDuplicateDetection`, `coachHistorySummary`,
+  `coachPerformanceSummary`, `findPriorSeasonTeam`) — it does **not** duplicate or fork any
+  authoritative data and is recomputed at runtime. It is read-only (no editing); cards link to
+  the existing detailed tabs. Selecting a team in My Team syncs the existing season/district/age
+  selection so the Roster tab stays consistent. Snapshot behavior is unchanged — My Team renders
+  from restored source data; older snapshots still import. No backend, auth, cloud DB,
+  `localStorage`, `IndexedDB`, auto-save, sync, durable persistence, roster/game/coach-assignment
+  mutation, opponent object model, or destructive identity merge was added. See
+  `docs/ui-workflow.md`.
+
 ## Phase 9: Multi-year analytics and visual polish
 
 ### Goal
