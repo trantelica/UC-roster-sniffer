@@ -1571,6 +1571,39 @@ All of this is in-memory only and never mutates rosters; imported games and resu
 preserved through workspace snapshot export/import (games are snapshot-aware since slice 24).
 No browser/cloud/database persistence exists.
 
+## Coach / staff model (Phase 7 slice 27)
+
+Phase 7 begins coach/staff intelligence. Coaches are tracked **separately from player
+rosters** and never mutate rosters, games, or schedules. The roster-embedded `Coach`
+(`{ name }`) stays as-is on `Team`; these are the normalized, season-spanning records added
+to `AppData` (`coaches`, `coachAssignments`):
+
+```text
+StaffCoach: { coachId, displayName, identityKey, sourceName?, notes? }
+TeamCoachAssignment: { assignmentId, seasonId, teamId, coachId,
+                       role: "headCoach" | "assistantCoach" | "unknown",
+                       sourceLabel?, sourceRowId?, notes? }
+```
+
+- **Coach identity is name-based and deterministic** (`coachModel.ts` reuses the existing
+  exact-identity name normalization; `coachId = "coach:" + identityKey`). The same name maps
+  to one coach across seasons/teams. Ambiguity (two distinct coachIds sharing one identity
+  key) is **surfaced for review, never silently merged**.
+- The sample coach model is derived from the roster-embedded coach fields
+  (`deriveCoachesAndAssignmentsFromTeams`), so e.g. a head coach who returns the next season
+  is one coach with two assignments. Raw names are preserved as `sourceName`.
+- Pure helpers (`coachHistorySummary.ts`): `summarizeTeamCoachStaff` (by role + prior-season
+  returning/new/departed continuity), `summarizeCoachHistory` (assignments across
+  seasons/teams), `buildCoachDirectory`, and `validateCoachAssignments` (unresolved
+  coach/team references reported, never invented).
+- Coach import (`coachImportAdapter` / `coachImportPreview` / `coachImportExecution`) maps a
+  row-per-assignment contract (`importType: "coach"`; `coachName` + `teamId` + `role`),
+  resolving teams by `teamId`. It is in-memory only with explicit execute/undo.
+- Workspace snapshots carry `coaches` / `coachAssignments` (optional for backward
+  compatibility; assignments must reference existing coaches + teams or restore is rejected).
+  Coach data is preserved only through workspace snapshot export/import; no
+  browser/cloud/database persistence exists.
+
 ## Portable Workspace Snapshot (Phase 5 slice 23)
 
 The portable workspace snapshot (`src/engine/workspaceSnapshot.ts`) is a versioned,

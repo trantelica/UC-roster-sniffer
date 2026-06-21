@@ -814,6 +814,15 @@ Acceptance criteria:
 - continuous-cohort record continues only when district and expected age progression continue
 - Scout-to-Scout exception is handled
 
+Status: **Phase 7 has begun.** Slice 27 adds a normalized coach/staff model (coaches +
+season/team assignments, tracked separately from rosters and never mutating
+rosters/games/schedules), deterministic name-based coach identity (ambiguity surfaced, not
+merged), team staff history with returning/new/departed continuity, a coach directory, a
+coach import workflow (preview → in-memory execute → undo), and workspace-snapshot support
+for coaches/assignments. Everything is in-memory only and preserved solely through workspace
+snapshot export/import. Coach lifetime / continuous-cohort game-record analytics and the
+Scout-to-Scout exception remain future work.
+
 ## Phase 8: My Team panel
 
 Goal: support season-specific favorite team workflows.

@@ -1,13 +1,17 @@
 import type {
   AgeDivision,
   Coach,
+  CoachRole,
   District,
   Game,
   GameStatus,
   Player,
+  StaffCoach,
   Team,
+  TeamCoachAssignment,
 } from '../domain/types';
 import { validateScheduleReferences } from './teamScheduleSummary';
+import { validateCoachAssignments } from './coachHistorySummary';
 
 /**
  * Phase 5 slice 23: PURE, deterministic PORTABLE WORKSPACE SNAPSHOT — ENGINE ONLY.
@@ -52,6 +56,8 @@ export type WorkspaceSnapshotSummary = {
   teamCount: number;
   playerCount: number;
   gameCount: number;
+  coachCount: number;
+  coachAssignmentCount: number;
 };
 
 export type WorkspaceData = {
@@ -63,6 +69,12 @@ export type WorkspaceData = {
    * with slice-23 snapshots that predate games; treated as an empty list when absent.
    */
   games: Game[];
+  /**
+   * Phase 7 slice 27: coach/staff model. Optional on input for backward compatibility with
+   * snapshots that predate coaches; treated as empty lists when absent.
+   */
+  coaches: StaffCoach[];
+  coachAssignments: TeamCoachAssignment[];
 };
 
 export type WorkspaceState = WorkspaceData & {
@@ -153,6 +165,31 @@ function copyGame(game: Game): Game {
   return copy;
 }
 
+function copyStaffCoach(coach: StaffCoach): StaffCoach {
+  const copy: StaffCoach = {
+    coachId: coach.coachId,
+    displayName: coach.displayName,
+    identityKey: coach.identityKey,
+  };
+  if (coach.sourceName !== undefined) copy.sourceName = coach.sourceName;
+  if (coach.notes !== undefined) copy.notes = coach.notes;
+  return copy;
+}
+
+function copyCoachAssignment(a: TeamCoachAssignment): TeamCoachAssignment {
+  const copy: TeamCoachAssignment = {
+    assignmentId: a.assignmentId,
+    seasonId: a.seasonId,
+    teamId: a.teamId,
+    coachId: a.coachId,
+    role: a.role,
+  };
+  if (a.sourceLabel !== undefined) copy.sourceLabel = a.sourceLabel;
+  if (a.sourceRowId !== undefined) copy.sourceRowId = a.sourceRowId;
+  if (a.notes !== undefined) copy.notes = a.notes;
+  return copy;
+}
+
 function distinctSeasonIds(teams: Team[]): string[] {
   const seen = new Set<string>();
   for (const team of teams) seen.add(team.seasonId);
@@ -176,6 +213,8 @@ function summarize(
     teamCount: workspace.teams.length,
     playerCount: countPlayers(workspace.teams),
     gameCount: workspace.games.length,
+    coachCount: workspace.coaches.length,
+    coachAssignmentCount: workspace.coachAssignments.length,
   };
 }
 
@@ -203,6 +242,8 @@ export function buildWorkspaceSnapshot(
     ageDivisions: workspace.ageDivisions.map(copyAgeDivision),
     teams: workspace.teams.map(copyTeam),
     games: (workspace.games ?? []).map(copyGame),
+    coaches: (workspace.coaches ?? []).map(copyStaffCoach),
+    coachAssignments: (workspace.coachAssignments ?? []).map(copyCoachAssignment),
   };
   return {
     appName: WORKSPACE_SNAPSHOT_APP,
@@ -233,6 +274,9 @@ export type WorkspaceSnapshotValidationErrorCode =
   | 'invalid-teams'
   | 'invalid-games'
   | 'unresolved-game-reference'
+  | 'invalid-coaches'
+  | 'invalid-coach-assignments'
+  | 'unresolved-coach-reference'
   | 'empty-workspace';
 
 export type WorkspaceSnapshotValidationError = {
@@ -404,6 +448,60 @@ function validGame(value: unknown): Game | null {
   return game;
 }
 
+const COACH_ROLES: CoachRole[] = ['headCoach', 'assistantCoach', 'unknown'];
+
+function validStaffCoach(value: unknown): StaffCoach | null {
+  if (!isObject(value)) return null;
+  if (
+    !isNonEmptyString(value.coachId) ||
+    typeof value.displayName !== 'string' ||
+    !isNonEmptyString(value.identityKey)
+  ) {
+    return null;
+  }
+  const coach: StaffCoach = {
+    coachId: value.coachId,
+    displayName: value.displayName,
+    identityKey: value.identityKey,
+  };
+  if (value.sourceName !== undefined) {
+    if (typeof value.sourceName !== 'string') return null;
+    coach.sourceName = value.sourceName;
+  }
+  if (value.notes !== undefined) {
+    if (typeof value.notes !== 'string') return null;
+    coach.notes = value.notes;
+  }
+  return coach;
+}
+
+function validCoachAssignment(value: unknown): TeamCoachAssignment | null {
+  if (!isObject(value)) return null;
+  if (
+    !isNonEmptyString(value.assignmentId) ||
+    !isNonEmptyString(value.seasonId) ||
+    !isNonEmptyString(value.teamId) ||
+    !isNonEmptyString(value.coachId)
+  ) {
+    return null;
+  }
+  if (!COACH_ROLES.includes(value.role as CoachRole)) return null;
+  const assignment: TeamCoachAssignment = {
+    assignmentId: value.assignmentId,
+    seasonId: value.seasonId,
+    teamId: value.teamId,
+    coachId: value.coachId,
+    role: value.role as CoachRole,
+  };
+  for (const field of ['sourceLabel', 'sourceRowId', 'notes'] as const) {
+    if (value[field] !== undefined) {
+      if (typeof value[field] !== 'string') return null;
+      assignment[field] = value[field] as string;
+    }
+  }
+  return assignment;
+}
+
 function validSelection(value: unknown): WorkspaceSnapshotSelection {
   const s = isObject(value) ? value : {};
   const pick = (v: unknown) => (typeof v === 'string' ? v : null);
@@ -549,9 +647,73 @@ export function validateWorkspaceSnapshot(
     }
   }
 
+  // Coaches/assignments are optional (older snapshots predate them). When present they must
+  // be valid arrays, and every assignment must reference an existing coach + team.
+  const coaches: StaffCoach[] = [];
+  if (ws.coaches !== undefined && ws.coaches !== null) {
+    if (!Array.isArray(ws.coaches)) {
+      return {
+        ok: false,
+        errors: [err('invalid-coaches', 'workspace.coaches must be an array when present.')],
+      };
+    }
+    for (const raw of ws.coaches as unknown[]) {
+      const coach = validStaffCoach(raw);
+      if (!coach) {
+        return {
+          ok: false,
+          errors: [err('invalid-coaches', 'A coach entry is structurally invalid.')],
+        };
+      }
+      coaches.push(coach);
+    }
+  }
+  const coachAssignments: TeamCoachAssignment[] = [];
+  if (ws.coachAssignments !== undefined && ws.coachAssignments !== null) {
+    if (!Array.isArray(ws.coachAssignments)) {
+      return {
+        ok: false,
+        errors: [
+          err('invalid-coach-assignments', 'workspace.coachAssignments must be an array when present.'),
+        ],
+      };
+    }
+    for (const raw of ws.coachAssignments as unknown[]) {
+      const assignment = validCoachAssignment(raw);
+      if (!assignment) {
+        return {
+          ok: false,
+          errors: [
+            err('invalid-coach-assignments', 'A coach assignment entry is structurally invalid.'),
+          ],
+        };
+      }
+      coachAssignments.push(assignment);
+    }
+    const unresolved = validateCoachAssignments(coachAssignments, coaches, teams);
+    if (unresolved.length > 0) {
+      const first = unresolved[0];
+      const missing = [
+        first.missingCoachId ? 'coach' : null,
+        first.missingTeamId ? 'team' : null,
+      ]
+        .filter(Boolean)
+        .join(' and ');
+      return {
+        ok: false,
+        errors: [
+          err(
+            'unresolved-coach-reference',
+            `Assignment ${first.assignmentId} references a ${missing} not in the snapshot. Coaches and teams must exist.`
+          ),
+        ],
+      };
+    }
+  }
+
   const generatedAt =
     typeof value.generatedAt === 'string' ? value.generatedAt : '';
-  const workspace: WorkspaceData = { districts, ageDivisions, teams, games };
+  const workspace: WorkspaceData = { districts, ageDivisions, teams, games, coaches, coachAssignments };
   const snapshot: WorkspaceSnapshot = {
     appName: typeof value.appName === 'string' ? value.appName : WORKSPACE_SNAPSHOT_APP,
     snapshotKind: WORKSPACE_SNAPSHOT_KIND,
@@ -610,6 +772,8 @@ export function restoreWorkspaceFromSnapshot(
     ageDivisions: snapshot.workspace.ageDivisions.map(copyAgeDivision),
     teams: snapshot.workspace.teams.map(copyTeam),
     games: (snapshot.workspace.games ?? []).map(copyGame),
+    coaches: (snapshot.workspace.coaches ?? []).map(copyStaffCoach),
+    coachAssignments: (snapshot.workspace.coachAssignments ?? []).map(copyCoachAssignment),
   };
 
   const selection = resolveSelection(workspace.teams, snapshot.selection);

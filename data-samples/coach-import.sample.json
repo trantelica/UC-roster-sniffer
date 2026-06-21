@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1",
+  "importType": "coach",
+  "seasonId": "2026",
+  "assignments": [
+    {
+      "coachName": "Pat Rivera",
+      "teamId": "2026-brighton-GR-B1",
+      "role": "assistantCoach",
+      "sourceLabel": "Asst Coach"
+    },
+    {
+      "coachName": "Jane Smith",
+      "teamId": "2026-alta-GR-B1",
+      "role": "headCoach",
+      "sourceLabel": "Head Coach"
+    }
+  ]
+}

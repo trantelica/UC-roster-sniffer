@@ -961,6 +961,23 @@ h1 {
   color: #666;
 }
 
+/* Coaching staff list (Phase 7 slice 27) */
+.staff-role {
+  font-size: 0.88rem;
+  margin: 0.25rem 0;
+  color: var(--color-carbon-black);
+}
+
+.staff-role-label {
+  font-weight: bold;
+  color: var(--color-steel-blue);
+}
+
+.schedule-outcome-review {
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+}
+
 /* In-memory game result editor */
 .game-result-editor {
   margin-top: 0.75rem;

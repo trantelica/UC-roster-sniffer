@@ -3,6 +3,7 @@ import rosterImport2026 from '../../data-samples/roster-import.sample.json';
 import rosterImport2025 from '../../data-samples/roster-import-2025.sample.json';
 import gamesSample from '../../data-samples/games.sample.json';
 import type { AppData, Game, Team, Coach } from '../domain/types';
+import { deriveCoachesAndAssignmentsFromTeams } from '../engine/coachModel';
 
 function toCoach(raw: { name: string }): Coach {
   return { name: raw.name };
@@ -59,10 +60,17 @@ export function loadSampleData(): AppData {
   // Games reference existing teams as home/away participants (no opponent objects).
   const games = (gamesSample.games as Game[]).map((g) => ({ ...g }));
 
+  // Phase 7 slice 27: derive a normalized coach/staff model from the roster-embedded coach
+  // fields. Coaches are deduped by identity key across seasons/teams (e.g. a head coach who
+  // returns the next year is one coach with two assignments). This never mutates rosters.
+  const { coaches, coachAssignments } = deriveCoachesAndAssignmentsFromTeams(teams);
+
   return {
     districts: districtConfig.districts,
     ageDivisions: districtConfig.ageDivisions,
     teams,
     games,
+    coaches,
+    coachAssignments,
   };
 }
