@@ -16,6 +16,8 @@ import type {
   GameResultPatch,
   GameResultUpdateResult,
 } from '../engine/gameResultUpdate';
+import { summarizeTeamCoachStaff } from '../engine/coachHistorySummary';
+import type { StaffCoach, TeamCoachAssignment } from '../domain/types';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
 
@@ -28,6 +30,11 @@ interface TeamViewProps {
   teams?: Team[];
   /** All games in the workspace; the team's schedule is derived from these. */
   games?: Game[];
+  /** Normalized coach model (slice 27). */
+  coaches?: StaffCoach[];
+  coachAssignments?: TeamCoachAssignment[];
+  /** Prior same-slot teamId, for coach continuity (slice 27). */
+  priorSeasonTeamId?: string | null;
   /**
    * Optional in-memory result/status update handler (slice 25). When provided, each game
    * row gets an Edit Result control. Returns the update result (errors are shown inline).
@@ -51,11 +58,21 @@ export default function TeamView({
   priorPlayers,
   teams = [],
   games = [],
+  coaches = [],
+  coachAssignments = [],
+  priorSeasonTeamId = null,
   onUpdateGameResult,
 }: TeamViewProps) {
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [editErrors, setEditErrors] = useState<string[]>([]);
   const gamesById = new Map(games.map((g) => [g.gameId, g]));
+  const staff = summarizeTeamCoachStaff({
+    teamId: team.teamId,
+    seasonId: team.seasonId,
+    coaches,
+    coachAssignments,
+    priorSeasonTeamId,
+  });
   const district = districts.find((d) => d.districtId === team.districtId);
   const ageDivision = ageDivisions.find((a) => a.ageDivisionId === team.ageDivisionId);
 
@@ -312,6 +329,40 @@ export default function TeamView({
       </section>
 
       <section className="team-section">
+        <h3>Coaching Staff &amp; History</h3>
+        {staff.totalAssignedCoaches === 0 ? (
+          <p className="empty-state">No coach/staff data loaded for this team.</p>
+        ) : (
+          <>
+            {staff.continuity.available && (
+              <div className="roster-status-summary">
+                <span className="roster-status-count">
+                  <strong>{staff.continuity.returningCoaches}</strong> Returning
+                </span>
+                <span className="roster-status-count">
+                  <strong>{staff.continuity.newToTeamCoaches}</strong> New to team
+                </span>
+                <span className="roster-status-count">
+                  <strong>{staff.continuity.departedCoaches}</strong> Departed
+                </span>
+              </div>
+            )}
+            <StaffRoleList label="Head coach" members={staff.headCoaches} />
+            <StaffRoleList label="Assistant coaches" members={staff.assistantCoaches} />
+            {staff.unknownRoleCoaches.length > 0 && (
+              <StaffRoleList label="Unknown role" members={staff.unknownRoleCoaches} />
+            )}
+            {staff.unresolvedCoachReferences > 0 && (
+              <p className="schedule-unresolved">
+                {staff.unresolvedCoachReferences} assignment(s) reference a coach not in the
+                workspace.
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="team-section">
         <h3>Head Coach</h3>
         {team.headCoach ? (
           <CoachCard coach={team.headCoach} role="headCoach" />
@@ -446,6 +497,34 @@ function GameResultEditor({
 /** Formats a context record as "W–L–T". */
 function formatRecord(record: ContextRecord): string {
   return `${record.wins}–${record.losses}–${record.ties}`;
+}
+
+function StaffRoleList({
+  label,
+  members,
+}: {
+  label: string;
+  members: ReturnType<typeof summarizeTeamCoachStaff>['headCoaches'];
+}) {
+  return (
+    <div className="staff-role">
+      <span className="staff-role-label">{label}:</span>{' '}
+      {members.length === 0 ? (
+        <span className="empty-state">none</span>
+      ) : (
+        members.map((m, i) => (
+          <span key={m.assignmentId} className="staff-coach-name">
+            {i > 0 && ', '}
+            {m.displayName}
+            {m.sourceLabel && m.role === 'unknown' ? ` (${m.sourceLabel})` : ''}
+            {m.unresolvedCoach && (
+              <span className="schedule-unresolved"> (unresolved)</span>
+            )}
+          </span>
+        ))
+      )}
+    </div>
+  );
 }
 
 /** One-line summary of a game from the selected team's perspective. */

@@ -12,7 +12,7 @@ import {
   type WorkspaceSnapshotValidationError,
 } from '../engine/workspaceSnapshot';
 import { updateGameResult, type GameResultPatch } from '../engine/gameResultUpdate';
-import type { Game } from '../domain/types';
+import type { Game, StaffCoach, TeamCoachAssignment } from '../domain/types';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
 import ScrapedImportPreview, {
@@ -20,10 +20,12 @@ import ScrapedImportPreview, {
 } from '../components/ScrapedImportPreview';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
+import CoachImportWorkbench from '../components/CoachImportWorkbench';
+import CoachDirectoryView from '../components/CoachDirectoryView';
 
 const initialAppData = loadSampleData();
 
-type AppView = 'roster' | 'import' | 'schedule' | 'standings';
+type AppView = 'roster' | 'import' | 'schedule' | 'standings' | 'coach-import' | 'coaches';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -96,6 +98,14 @@ export default function App() {
     return result;
   }
 
+  // --- Slice 27: in-memory coach data (coach import execute/undo) -----------
+  function handleApplyCoachData(
+    coaches: StaffCoach[],
+    coachAssignments: TeamCoachAssignment[]
+  ) {
+    setWorkspace((current) => ({ ...current, coaches, coachAssignments }));
+  }
+
   // --- Slice 23: portable workspace snapshot export / import ---------------
 
   function handleExportSnapshot() {
@@ -107,6 +117,9 @@ export default function App() {
         teams: liveTeams,
         // Schedules/results travel with the workspace snapshot (slice 24).
         games: workspace.games,
+        // Coaches/assignments travel with the workspace snapshot (slice 27).
+        coaches: workspace.coaches,
+        coachAssignments: workspace.coachAssignments,
         selection: {
           seasonId: selectedSeason,
           districtId: selectedDistrict,
@@ -209,6 +222,9 @@ export default function App() {
           priorPlayers={priorTeam?.players ?? null}
           teams={liveTeams}
           games={workspace.games}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
+          priorSeasonTeamId={priorTeam?.teamId ?? null}
           onUpdateGameResult={handleUpdateGameResult}
         />
       ) : (
@@ -253,6 +269,22 @@ export default function App() {
         >
           Standings
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'coach-import' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'coach-import'}
+          onClick={() => setView('coach-import')}
+        >
+          Coach import
+        </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'coaches' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'coaches'}
+          onClick={() => setView('coaches')}
+        >
+          Coaches
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -292,6 +324,25 @@ export default function App() {
           districts={workspace.districts}
           ageDivisions={workspace.ageDivisions}
           defaultSeasonId={selectedSeason}
+        />
+      </div>
+      <div hidden={view !== 'coach-import'}>
+        <CoachImportWorkbench
+          key={workspaceEpoch}
+          teams={liveTeams}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
+          onApplyCoachData={handleApplyCoachData}
+        />
+      </div>
+      <div hidden={view !== 'coaches'}>
+        <CoachDirectoryView
+          key={workspaceEpoch}
+          teams={liveTeams}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { AgeDivision, District, Game, Team } from '../domain/types';
+import type { AgeDivision, District, Game, StaffCoach, Team, TeamCoachAssignment } from '../domain/types';
 import {
   buildWorkspaceSnapshot,
   parseWorkspaceSnapshotJson,
@@ -67,6 +67,8 @@ function workspaceState(): WorkspaceState {
       team('2026-alta-GR-B1', '2026', ['Jordan Smith', 'Brand New', 'Cary, Hudson']),
     ],
     games: [],
+    coaches: [],
+    coachAssignments: [],
     selection: {
       seasonId: '2026',
       districtId: 'alta',
@@ -181,6 +183,8 @@ describe('workspace snapshot builder', () => {
       teamCount: 2,
       playerCount: 5,
       gameCount: 0,
+      coachCount: 0,
+      coachAssignmentCount: 0,
     });
   });
 
@@ -610,5 +614,79 @@ describe('workspace snapshot game context (slice 26)', () => {
     expect(game.isPlayoff).toBeUndefined();
     expect(game.isChampionship).toBeUndefined();
     expect(game.isNeutralSite).toBeUndefined();
+  });
+});
+
+describe('workspace snapshot coaches/staff (slice 27)', () => {
+  const COACH: StaffCoach = {
+    coachId: 'coach:jane smith', displayName: 'Jane Smith', identityKey: 'jane smith', sourceName: 'Jane Smith',
+  };
+  const ASSIGNMENT: TeamCoachAssignment = {
+    assignmentId: '2026:2026-alta-GR-B1:coach:jane smith',
+    seasonId: '2026', teamId: '2026-alta-GR-B1', coachId: 'coach:jane smith', role: 'headCoach', sourceLabel: 'Head Coach',
+  };
+
+  function workspaceWithCoaches(): WorkspaceState {
+    return { ...workspaceState(), coaches: [COACH], coachAssignments: [ASSIGNMENT] };
+  }
+
+  it('exported snapshot includes coaches/coachAssignments with counts', () => {
+    const snapshot = buildWorkspaceSnapshot({ workspace: workspaceWithCoaches(), generatedAt: GENERATED_AT });
+    expect(snapshot.workspace.coaches.map((c) => c.displayName)).toEqual(['Jane Smith']);
+    expect(snapshot.workspace.coachAssignments).toHaveLength(1);
+    expect(snapshot.summary.coachCount).toBe(1);
+    expect(snapshot.summary.coachAssignmentCount).toBe(1);
+  });
+
+  it('valid coach data restores exactly', () => {
+    const json = JSON.stringify(buildWorkspaceSnapshot({ workspace: workspaceWithCoaches(), generatedAt: GENERATED_AT }));
+    const parsed = parseWorkspaceSnapshotJson(json);
+    if (!parsed.ok) throw new Error('expected ok');
+    const restored = restoreWorkspaceFromSnapshot(parsed.snapshot);
+    expect(restored.workspace.coaches[0]).toEqual(COACH);
+    expect(restored.workspace.coachAssignments[0]).toEqual(ASSIGNMENT);
+  });
+
+  it('an older snapshot without coach fields restores with empty coach arrays', () => {
+    const raw = JSON.parse(JSON.stringify(buildWorkspaceSnapshot({ workspace: workspaceState(), generatedAt: GENERATED_AT })));
+    delete raw.workspace.coaches;
+    delete raw.workspace.coachAssignments;
+    const result = validateWorkspaceSnapshot(raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.workspace.coaches).toEqual([]);
+    expect(result.snapshot.workspace.coachAssignments).toEqual([]);
+  });
+
+  it('rejects a structurally invalid coach', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION, snapshotKind: 'workspace',
+      workspace: {
+        districts: [], ageDivisions: [],
+        teams: [{ teamId: '2026-alta-GR-B1', seasonId: '2026', districtId: 'alta', ageDivisionId: 'GR', teamCode: 'B1', draftOrder: 1, divisionTeamCount: 1, headCoach: null, assistantCoaches: [], players: [] }],
+        coaches: [{ coachId: '', displayName: 'x', identityKey: 'x' }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('invalid-coaches');
+  });
+
+  it('rejects an assignment referencing an unknown coach or team', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION, snapshotKind: 'workspace',
+      workspace: {
+        districts: [], ageDivisions: [],
+        teams: [{ teamId: '2026-alta-GR-B1', seasonId: '2026', districtId: 'alta', ageDivisionId: 'GR', teamCode: 'B1', draftOrder: 1, divisionTeamCount: 1, headCoach: null, assistantCoaches: [], players: [] }],
+        coaches: [],
+        coachAssignments: [{ assignmentId: 'a1', seasonId: '2026', teamId: '2026-alta-GR-B1', coachId: 'coach:ghost', role: 'headCoach' }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('unresolved-coach-reference');
+  });
+
+  it('restore replaces coach data rather than merging', () => {
+    const restored = restoreWorkspaceFromSnapshot(buildWorkspaceSnapshot({ workspace: workspaceWithCoaches(), generatedAt: GENERATED_AT }));
+    expect(restored.workspace.coaches.map((c) => c.coachId)).toEqual(['coach:jane smith']);
   });
 });

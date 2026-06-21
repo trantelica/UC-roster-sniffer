@@ -523,6 +523,26 @@ points for, and name. Empty states cover no teams and "No final games available 
 standings"; unresolved final references are noted. Schedule imports and result edits flow
 into standings immediately and are preserved only through workspace snapshot export/import.
 
+## Coach staff, directory & import (Phase 7 slice 27)
+
+The team view gained a read-only **Coaching Staff & History** section: head coach, assistant
+coaches, unknown-role coaches, and (when a prior same-slot team exists) returning / new /
+departed coach counts. Empty teams show "No coach/staff data loaded for this team." A
+**Coaches** tab lists every coach with their latest assignment, seasons active, teams coached,
+and roles held; selecting a coach shows their assignment history across seasons/teams. Both
+are read-only.
+
+A **Coach import** tab mirrors the schedule import workbench: load a local coach JSON file
+(or the bundled demo), preview row-level add / update / skip / error / **review** outcomes
+with summary counts (rows / valid / invalid / coaches-to-add / assignments to add-update /
+skipped / blocking), then explicitly **Execute Coach Import (In Memory)** and **Undo Coach
+Import**. Ambiguous coach identity is surfaced as a blocking *review* row, never merged.
+Copy states coach import is in-memory only until a workspace snapshot export, that workspace
+snapshot export is the durability path, and that no browser storage or cloud sync is used.
+Coach import never modifies rosters or games; while executed, the file controls are locked
+until undo. Coach data travels with workspace snapshots; importing a snapshot clears
+transient coach-import execution/undo state.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

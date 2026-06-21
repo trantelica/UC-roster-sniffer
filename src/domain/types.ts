@@ -76,9 +76,40 @@ export interface Game {
   isChampionship?: boolean;
 }
 
+/**
+ * Phase 7 slice 27: normalized coach/staff model, tracked separately from player rosters.
+ * `Coach` (above) stays the roster-embedded shape ({ name }); these are the season-spanning
+ * records. Coach identity is name-based and deterministic; ambiguity is surfaced, never
+ * silently merged. Coach data never mutates rosters, games, or schedules.
+ */
+export type CoachRole = 'headCoach' | 'assistantCoach' | 'unknown';
+
+export interface StaffCoach {
+  coachId: string;
+  displayName: string;
+  /** Deterministic lowercase identity key for name-based matching. */
+  identityKey: string;
+  /** Raw source name, preserved exactly when available. */
+  sourceName?: string;
+  notes?: string;
+}
+
+export interface TeamCoachAssignment {
+  assignmentId: string;
+  seasonId: string;
+  teamId: string;
+  coachId: string;
+  role: CoachRole;
+  sourceLabel?: string;
+  sourceRowId?: string;
+  notes?: string;
+}
+
 export interface AppData {
   districts: District[];
   ageDivisions: AgeDivision[];
   teams: Team[];
   games: Game[];
+  coaches: StaffCoach[];
+  coachAssignments: TeamCoachAssignment[];
 }

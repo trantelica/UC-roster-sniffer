@@ -1270,6 +1270,32 @@ Imported schedule games and in-memory result edits travel with the workspace sna
 are snapshot-aware since slice 24); importing a workspace snapshot replaces the games and
 clears transient schedule-import execution/undo state.
 
+## Coach import workflow (Phase 7 slice 27)
+
+Phase 7 adds a coach import workflow, **separate from roster and schedule import**, following
+the same preview → execute → undo pattern. It reads a focused row-per-assignment contract
+(`data-samples/coach-import.sample.json`; `importType: "coach"`, rows with `coachName` +
+`teamId` + `role`) — chosen over the nested Phase-5 scraped coaches contract for the same
+reason slice 24/25 chose clean teamId-referenced contracts (the scraped coaches JSON resolves
+team labels via the canonical pipeline and remains a separate future scraped-coach path).
+
+- **Adapter** (`coachImportAdapter.ts`) validates the shape, resolves `teamId` against
+  existing teams (no opponent/team invention), derives a name-based identity key, and maps
+  rows to assignment candidates with stable error codes (`invalid-row-shape`,
+  `unresolved-team`, `invalid-role`). Raw coach names/source labels are preserved.
+- **Preview** (`coachImportPreview.ts`) classifies rows add / update / skip / error /
+  **review**. A row reuses an existing coach when exactly one shares its identity key; zero
+  matches add a new coach; MORE THAN ONE existing match is **ambiguous → review** (blocking,
+  never merged). Assignments match by (season, team, coach); a duplicate within the import
+  blocks. It never silently overwrites.
+- **Execution / undo** (`coachImportExecution.ts`) apply an executable preview into new
+  coaches/assignments arrays (`durable:false` / `persisted:false` audit); undo removes added
+  assignments, restores updated ones, and removes added coaches only when no surviving
+  assignment references them. Coach import never mutates rosters or games.
+
+Everything is in-memory only — durability comes only from a workspace snapshot export. No
+backend, browser storage, cloud, or sync is used.
+
 ## Schedule import
 
 A team may have games loaded before results are known.

@@ -1168,6 +1168,28 @@ Continuous-cohort record resets on district change, skipped season, or broken pr
 Scout-to-Scout exception works.
 ```
 
+### Slices
+
+- **Slice 27 (done): coach/staff history, coach import workflow, team staff intelligence.**
+  Phase 7 begins. Adds a normalized coach model (`StaffCoach`, `TeamCoachAssignment`,
+  `CoachRole`; `AppData.coaches` / `coachAssignments`), tracked separately from rosters and
+  never mutating rosters/games/schedules. `coachModel.ts` derives the sample coach model from
+  roster-embedded coach fields (deduped by deterministic name-based identity key, so a
+  returning coach is one record across seasons). `coachHistorySummary.ts` provides
+  `summarizeTeamCoachStaff` (by role + prior-season returning/new/departed continuity),
+  `summarizeCoachHistory`, `buildCoachDirectory`, and `validateCoachAssignments`. A coach
+  import workflow (`coachImportAdapter` / `coachImportPreview` / `coachImportExecution`) reads
+  a row-per-assignment contract (`data-samples/coach-import.sample.json`), previews
+  add/update/skip/error/**review**, and executes/undoes in memory; ambiguous identity is
+  surfaced, never merged. UI: a read-only **Coaching Staff & History** TeamView section, a
+  **Coaches** directory tab, and a **Coach import** workbench tab. Workspace snapshots carry
+  coaches/assignments (optional/backward-compatible; assignments must resolve to existing
+  coaches + teams). Coach lifetime/continuous-cohort game-record analytics and the
+  Scout-to-Scout exception remain later Phase 7 work. No backend, auth, cloud DB,
+  `localStorage`, `IndexedDB`, auto-save, sync, external coach service, roster/game mutation,
+  durable persistence, or destructive identity merge was added. See `docs/data-model.md`,
+  `docs/ui-workflow.md`, and `docs/import-workflow.md`.
+
 ## Phase 8: My Team panel
 
 ### Goal
