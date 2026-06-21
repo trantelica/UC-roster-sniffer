@@ -62,6 +62,36 @@
       "location": "Alta Field",
       "status": "postponed",
       "notes": "Postponed; reschedule pending."
+    },
+    {
+      "gameId": "2026-GR-B1-semifinal",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Semifinal",
+      "scheduledDate": "2026-10-10",
+      "homeTeamId": "2026-alta-GR-B1",
+      "awayTeamId": "2026-brighton-GR-B1",
+      "location": "Alta Field",
+      "status": "final",
+      "homeScore": 14,
+      "awayScore": 7,
+      "isPlayoff": true
+    },
+    {
+      "gameId": "2026-GR-B1-championship",
+      "seasonId": "2026",
+      "ageDivisionId": "GR",
+      "weekLabel": "Championship",
+      "scheduledDate": "2026-10-31",
+      "homeTeamId": "2026-alta-GR-B1",
+      "awayTeamId": "2026-brighton-GR-B1",
+      "location": "Neutral Stadium",
+      "status": "final",
+      "homeScore": 20,
+      "awayScore": 14,
+      "isPlayoff": true,
+      "isChampionship": true,
+      "isNeutralSite": true
     }
   ]
 }

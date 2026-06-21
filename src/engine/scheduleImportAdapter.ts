@@ -45,6 +45,8 @@ export type ScheduleImportSource = {
   opponentScore: number | null;
   result: string | null;
   status: string | null;
+  isPlayoff: boolean | null;
+  isChampionship: boolean | null;
 };
 
 export type ScheduleImportAdaptedRow = {
@@ -86,6 +88,10 @@ function asNullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function asNullableBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
 function buildSource(row: Record<string, unknown>): ScheduleImportSource {
   return {
     gameId: asNullableString(row.gameId),
@@ -98,6 +104,8 @@ function buildSource(row: Record<string, unknown>): ScheduleImportSource {
     opponentScore: asNullableNumber(row.opponentScore),
     result: asNullableString(row.result),
     status: asNullableString(row.status),
+    isPlayoff: asNullableBoolean(row.isPlayoff),
+    isChampionship: asNullableBoolean(row.isChampionship),
   };
 }
 
@@ -117,7 +125,7 @@ function adaptRow(
       source: {
         gameId: null, teamId: null, opponentTeamId: null, weekLabel: null,
         gameDate: null, homeAway: null, teamScore: null, opponentScore: null,
-        result: null, status: null,
+        result: null, status: null, isPlayoff: null, isChampionship: null,
       },
       game: null,
       errors: [{ code: 'invalid-row-shape', message: 'Row is not an object.' }],
@@ -234,6 +242,10 @@ function adaptRow(
     game.homeScore = teamIsHome ? (source.teamScore as number) : (source.opponentScore as number);
     game.awayScore = teamIsHome ? (source.opponentScore as number) : (source.teamScore as number);
   }
+  // Slice 26: preserve game context. "neutral" orientation -> neutral-site game.
+  if (homeAway === 'neutral') game.isNeutralSite = true;
+  if (source.isPlayoff === true) game.isPlayoff = true;
+  if (source.isChampionship === true) game.isChampionship = true;
   return { rowIndex, sourceRowId, source, game, errors: [] };
 }
 

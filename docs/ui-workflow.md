@@ -509,6 +509,20 @@ immediately. This is result/status editing only — not full schedule constructi
 games and result edits are preserved only through workspace snapshot export/import; importing
 a workspace snapshot clears transient schedule-import execution/undo state.
 
+## Game context & standings (Phase 6 slice 26)
+
+The team Schedule & Results section now shows record splits — overall plus **regular
+season**, **playoffs** (includes championship games), and **championship** — and each game
+row carries context markers (**Playoff**, **Championship**, **Neutral**). Result editing
+remains limited to status/scores/notes and preserves the context flags.
+
+A read-only **Standings** tab shows standings for a selected season + age division, derived
+from final games only: rank, team, classification (team code), W–L–T, win %, PF, PA, DIFF,
+and playoff/championship records, ranked by win percentage then wins, point differential,
+points for, and name. Empty states cover no teams and "No final games available for these
+standings"; unresolved final references are noted. Schedule imports and result edits flow
+into standings immediately and are preserved only through workspace snapshot export/import.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

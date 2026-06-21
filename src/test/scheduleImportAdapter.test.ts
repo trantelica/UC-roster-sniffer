@@ -129,4 +129,53 @@ describe('schedule import adapter', () => {
     expect(JSON.stringify(input)).toBe(inputBefore);
     expect(JSON.stringify(TEAMS)).toBe(teamsBefore);
   });
+
+  // --- Slice 26: game context preservation ---
+
+  it('maps neutral homeAway to isNeutralSite:true', () => {
+    const neutralRow = { ...HOME_ROW, gameId: 'g-neutral', homeAway: 'neutral' };
+    const result = adaptScheduleImport(payload([neutralRow]), { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.rows[0].game!.isNeutralSite).toBe(true);
+  });
+
+  it('does not set isNeutralSite for non-neutral games', () => {
+    const result = adaptScheduleImport(payload([HOME_ROW]), { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.rows[0].game!.isNeutralSite).toBeUndefined();
+  });
+
+  it('preserves isPlayoff', () => {
+    const playoffRow = { ...HOME_ROW, gameId: 'g-playoff', isPlayoff: true };
+    const result = adaptScheduleImport(payload([playoffRow]), { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.rows[0].game!.isPlayoff).toBe(true);
+    expect(result.rows[0].game!.isChampionship).toBeUndefined();
+  });
+
+  it('preserves isChampionship', () => {
+    const champRow = { ...HOME_ROW, gameId: 'g-champ', isPlayoff: true, isChampionship: true };
+    const result = adaptScheduleImport(payload([champRow]), { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.rows[0].game!.isChampionship).toBe(true);
+  });
+
+  it('preserves the championship row from the existing sample contract (neutral + flags)', () => {
+    const result = adaptScheduleImport(scheduleSample, { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    const champ = result.rows.find((r) => r.game?.isChampionship)?.game;
+    expect(champ).toBeDefined();
+    expect(champ!.isChampionship).toBe(true);
+    expect(champ!.isPlayoff).toBe(true);
+    expect(champ!.isNeutralSite).toBe(true);
+    expect(champ!.status).toBe('final');
+  });
+
+  it('ignores non-boolean flag values (lenient; only true sets the flag)', () => {
+    const weirdRow = { ...HOME_ROW, gameId: 'g-weird', isPlayoff: 'yes', isChampionship: 1 };
+    const result = adaptScheduleImport(payload([weirdRow]), { teams: TEAMS });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.rows[0].game!.isPlayoff).toBeUndefined();
+    expect(result.rows[0].game!.isChampionship).toBeUndefined();
+  });
 });

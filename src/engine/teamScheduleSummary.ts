@@ -1,4 +1,4 @@
-import type { AgeDivision, District, Game, GameStatus, Team } from '../domain/types';
+import type { AgeDivision, District, Game, GameStatus, GameType, Team } from '../domain/types';
 
 /**
  * Phase 6 slice 24: PURE, deterministic team SCHEDULE / RESULT summaries — ENGINE ONLY.
@@ -14,10 +14,32 @@ import type { AgeDivision, District, Game, GameStatus, Team } from '../domain/ty
  * deterministic ordering (scheduledDate, then weekLabel, then gameId).
  */
 
-export const TEAM_SCHEDULE_SUMMARY_LOGIC_VERSION = 'phase6-slice24-team-schedule-summary-v1';
+export const TEAM_SCHEDULE_SUMMARY_LOGIC_VERSION = 'phase6-slice26-team-schedule-summary-v2';
 
 export type TeamGameResult = 'win' | 'loss' | 'tie';
 export type GameHomeAway = 'home' | 'away';
+
+/** A win/loss/tie record with point totals for a context (overall/regular/playoff/etc.). */
+export type ContextRecord = {
+  wins: number;
+  losses: number;
+  ties: number;
+  gamesPlayed: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDifferential: number;
+};
+
+function emptyContextRecord(): ContextRecord {
+  return { wins: 0, losses: 0, ties: 0, gamesPlayed: 0, pointsFor: 0, pointsAgainst: 0, pointDifferential: 0 };
+}
+
+/** Derives a game's context type. `championship` always implies playoff context. */
+export function deriveGameType(game: Game): GameType {
+  if (game.isChampionship) return 'championship';
+  if (game.isPlayoff) return 'playoff';
+  return 'regular';
+}
 
 export type TeamScheduleGameView = {
   gameId: string;
@@ -34,6 +56,9 @@ export type TeamScheduleGameView = {
   resultDisplay: string;
   result: TeamGameResult | null;
   location: string | null;
+  /** Slice 26 context for display markers. */
+  gameType: GameType;
+  isNeutralSite: boolean;
   /** True when the opponent team reference could not be resolved. */
   unresolvedReference: boolean;
 };
@@ -44,12 +69,18 @@ export type TeamScheduleSummary = {
   completedGames: number;
   upcomingGames: number;
   cancelledGames: number;
+  /** Overall (all final games) — kept flat for back-compatibility. */
   wins: number;
   losses: number;
   ties: number;
   pointsFor: number;
   pointsAgainst: number;
   pointDifferential: number;
+  /** Slice 26 record splits. Playoff includes championship games; regular excludes both. */
+  overallRecord: ContextRecord;
+  regularSeasonRecord: ContextRecord;
+  playoffRecord: ContextRecord;
+  championshipRecord: ContextRecord;
   nextGame: TeamScheduleGameView | null;
   lastGame: TeamScheduleGameView | null;
   games: TeamScheduleGameView[];
@@ -181,8 +212,26 @@ function toGameView(
     resultDisplay,
     result,
     location: game.location ?? null,
+    gameType: deriveGameType(game),
+    isNeutralSite: game.isNeutralSite === true,
     unresolvedReference: opponentTeam === null,
   };
+}
+
+/** Adds one final game's result into a context record. Mutates the accumulator only. */
+function accumulate(
+  record: ContextRecord,
+  result: TeamGameResult,
+  teamScore: number,
+  opponentScore: number
+): void {
+  record.gamesPlayed += 1;
+  record.pointsFor += teamScore;
+  record.pointsAgainst += opponentScore;
+  record.pointDifferential = record.pointsFor - record.pointsAgainst;
+  if (result === 'win') record.wins += 1;
+  else if (result === 'loss') record.losses += 1;
+  else record.ties += 1;
 }
 
 export type SummarizeTeamScheduleInput = {
@@ -207,27 +256,30 @@ export function summarizeTeamSchedule(
     toGameView(g, teamId, teamsById, districts, ageDivisions)
   );
 
-  let wins = 0;
-  let losses = 0;
-  let ties = 0;
-  let pointsFor = 0;
-  let pointsAgainst = 0;
-  let completedGames = 0;
+  const overallRecord = emptyContextRecord();
+  const regularSeasonRecord = emptyContextRecord();
+  const playoffRecord = emptyContextRecord();
+  const championshipRecord = emptyContextRecord();
   let upcomingGames = 0;
   let cancelledGames = 0;
 
   for (const game of scheduled) {
     const isHome = game.homeTeamId === teamId;
     if (game.status === 'final' && hasUsableScores(game)) {
-      completedGames += 1;
       const teamScore = (isHome ? game.homeScore : game.awayScore) as number;
       const opponentScore = (isHome ? game.awayScore : game.homeScore) as number;
-      pointsFor += teamScore;
-      pointsAgainst += opponentScore;
       const result = deriveTeamGameResult(game, teamId);
-      if (result === 'win') wins += 1;
-      else if (result === 'loss') losses += 1;
-      else if (result === 'tie') ties += 1;
+      if (!result) continue;
+      accumulate(overallRecord, result, teamScore, opponentScore);
+      const gameType = deriveGameType(game);
+      if (gameType === 'championship') {
+        accumulate(championshipRecord, result, teamScore, opponentScore);
+        accumulate(playoffRecord, result, teamScore, opponentScore);
+      } else if (gameType === 'playoff') {
+        accumulate(playoffRecord, result, teamScore, opponentScore);
+      } else {
+        accumulate(regularSeasonRecord, result, teamScore, opponentScore);
+      }
     } else if (game.status === 'scheduled' || game.status === 'postponed') {
       upcomingGames += 1;
     } else if (game.status === 'cancelled') {
@@ -246,15 +298,19 @@ export function summarizeTeamSchedule(
   return {
     teamId,
     totalGames: scheduled.length,
-    completedGames,
+    completedGames: overallRecord.gamesPlayed,
     upcomingGames,
     cancelledGames,
-    wins,
-    losses,
-    ties,
-    pointsFor,
-    pointsAgainst,
-    pointDifferential: pointsFor - pointsAgainst,
+    wins: overallRecord.wins,
+    losses: overallRecord.losses,
+    ties: overallRecord.ties,
+    pointsFor: overallRecord.pointsFor,
+    pointsAgainst: overallRecord.pointsAgainst,
+    pointDifferential: overallRecord.pointDifferential,
+    overallRecord,
+    regularSeasonRecord,
+    playoffRecord,
+    championshipRecord,
     nextGame,
     lastGame,
     games: views,

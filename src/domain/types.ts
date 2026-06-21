@@ -45,6 +45,12 @@ export interface Team {
  */
 export type GameStatus = 'scheduled' | 'final' | 'cancelled' | 'postponed';
 
+/**
+ * Phase 6 slice 26: derived game context. `championship` always counts as playoff context
+ * for derived summaries; `regular` is the default when no playoff/championship flag is set.
+ */
+export type GameType = 'regular' | 'playoff' | 'championship';
+
 export interface Game {
   gameId: string;
   seasonId: string;
@@ -61,6 +67,13 @@ export interface Game {
   homeScore?: number;
   awayScore?: number;
   notes?: string;
+  /**
+   * Phase 6 slice 26 game context (all optional; absent defaults to non-neutral / regular).
+   * `isChampionship` is also treated as playoff context for derived summaries.
+   */
+  isNeutralSite?: boolean;
+  isPlayoff?: boolean;
+  isChampionship?: boolean;
 }
 
 export interface AppData {

@@ -788,9 +788,14 @@ team-centric `schedule-import.sample.json` rows into the game model (opponents r
 through existing teams; add/update/skip/error classification with safe gameId/natural-key
 matching that never silently overwrites), plus in-memory result/status editing from the team
 schedule view. Both are in-memory only and preserved solely through workspace snapshot
-export/import. Schedules/results are maintained separately from roster imports and never
-mutate rosters. Schedule editing remains limited to result/status updates (not full schedule
-construction); playoff/championship flags and external schedule import remain future work.
+export/import. Slice 26 expands game context (neutral-site, playoff, and championship flags,
+preserved through import / result editing / snapshots), adds team record splits (regular /
+playoff / championship — championship counts as playoff context), and adds a read-only
+**Standings** dashboard derived from final games only for a selected season + age division
+(opponents resolved through existing teams). Schedules/results are maintained separately from
+roster imports and never mutate rosters. Schedule editing remains limited to result/status
+updates (not full schedule construction); external schedule import and full multi-year
+analytics dashboards remain future work.
 
 ## Phase 7: Coach analytics
 

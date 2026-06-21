@@ -10,6 +10,7 @@ import {
 import {
   summarizeTeamSchedule,
   type TeamScheduleGameView,
+  type ContextRecord,
 } from '../engine/teamScheduleSummary';
 import type {
   GameResultPatch,
@@ -192,6 +193,18 @@ export default function TeamView({
               </span>
             </div>
 
+            <div className="roster-status-summary">
+              <span className="roster-status-count">
+                <strong>{formatRecord(schedule.regularSeasonRecord)}</strong> Regular season
+              </span>
+              <span className="roster-status-count">
+                <strong>{formatRecord(schedule.playoffRecord)}</strong> Playoffs
+              </span>
+              <span className="roster-status-count">
+                <strong>{formatRecord(schedule.championshipRecord)}</strong> Championship
+              </span>
+            </div>
+
             <p className="schedule-highlight">
               <strong>Next game:</strong>{' '}
               {schedule.nextGame
@@ -227,6 +240,15 @@ export default function TeamView({
                     <td>{game.homeAway === 'home' ? 'Home' : 'Away'}</td>
                     <td>
                       {game.opponentDisplayName}
+                      {game.gameType === 'championship' && (
+                        <span className="game-tag game-tag-championship">Championship</span>
+                      )}
+                      {game.gameType === 'playoff' && (
+                        <span className="game-tag game-tag-playoff">Playoff</span>
+                      )}
+                      {game.isNeutralSite && (
+                        <span className="game-tag game-tag-neutral">Neutral</span>
+                      )}
                       {game.unresolvedReference && (
                         <span className="schedule-unresolved">
                           {' '}
@@ -419,6 +441,11 @@ function GameResultEditor({
       </button>
     </div>
   );
+}
+
+/** Formats a context record as "W–L–T". */
+function formatRecord(record: ContextRecord): string {
+  return `${record.wins}–${record.losses}–${record.ties}`;
 }
 
 /** One-line summary of a game from the selected team's perspective. */
