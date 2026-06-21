@@ -782,9 +782,15 @@ objects), pure deterministic team schedule summaries (W-L-T, points for/against/
 differential, next game, last result, per-game opponent-resolved views; only final games
 count toward the record), a read-only **Schedule & Results** team-view section, and
 workspace-snapshot support for schedules/results (optional/backward-compatible at
-schemaVersion 1). Schedules/results are maintained separately from roster imports and never
-mutate rosters. Playoff/championship flags, result-update editing, and external schedule
-import remain future work.
+schemaVersion 1). Slice 25 then makes schedule/results a working local feature: a schedule
+import workflow (preview → explicit in-memory execution → undo) that maps the preserved
+team-centric `schedule-import.sample.json` rows into the game model (opponents resolve
+through existing teams; add/update/skip/error classification with safe gameId/natural-key
+matching that never silently overwrites), plus in-memory result/status editing from the team
+schedule view. Both are in-memory only and preserved solely through workspace snapshot
+export/import. Schedules/results are maintained separately from roster imports and never
+mutate rosters. Schedule editing remains limited to result/status updates (not full schedule
+construction); playoff/championship flags and external schedule import remain future work.
 
 ## Phase 7: Coach analytics
 

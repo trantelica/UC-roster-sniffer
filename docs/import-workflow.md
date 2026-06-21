@@ -1212,6 +1212,59 @@ Flag low confidence when:
 1. The player was not in the same district in the preceding season, and the same named match exists in another district.
 2. There are two or more matching names in the same district.
 
+## Schedule import workflow (Phase 6 slice 25)
+
+Slice 25 makes schedule/results a working local feature, **separate from roster import**.
+It reads the preserved team-centric `data-samples/schedule-import.sample.json` row contract
+(`importType: "schedule"`; rows with `teamId` / `opponentTeamId` / `homeAway` and
+team-relative `teamScore` / `opponentScore`) and maps it into the game-centric slice-24
+`Game` model. **Opponents resolve through existing `Team.teamId` references only** — no
+opponent object is created, and an unresolvable reference rejects the row.
+
+Pure engine pipeline:
+
+- **Adapter** (`src/engine/scheduleImportAdapter.ts`, `adaptScheduleImport`) — validates the
+  file shape, then maps each row to a `Game` or row errors. Home/away are derived from
+  `homeAway` (`away` swaps the listed team and opponent; `neutral` treats the listed team as
+  home by deterministic convention since `Game` has no neutral concept); scores are oriented
+  to home/away. Status comes from an explicit `status` if present, else is derived
+  (`final` when a result/scores are present, otherwise `scheduled`); a final game requires
+  both scores. Stable row error codes: `invalid-row-shape`, `missing-season`,
+  `invalid-home-away`, `unresolved-home-team` / `unresolved-away-team`, `invalid-status`,
+  `invalid-scores`, `invalid-final-scores`. Source row values are preserved for display.
+- **Preview** (`src/engine/scheduleImportPreview.ts`, `buildScheduleImportPreview`) —
+  classifies every row as **add / update / skip / error** against the current games. A row
+  updates an existing game when their `gameId` matches, else when the deterministic natural
+  key (`seasonId + scheduledDate + homeTeamId + awayTeamId`) matches exactly one existing
+  game; an ambiguous natural-key match or a duplicate within the import is a blocking error
+  (`ambiguous-existing-match`, `duplicate-in-import`, `duplicate-natural-key`). It never
+  silently overwrites. The preview reports `totalRows` / `validRows` / `invalidRows` /
+  `addCandidates` / `updateCandidates` / `skippedRows` / `blockingErrors` and `isExecutable`.
+- **Execution / undo** (`src/engine/scheduleImportExecution.ts`) — `executeScheduleImport`
+  applies an executable preview into a new games array (adds appended, updates in place
+  keeping the existing gameId, skips/errors not applied) with a `durable:false` /
+  `persisted:false` audit; `undoScheduleImport` removes added games and restores updated
+  games to their captured prior state, preserving unrelated games. Caller-supplied
+  `transactionId` / `executedAt` / `undoneAt` keep output deterministic.
+
+The **Schedule import** tab previews, executes (explicitly), and undoes the import in
+memory. Imported games appear immediately in the team Schedule & Results view, and the
+record recalculates. This is **in-memory only** — durability comes only from a workspace
+snapshot export. No backend, browser storage, cloud, or sync is used.
+
+### In-memory result/status updates (Phase 6 slice 25)
+
+The team Schedule & Results section gained an **Edit Result** control per game
+(`src/engine/gameResultUpdate.ts`, `updateGameResult`): the user can update a game's status,
+home/away scores, and notes in memory. Final games require valid numeric scores;
+scheduled / postponed / cancelled games may have blank scores. Invalid edits are rejected
+with readable messages and do not alter state. The summary recalculates immediately. This is
+**result/status editing only — not full schedule construction**, and is in-memory only.
+
+Imported schedule games and in-memory result edits travel with the workspace snapshot (games
+are snapshot-aware since slice 24); importing a workspace snapshot replaces the games and
+clears transient schedule-import execution/undo state.
+
 ## Schedule import
 
 A team may have games loaded before results are known.

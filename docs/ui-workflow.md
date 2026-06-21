@@ -484,9 +484,30 @@ list (date/week, home/away, opponent, status, score/result, location). Only `fin
 with scores count toward the record; `scheduled`/`postponed` games are upcoming and
 `cancelled` games are shown but excluded from the record. Team with no games shows "No
 schedule/results loaded for this team." An unresolved opponent reference is shown inline
-("opponent reference could not be resolved") and never crashes the view. This section is
-read-only — schedule editing/import is future work — and schedules/results travel with the
-workspace snapshot.
+("opponent reference could not be resolved") and never crashes the view. Schedules/results
+travel with the workspace snapshot.
+
+## Schedule import workbench & in-memory result edits (Phase 6 slice 25)
+
+A dedicated **Schedule import** tab (separate from the read-only roster Import preview) lets
+the user load a schedule JSON file (or a bundled demo of the preserved
+`schedule-import.sample.json`) and previews it: summary counts (rows / valid / invalid /
+additions / updates / skipped / blocking errors) and a row-level table (date/week, home,
+away, status, score, outcome add/update/skip/error, and the reason when blocked). **Execute
+Schedule Import (In Memory)** is enabled only when the preview is executable; execution is
+explicit. After execution the team Schedule & Results view reflects the imported games and an
+**Undo Schedule Import** action appears. While executed, the file controls are locked — the
+user must undo before loading a different schedule file. Copy states the import is in-memory
+only, that workspace snapshot export is the durability path, and that no browser storage or
+cloud sync is used.
+
+In the team Schedule & Results section, each game row gains an **Edit Result** control
+(shown only when an in-memory update handler is wired): the user edits status, home/away
+scores, and notes and clicks **Save Result In Memory**. Final games require both scores;
+invalid edits show a readable error and leave state unchanged. The record/summary recalculate
+immediately. This is result/status editing only — not full schedule construction. Imported
+games and result edits are preserved only through workspace snapshot export/import; importing
+a workspace snapshot clears transient schedule-import execution/undo state.
 
 ## Import collision UI
 
