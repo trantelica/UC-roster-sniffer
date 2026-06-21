@@ -84,7 +84,10 @@ function gamesEqual(a: Game, b: Game): boolean {
     a.status === b.status &&
     (a.homeScore ?? null) === (b.homeScore ?? null) &&
     (a.awayScore ?? null) === (b.awayScore ?? null) &&
-    (a.notes ?? null) === (b.notes ?? null)
+    (a.notes ?? null) === (b.notes ?? null) &&
+    (a.isNeutralSite ?? false) === (b.isNeutralSite ?? false) &&
+    (a.isPlayoff ?? false) === (b.isPlayoff ?? false) &&
+    (a.isChampionship ?? false) === (b.isChampionship ?? false)
   );
 }
 

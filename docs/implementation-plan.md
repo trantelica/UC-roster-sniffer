@@ -1123,6 +1123,28 @@ Championship appearance and win derive from championship-flagged games.
   or opponent object model was added. See `docs/import-workflow.md` ("Schedule import
   workflow (Phase 6 slice 25)"), `docs/data-model.md`, and `docs/ui-workflow.md`.
 
+- **Slice 26 (done): game context expansion, playoff/championship support, and standings
+  dashboard.** Expands the `Game` model with optional `isNeutralSite` / `isPlayoff` /
+  `isChampionship` (older games stay valid; a derived `GameType` of regular/playoff/
+  championship comes from the flags, championship implying playoff context). The schedule
+  import adapter now preserves these (`homeAway: neutral` → `isNeutralSite`, plus
+  `isPlayoff` / `isChampionship` from the existing contract — sample unchanged) and
+  `gameResultUpdate` / preview equality preserve them. `teamScheduleSummary` gained record
+  splits (`overallRecord` / `regularSeasonRecord` / `playoffRecord` /
+  `championshipRecord`, each with points) and per-game `gameType` / `isNeutralSite` markers;
+  championship counts toward both championship and playoff records, regular excludes both. A
+  new pure `standingsSummary.ts` (`buildStandings`) derives per-(season, age division)
+  standings from final games only, ranked by win % then wins, point differential, points
+  for, name, teamId (opponents resolved only through existing teams; unresolved final
+  references flagged, never invented). A read-only **Standings** tab
+  (`StandingsView.tsx`) and TeamView record-split/markers surface it. Workspace snapshots
+  build/validate/restore the new context fields (booleans required when present; older
+  snapshots without them still restore). Sample games gained a playoff semifinal and a
+  neutral-site championship. No backend, auth, cloud DB, `localStorage`, `IndexedDB`,
+  auto-save, sync, external schedule service, roster mutation, durable persistence, or
+  opponent object model was added. See `docs/data-model.md`, `docs/ui-workflow.md`, and
+  `docs/import-workflow.md`.
+
 ## Phase 7: Coach analytics
 
 ### Goal

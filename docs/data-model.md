@@ -1510,7 +1510,15 @@ status: "scheduled" | "final" | "cancelled" | "postponed"
 homeScore?: number                (required in practice only for final games)
 awayScore?: number
 notes?: string
+isNeutralSite?: boolean           (slice 26; absent = non-neutral)
+isPlayoff?: boolean               (slice 26; absent = regular)
+isChampionship?: boolean          (slice 26; also playoff context for summaries)
 ```
+
+Slice 26 adds game context. A derived `GameType` (`regular` / `playoff` / `championship`)
+comes from these flags (`deriveGameType`): championship implies playoff context. Defaults:
+regular + non-neutral when flags are absent. Existing slice-24/25 games without these fields
+remain valid. Neutral-site games never create a venue/opponent entity.
 
 Rules:
 
@@ -1522,7 +1530,16 @@ Rules:
   `postponed` are upcoming; `cancelled` is excluded from the record.
 - The read-only team schedule summary (`src/engine/teamScheduleSummary.ts`) derives W-L-T,
   points for/against/differential, next game, last result, and per-game opponent-resolved
-  views, sorted by scheduledDate, then weekLabel, then gameId.
+  views, sorted by scheduledDate, then weekLabel, then gameId. Slice 26 adds record splits
+  (`overallRecord` / `regularSeasonRecord` / `playoffRecord` / `championshipRecord`):
+  only final games count; championship games count in both championship and playoff records;
+  regular excludes both.
+- **Standings** (`src/engine/standingsSummary.ts`, `buildStandings`) derive per-team
+  records for a selected season + age division from final games only, ranked by win
+  percentage, then wins, point differential, points for, display name, and teamId. Opponents
+  resolve only through existing teams; unresolved final references are flagged
+  (`unresolvedGameReferenceCount`), never invented. Classification grouping is by team code
+  shown per row (no separate classification model).
 - `AppData` gains `games: Game[]`. Sample games live in `data-samples/games.sample.json`
   (game-centric); the older `data-samples/schedule-import.sample.json` is a separate,
   preserved team-centric import-row contract and is unchanged.

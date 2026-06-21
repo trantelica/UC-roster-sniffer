@@ -933,6 +933,34 @@ h1 {
   color: #555;
 }
 
+/* Game context tags (Phase 6 slice 26) */
+.game-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.6rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  vertical-align: middle;
+}
+
+.game-tag-championship {
+  background-color: var(--color-bronze-spice);
+  color: var(--color-mint-cream);
+  border-color: var(--color-bronze-spice);
+}
+
+.game-tag-playoff {
+  color: var(--color-steel-blue);
+}
+
+.game-tag-neutral {
+  color: #666;
+}
+
 /* In-memory game result editor */
 .game-result-editor {
   margin-top: 0.75rem;

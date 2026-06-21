@@ -539,3 +539,76 @@ describe('workspace snapshot schedules/results (slice 24)', () => {
     expect(JSON.stringify(ws.games)).toBe(before);
   });
 });
+
+describe('workspace snapshot game context (slice 26)', () => {
+  function workspaceWithContextGame(): WorkspaceState {
+    return {
+      ...workspaceState(),
+      games: [
+        sampleGame({
+          gameId: 'g-champ',
+          status: 'final',
+          homeScore: 20,
+          awayScore: 14,
+          isPlayoff: true,
+          isChampionship: true,
+          isNeutralSite: true,
+        }),
+      ],
+    };
+  }
+
+  it('preserves neutral/playoff/championship fields through build -> parse -> restore', () => {
+    const json = JSON.stringify(
+      buildWorkspaceSnapshot({ workspace: workspaceWithContextGame(), generatedAt: GENERATED_AT })
+    );
+    const parsed = parseWorkspaceSnapshotJson(json);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const restored = restoreWorkspaceFromSnapshot(parsed.snapshot);
+    const game = restored.workspace.games.find((g) => g.gameId === 'g-champ')!;
+    expect(game.isPlayoff).toBe(true);
+    expect(game.isChampionship).toBe(true);
+    expect(game.isNeutralSite).toBe(true);
+  });
+
+  it('rejects an invalid context field type', () => {
+    const result = validateWorkspaceSnapshot({
+      schemaVersion: WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+      snapshotKind: 'workspace',
+      workspace: {
+        districts: [],
+        ageDivisions: [],
+        teams: [
+          {
+            teamId: '2026-alta-GR-B1', seasonId: '2026', districtId: 'alta', ageDivisionId: 'GR',
+            teamCode: 'B1', draftOrder: 1, divisionTeamCount: 1, headCoach: null,
+            assistantCoaches: [], players: [],
+          },
+        ],
+        games: [
+          {
+            gameId: 'g1', seasonId: '2026', weekLabel: 'Week 1', scheduledDate: '2026-08-22',
+            homeTeamId: '2026-alta-GR-B1', awayTeamId: '2026-alta-GR-B1', status: 'scheduled',
+            isPlayoff: 'yes',
+          },
+        ],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0].code).toBe('invalid-games');
+  });
+
+  it('an older snapshot without context fields still restores (fields absent)', () => {
+    const json = JSON.stringify(
+      buildWorkspaceSnapshot({ workspace: workspaceWithGames(), generatedAt: GENERATED_AT })
+    );
+    const parsed = parseWorkspaceSnapshotJson(json);
+    if (!parsed.ok) throw new Error('expected ok');
+    const restored = restoreWorkspaceFromSnapshot(parsed.snapshot);
+    const game = restored.workspace.games.find((g) => g.gameId === 'g-final')!;
+    expect(game.isPlayoff).toBeUndefined();
+    expect(game.isChampionship).toBeUndefined();
+    expect(game.isNeutralSite).toBeUndefined();
+  });
+});

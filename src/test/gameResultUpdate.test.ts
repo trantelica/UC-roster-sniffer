@@ -88,4 +88,16 @@ describe('updateGameResult', () => {
     updateGameResult({ games, gameId: 'g1', patch: { status: 'final', homeScore: 1, awayScore: 0 } });
     expect(JSON.stringify(games)).toBe(before);
   });
+
+  it('preserves context fields (neutral/playoff/championship) on a result edit (slice 26)', () => {
+    const games = [
+      game({ gameId: 'g1', status: 'scheduled', isPlayoff: true, isChampionship: true, isNeutralSite: true }),
+    ];
+    const result = updateGameResult({ games, gameId: 'g1', patch: { status: 'final', homeScore: 20, awayScore: 14 } });
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.updatedGame.isPlayoff).toBe(true);
+    expect(result.updatedGame.isChampionship).toBe(true);
+    expect(result.updatedGame.isNeutralSite).toBe(true);
+    expect(result.updatedGame.status).toBe('final');
+  });
 });

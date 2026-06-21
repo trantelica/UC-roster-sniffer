@@ -19,10 +19,11 @@ import ScrapedImportPreview, {
   type InMemoryImportAppState,
 } from '../components/ScrapedImportPreview';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
+import StandingsView from '../components/StandingsView';
 
 const initialAppData = loadSampleData();
 
-type AppView = 'roster' | 'import' | 'schedule';
+type AppView = 'roster' | 'import' | 'schedule' | 'standings';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -244,6 +245,14 @@ export default function App() {
         >
           Schedule import
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'standings' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'standings'}
+          onClick={() => setView('standings')}
+        >
+          Standings
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -273,6 +282,16 @@ export default function App() {
           teams={liveTeams}
           games={workspace.games}
           onApplyGames={handleApplyGames}
+        />
+      </div>
+      <div hidden={view !== 'standings'}>
+        <StandingsView
+          key={workspaceEpoch}
+          teams={liveTeams}
+          games={workspace.games}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
+          defaultSeasonId={selectedSeason}
         />
       </div>
     </div>

@@ -1252,6 +1252,11 @@ memory. Imported games appear immediately in the team Schedule & Results view, a
 record recalculates. This is **in-memory only** — durability comes only from a workspace
 snapshot export. No backend, browser storage, cloud, or sync is used.
 
+**Slice 26 — game context preservation:** the adapter also preserves game context from the
+contract: `homeAway: neutral` maps to `isNeutralSite: true`, and `isPlayoff` /
+`isChampionship` are carried onto the `Game` (only boolean `true` sets a flag). Championship
+games count as playoff context in derived record splits and feed the standings dashboard.
+
 ### In-memory result/status updates (Phase 6 slice 25)
 
 The team Schedule & Results section gained an **Edit Result** control per game

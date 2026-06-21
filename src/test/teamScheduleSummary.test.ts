@@ -179,6 +179,68 @@ describe('summarizeTeamSchedule', () => {
   });
 });
 
+describe('record splits (Phase 6 slice 26)', () => {
+  // alta: regular W (w1 21-14), regular T (w2 28-28), playoff W (semifinal 14-7),
+  // championship W (final 20-14, neutral).
+  const CONTEXT_GAMES: Game[] = [
+    ...GAMES,
+    game({ gameId: 'semi', weekLabel: 'Semifinal', scheduledDate: '2026-10-10', status: 'final', homeTeamId: ALTA.teamId, awayTeamId: BRIGHTON.teamId, homeScore: 14, awayScore: 7, isPlayoff: true }),
+    game({ gameId: 'champ', weekLabel: 'Championship', scheduledDate: '2026-10-31', status: 'final', homeTeamId: ALTA.teamId, awayTeamId: BRIGHTON.teamId, homeScore: 20, awayScore: 14, isPlayoff: true, isChampionship: true, isNeutralSite: true }),
+  ];
+
+  it('regular-season record excludes playoff and championship games', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    expect(s.regularSeasonRecord.wins).toBe(1); // w1 only (w2 is a tie)
+    expect(s.regularSeasonRecord.ties).toBe(1); // w2
+    expect(s.regularSeasonRecord.gamesPlayed).toBe(2);
+  });
+
+  it('playoff record includes playoff AND championship games', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    expect(s.playoffRecord.wins).toBe(2); // semifinal + championship
+    expect(s.playoffRecord.gamesPlayed).toBe(2);
+  });
+
+  it('championship record includes championship games only', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    expect(s.championshipRecord.wins).toBe(1);
+    expect(s.championshipRecord.gamesPlayed).toBe(1);
+  });
+
+  it('overall record sums all final games', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    expect(s.overallRecord.wins).toBe(3);
+    expect(s.overallRecord.ties).toBe(1);
+    expect(s.overallRecord.gamesPlayed).toBe(4);
+    expect(s.wins).toBe(3); // flat field stays = overall
+  });
+
+  it('marks neutral-site and game type in derived game rows', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    const champ = s.games.find((g) => g.gameId === 'champ')!;
+    expect(champ.gameType).toBe('championship');
+    expect(champ.isNeutralSite).toBe(true);
+    const semi = s.games.find((g) => g.gameId === 'semi')!;
+    expect(semi.gameType).toBe('playoff');
+    const w1 = s.games.find((g) => g.gameId === 'w1')!;
+    expect(w1.gameType).toBe('regular');
+    expect(w1.isNeutralSite).toBe(false);
+  });
+
+  it('scheduled/postponed/cancelled games do not count toward any record', () => {
+    const s = altaSummary(CONTEXT_GAMES);
+    expect(s.overallRecord.gamesPlayed).toBe(4); // w1, w2, semi, champ — not w3/w4/w5
+    expect(s.upcomingGames).toBe(2); // w3 scheduled + w5 postponed
+    expect(s.cancelledGames).toBe(1); // w4
+  });
+
+  it('does not mutate inputs', () => {
+    const before = JSON.stringify(CONTEXT_GAMES);
+    altaSummary(CONTEXT_GAMES);
+    expect(JSON.stringify(CONTEXT_GAMES)).toBe(before);
+  });
+});
+
 describe('getTeamSchedule', () => {
   it('returns only the team’s games, sorted, without mutating input', () => {
     const input = [...GAMES].reverse();

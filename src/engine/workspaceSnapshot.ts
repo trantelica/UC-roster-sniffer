@@ -147,6 +147,9 @@ function copyGame(game: Game): Game {
   if (game.homeScore !== undefined) copy.homeScore = game.homeScore;
   if (game.awayScore !== undefined) copy.awayScore = game.awayScore;
   if (game.notes !== undefined) copy.notes = game.notes;
+  if (game.isNeutralSite !== undefined) copy.isNeutralSite = game.isNeutralSite;
+  if (game.isPlayoff !== undefined) copy.isPlayoff = game.isPlayoff;
+  if (game.isChampionship !== undefined) copy.isChampionship = game.isChampionship;
   return copy;
 }
 
@@ -391,6 +394,13 @@ function validGame(value: unknown): Game | null {
   if (isFiniteNumber(value.homeScore)) game.homeScore = value.homeScore;
   if (isFiniteNumber(value.awayScore)) game.awayScore = value.awayScore;
   if (typeof value.notes === 'string') game.notes = value.notes;
+  // Slice 26 context fields must be booleans when present (invalid types reject the game).
+  for (const flag of ['isNeutralSite', 'isPlayoff', 'isChampionship'] as const) {
+    if (value[flag] !== undefined) {
+      if (typeof value[flag] !== 'boolean') return null;
+      game[flag] = value[flag] as boolean;
+    }
+  }
   return game;
 }
 
