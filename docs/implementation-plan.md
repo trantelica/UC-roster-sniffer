@@ -1292,6 +1292,25 @@ System colors remain centralized.
   auto-save, sync, durable persistence, roster/game/coach-assignment mutation, opponent object
   model, destructive identity merge, or charting library was added. See `docs/ui-workflow.md`.
 
+- **Slice 31 (done): visual intelligence polish & navigation depth.** Improves the readability and
+  navigability of the existing intelligence surfaces without new persistence, data models, or a
+  charting library. Adds two pure display-only engine helpers: `teamBrandingDisplay.ts`
+  (`getDistrictBranding` / `getTeamBranding` → display name, mascot, colors, classification label,
+  and a deterministic initials badge from existing district fields, with safe fallbacks) and
+  `navigationTargets.ts` (`resolveTeamNavigationTarget` / `resolveCoachNavigationTarget` → resolve
+  a target or report `found: false` so the UI can disable a stale affordance). A shared
+  `TeamBrandBadge` renders a colored initials badge (no image assets exist, so it never shows a
+  broken logo). Branding badges, record/diff chips, and rank badges are applied across My Team,
+  Analytics, Standings, and TeamView. Cross-tab navigation (selection/view state only) is wired
+  from Analytics (team→My Team, coach→Coaches), Standings (team→My Team), My Team (opponent→team,
+  coach→Coaches), TeamView (opponent→team), and Coach Directory (assignment team→My Team). The
+  Coaches tab's selected coach is now externally addressable via app state (not persisted; cleared
+  when the coach leaves the workspace). Empty/unavailable states stay plain-language and never
+  fabricate zeros. No backend, auth, cloud DB, `localStorage`, `IndexedDB`, auto-save, sync,
+  durable persistence, roster/game/coach-assignment mutation, opponent object model, destructive
+  identity merge, duplicated authoritative model, or charting library was added. See
+  `docs/ui-workflow.md` and `docs/design-system.md`.
+
 ## Coding agent guardrails
 
 The coding agent should:

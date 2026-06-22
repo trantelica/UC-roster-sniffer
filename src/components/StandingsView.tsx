@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { AgeDivision, District, Game, Team } from '../domain/types';
 import { getDistinctSeasons } from '../engine/filters';
 import { buildStandings, type StandingsRow } from '../engine/standingsSummary';
+import { getDistrictBranding, type DistrictBrandingDisplay } from '../engine/teamBrandingDisplay';
+import TeamBrandBadge from './TeamBrandBadge';
 
 /**
  * Phase 6 slice 26: read-only STANDINGS dashboard.
@@ -17,14 +19,21 @@ export default function StandingsView({
   districts,
   ageDivisions,
   defaultSeasonId,
+  onOpenTeam,
 }: {
   teams: Team[];
   games: Game[];
   districts: District[];
   ageDivisions: AgeDivision[];
   defaultSeasonId: string | null;
+  /** Opens a team elsewhere (My Team). Display-only navigation; never mutates data. */
+  onOpenTeam?: (teamId: string) => void;
 }) {
   const seasons = useMemo(() => getDistinctSeasons(teams), [teams]);
+  const districtIdByTeamId = useMemo(
+    () => new Map(teams.map((t) => [t.teamId, t.districtId])),
+    [teams]
+  );
   const [season, setSeason] = useState<string | null>(
     defaultSeasonId && seasons.includes(defaultSeasonId)
       ? defaultSeasonId
@@ -138,7 +147,15 @@ export default function StandingsView({
             </thead>
             <tbody>
               {standings.rows.map((row) => (
-                <StandingsRowView key={row.teamId} row={row} />
+                <StandingsRowView
+                  key={row.teamId}
+                  row={row}
+                  branding={getDistrictBranding(
+                    districtIdByTeamId.get(row.teamId) ?? '',
+                    districts
+                  )}
+                  onOpenTeam={onOpenTeam}
+                />
               ))}
             </tbody>
           </table>
@@ -152,19 +169,47 @@ function record(r: { wins: number; losses: number; ties: number }): string {
   return `${r.wins}–${r.losses}–${r.ties}`;
 }
 
-function StandingsRowView({ row }: { row: StandingsRow }) {
+function StandingsRowView({
+  row,
+  branding,
+  onOpenTeam,
+}: {
+  row: StandingsRow;
+  branding: DistrictBrandingDisplay;
+  onOpenTeam?: (teamId: string) => void;
+}) {
   return (
     <tr>
-      <td>{row.rank}</td>
-      <td>{row.displayName}</td>
+      <td>
+        <span className="rank-badge">{row.rank}</span>
+      </td>
+      <td>
+        <span className="team-cell">
+          <TeamBrandBadge branding={branding} title={branding.districtName} size="sm" />
+          {onOpenTeam ? (
+            <button
+              type="button"
+              className="link-button-inline"
+              onClick={() => onOpenTeam(row.teamId)}
+              title="Open in My Team"
+            >
+              {row.displayName}
+            </button>
+          ) : (
+            row.displayName
+          )}
+        </span>
+      </td>
       <td>{row.teamCode}</td>
-      <td>{record(row)}</td>
+      <td><span className="metric-chip">{record(row)}</span></td>
       <td>{row.gamesPlayed === 0 ? '—' : row.winPercentage.toFixed(3)}</td>
       <td>{row.pointsFor}</td>
       <td>{row.pointsAgainst}</td>
       <td>
-        {row.pointDifferential >= 0 ? '+' : ''}
-        {row.pointDifferential}
+        <span className={`diff-chip ${row.pointDifferential >= 0 ? 'diff-pos' : 'diff-neg'}`}>
+          {row.pointDifferential >= 0 ? '+' : ''}
+          {row.pointDifferential}
+        </span>
       </td>
       <td>{record(row.playoffRecord)}</td>
       <td>{record(row.championshipRecord)}</td>

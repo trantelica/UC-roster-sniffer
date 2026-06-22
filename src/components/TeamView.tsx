@@ -22,8 +22,10 @@ import {
   type CoachPerformanceRecord,
 } from '../engine/coachPerformanceSummary';
 import type { StaffCoach, TeamCoachAssignment } from '../domain/types';
+import { getTeamBranding } from '../engine/teamBrandingDisplay';
 import CoachCard from './CoachCard';
 import PlayerCard from './PlayerCard';
+import TeamBrandBadge from './TeamBrandBadge';
 
 interface TeamViewProps {
   team: Team;
@@ -44,6 +46,8 @@ interface TeamViewProps {
    * row gets an Edit Result control. Returns the update result (errors are shown inline).
    */
   onUpdateGameResult?: (gameId: string, patch: GameResultPatch) => GameResultUpdateResult;
+  /** Opens an opponent team in My Team. Display-only navigation; never mutates data. */
+  onOpenTeam?: (teamId: string) => void;
 }
 
 const GAME_STATUS_LABELS: Record<string, string> = {
@@ -72,10 +76,14 @@ export default function TeamView({
   coachAssignments = [],
   priorSeasonTeamId = null,
   onUpdateGameResult,
+  onOpenTeam,
 }: TeamViewProps) {
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [editErrors, setEditErrors] = useState<string[]>([]);
   const gamesById = new Map(games.map((g) => [g.gameId, g]));
+  const allTeams = teams.length > 0 ? teams : [team];
+  const teamIds = new Set(allTeams.map((t) => t.teamId));
+  const branding = getTeamBranding(team, districts, ageDivisions);
   const staff = summarizeTeamCoachStaff({
     teamId: team.teamId,
     seasonId: team.seasonId,
@@ -113,7 +121,10 @@ export default function TeamView({
 
   return (
     <div className="team-view">
-      <h2 className="team-name">{teamName}</h2>
+      <h2 className="team-name">
+        <TeamBrandBadge branding={branding} title={branding.districtName} />
+        {teamName}
+      </h2>
 
       <div className="team-meta">
         <span><strong>District:</strong> {districtName}</span>
@@ -276,7 +287,20 @@ export default function TeamView({
                     </td>
                     <td>{game.homeAway === 'home' ? 'Home' : 'Away'}</td>
                     <td>
-                      {game.opponentDisplayName}
+                      {onOpenTeam &&
+                      !game.unresolvedReference &&
+                      teamIds.has(game.opponentTeamId) ? (
+                        <button
+                          type="button"
+                          className="link-button-inline"
+                          onClick={() => onOpenTeam(game.opponentTeamId)}
+                          title="Open opponent in My Team"
+                        >
+                          {game.opponentDisplayName}
+                        </button>
+                      ) : (
+                        game.opponentDisplayName
+                      )}
                       {game.gameType === 'championship' && (
                         <span className="game-tag game-tag-championship">Championship</span>
                       )}

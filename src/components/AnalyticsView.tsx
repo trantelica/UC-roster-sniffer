@@ -12,6 +12,8 @@ import {
   type AnalyticsAttentionSeverity,
   type TrendRecord,
 } from '../engine/multiYearAnalyticsSummary';
+import { getDistrictBranding } from '../engine/teamBrandingDisplay';
+import TeamBrandBadge from './TeamBrandBadge';
 
 /**
  * Phase 9 slice 30: read-only MULTI-YEAR ANALYTICS dashboard.
@@ -57,7 +59,7 @@ export default function AnalyticsView({
   coaches,
   coachAssignments,
   onOpenTeam,
-  onOpenCoaches,
+  onOpenCoach,
 }: {
   teams: Team[];
   districts: District[];
@@ -66,7 +68,8 @@ export default function AnalyticsView({
   coaches: StaffCoach[];
   coachAssignments: TeamCoachAssignment[];
   onOpenTeam?: (teamId: string) => void;
-  onOpenCoaches?: () => void;
+  /** Opens a specific coach in the Coaches tab. Display-only; never mutates data. */
+  onOpenCoach?: (coachId: string) => void;
 }) {
   const [seasonFilter, setSeasonFilter] = useState<string>(''); // '' = all
   const [districtFilter, setDistrictFilter] = useState<string>('');
@@ -224,7 +227,27 @@ export default function AnalyticsView({
             <tbody>
               {summary.teamTrends.map((row) => (
                 <tr key={row.teamId}>
-                  <td>{row.displayName}</td>
+                  <td>
+                    <span className="team-cell">
+                      <TeamBrandBadge
+                        branding={getDistrictBranding(row.districtId, districts)}
+                        title={row.districtName}
+                        size="sm"
+                      />
+                      {onOpenTeam ? (
+                        <button
+                          type="button"
+                          className="link-button-inline"
+                          onClick={() => onOpenTeam(row.teamId)}
+                          title="Open in My Team"
+                        >
+                          {row.displayName}
+                        </button>
+                      ) : (
+                        row.displayName
+                      )}
+                    </span>
+                  </td>
                   <td>{row.seasonId}</td>
                   <td>{row.teamCode}</td>
                   <td>{row.playerCount}</td>
@@ -233,20 +256,32 @@ export default function AnalyticsView({
                       ? `${num(row.returningCount)} / ${num(row.newCount)} / ${num(row.unknownMovementCount)}`
                       : '— (no prior)'}
                   </td>
-                  <td>{rate(row.rosterRetentionRate)}</td>
+                  <td>
+                    {row.rosterRetentionRate === null ? (
+                      '—'
+                    ) : (
+                      <span className="metric-chip">{rate(row.rosterRetentionRate)}</span>
+                    )}
+                  </td>
                   <td>
                     {row.yUpCount === null
                       ? '—'
                       : `${row.yUpCount} / ${row.zDownCount}`}
                   </td>
                   <td>
-                    {wlt(row.record)}
-                    <span className="schedule-week"> · {diff(row.pointDifferential)}</span>
+                    <span className="metric-chip">{wlt(row.record)}</span>
+                    <span
+                      className={`diff-chip ${row.pointDifferential >= 0 ? 'diff-pos' : 'diff-neg'}`}
+                    >
+                      {diff(row.pointDifferential)}
+                    </span>
                   </td>
                   <td>
-                    {row.standingsRank !== null
-                      ? `#${row.standingsRank} of ${row.standingsTotalTeams}`
-                      : '—'}
+                    {row.standingsRank !== null ? (
+                      <span className="rank-badge">#{row.standingsRank}</span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td>
                     {row.coachContinuityAvailable ? num(row.coachContinuityReturning) : '—'}
@@ -289,12 +324,27 @@ export default function AnalyticsView({
             <tbody>
               {summary.districtTrends.map((row) => (
                 <tr key={row.districtId}>
-                  <td>{row.districtName}</td>
+                  <td>
+                    <span className="team-cell">
+                      <TeamBrandBadge
+                        branding={getDistrictBranding(row.districtId, districts)}
+                        title={row.districtName}
+                        size="sm"
+                      />
+                      {row.districtName}
+                    </span>
+                  </td>
                   <td>{row.seasonsRepresented.join(', ')}</td>
                   <td>{row.teamCount}</td>
                   <td>{row.playerCount}</td>
-                  <td>{recordWithPct(row.aggregateRecord)}</td>
-                  <td>{diff(row.aggregatePointDifferential)}</td>
+                  <td><span className="metric-chip">{recordWithPct(row.aggregateRecord)}</span></td>
+                  <td>
+                    <span
+                      className={`diff-chip ${row.aggregatePointDifferential >= 0 ? 'diff-pos' : 'diff-neg'}`}
+                    >
+                      {diff(row.aggregatePointDifferential)}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -361,10 +411,23 @@ export default function AnalyticsView({
             <tbody>
               {summary.coachTrends.map((row) => (
                 <tr key={row.coachId}>
-                  <td>{row.displayName}</td>
+                  <td>
+                    {onOpenCoach ? (
+                      <button
+                        type="button"
+                        className="link-button-inline"
+                        onClick={() => onOpenCoach(row.coachId)}
+                        title="Open in Coaches"
+                      >
+                        {row.displayName}
+                      </button>
+                    ) : (
+                      row.displayName
+                    )}
+                  </td>
                   <td>{row.seasonsActive.length}</td>
                   <td>{row.totalAssignments}</td>
-                  <td>{recordWithPct(row.careerRecord)}</td>
+                  <td><span className="metric-chip">{recordWithPct(row.careerRecord)}</span></td>
                   <td>{wlt(row.careerPlayoffRecord)}</td>
                   <td>{wlt(row.careerChampionshipRecord)}</td>
                   <td>
@@ -373,11 +436,11 @@ export default function AnalyticsView({
                       : '—'}
                   </td>
                   <td>
-                    {onOpenCoaches && (
+                    {onOpenCoach && (
                       <button
                         type="button"
                         className="import-link-button"
-                        onClick={() => onOpenCoaches()}
+                        onClick={() => onOpenCoach(row.coachId)}
                       >
                         Coaches →
                       </button>

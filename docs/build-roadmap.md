@@ -845,8 +845,16 @@ aggregate attention summary (info/warning/blocker). It is derived at runtime by
 `buildMultiYearAnalyticsSummary`, composing the existing roster, schedule, standings, cohort,
 and coach helpers; unavailable values are surfaced (never fabricated). Analytics do not
 duplicate authoritative data, are not persisted into workspace snapshots, and reflect in-memory
-roster/schedule/coach changes and snapshot restore. No charting library was added. District
-branding and visual-language polish remain future Phase 9 work.
+roster/schedule/coach changes and snapshot restore. No charting library was added.
+
+Slice 31 adds **visual intelligence polish & cross-tab navigation**: display-only district/team
+branding badges (colored initials, since no logo assets exist), compact record/differential/rank
+chips, and cross-tab navigation (open a team in My Team, a coach in Coaches, or an opponent team)
+across Analytics, Standings, My Team, TeamView, and Coach Directory. Branding and navigation are
+derived from existing workspace data via the pure `teamBrandingDisplay` and `navigationTargets`
+helpers; navigation changes selection/view state only and never mutates data, and empty/unavailable
+states stay plain-language without fabricated zeros. No persistence, storage, or charting library
+was added. District helmet/logo artwork (real image assets) remains future Phase 9 work.
 
 ## Phase 8: My Team panel
 

@@ -48,6 +48,9 @@ export default function CoachDirectoryView({
   coaches,
   coachAssignments,
   games = [],
+  selectedCoachId: controlledSelectedCoachId,
+  onSelectCoach,
+  onOpenTeam,
 }: {
   teams: Team[];
   districts: District[];
@@ -55,6 +58,11 @@ export default function CoachDirectoryView({
   coaches: StaffCoach[];
   coachAssignments: TeamCoachAssignment[];
   games?: Game[];
+  /** Externally controlled selected coach (e.g. cross-tab navigation). Uncontrolled if omitted. */
+  selectedCoachId?: string | null;
+  onSelectCoach?: (coachId: string | null) => void;
+  /** Opens an assigned team in My Team. Display-only navigation; never mutates data. */
+  onOpenTeam?: (teamId: string) => void;
 }) {
   const directory = useMemo(
     () =>
@@ -68,7 +76,22 @@ export default function CoachDirectoryView({
       }),
     [coaches, coachAssignments, teams, games, districts, ageDivisions]
   );
-  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
+  // Selection is controlled when an onSelectCoach handler is supplied, otherwise local.
+  const [internalSelectedCoachId, setInternalSelectedCoachId] = useState<string | null>(null);
+  const isControlled = onSelectCoach !== undefined;
+  const rawSelectedCoachId = isControlled
+    ? controlledSelectedCoachId ?? null
+    : internalSelectedCoachId;
+  // Guard: a selected coach that is no longer in the workspace is treated as no selection.
+  const selectedCoachId =
+    rawSelectedCoachId && coaches.some((c) => c.coachId === rawSelectedCoachId)
+      ? rawSelectedCoachId
+      : null;
+  const setSelectedCoachId = (id: string | null) => {
+    if (isControlled) onSelectCoach!(id);
+    else setInternalSelectedCoachId(id);
+  };
+  const teamIds = useMemo(() => new Set(teams.map((t) => t.teamId)), [teams]);
 
   const selectedHistory = useMemo(() => {
     if (!selectedCoachId) return null;
@@ -233,7 +256,18 @@ export default function CoachDirectoryView({
                   <tr key={a.assignmentId}>
                     <td>{a.seasonId}</td>
                     <td>
-                      {a.teamDisplayName}
+                      {onOpenTeam && !a.unresolvedTeam && teamIds.has(a.teamId) ? (
+                        <button
+                          type="button"
+                          className="link-button-inline"
+                          onClick={() => onOpenTeam(a.teamId)}
+                          title="Open team in My Team"
+                        >
+                          {a.teamDisplayName}
+                        </button>
+                      ) : (
+                        a.teamDisplayName
+                      )}
                       {a.unresolvedTeam && (
                         <span className="schedule-unresolved"> (unresolved team)</span>
                       )}
