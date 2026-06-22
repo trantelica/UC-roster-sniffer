@@ -1137,3 +1137,44 @@ h1 {
   grid-column: 1 / -1;
   background-color: var(--color-alabaster-grey);
 }
+
+/* Multi-year analytics dashboard (Phase 9 slice 30) */
+.analytics-coverage {
+  margin: 0.75rem 0;
+}
+
+.analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem;
+  background-color: var(--color-alabaster-grey);
+  border-radius: 4px;
+}
+
+.analytics-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-carbon-black);
+}
+
+.analytics-filters select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--color-carbon-black);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  min-width: 9rem;
+  font-weight: 400;
+}
+
+.analytics-attention-count {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--color-bronze-spice);
+  min-width: 1.5rem;
+  text-align: right;
+}

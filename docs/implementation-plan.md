@@ -1272,6 +1272,26 @@ Branding improves clarity without overwhelming roster-status badges.
 System colors remain centralized.
 ```
 
+- **Slice 30 (done): multi-year analytics dashboard.** Phase 9 begins. Adds a read-only
+  **Analytics** tab showing season-over-season trends. The pure engine
+  `multiYearAnalyticsSummary.ts` (`buildMultiYearAnalyticsSummary`) composes the existing helpers
+  (`teamScheduleSummary`, `standingsSummary`, `priorSeasonRosterComparisonSummary`,
+  `findPriorSeasonTeam`, `coachHistorySummary`, `detectCohortReclassificationSignals`,
+  `playerDuplicateDetection`) to derive: a season-coverage summary; team trends (roster
+  retention, returning/new/unknown movement, season-wide y-up/z-down candidate counts, record,
+  point differential, standings rank, head coaches, coach continuity); district and age-division
+  aggregate trends; coach trends (per-season + career overall/playoff/championship records, latest
+  assignment); and an aggregate attention summary (stable codes + `info`/`warning`/`blocker`
+  severity + counts). Standings ranks are always computed within the true (season, age-division)
+  group; unavailable values (no prior-season team, no final games) are returned as null, never
+  fabricated zeros. The Analytics UI provides season/district/age-division/team/coach filters
+  (component state only, not persisted) and read-only tables; rows can navigate to the existing
+  My Team / Coaches tabs. Analytics are recomputed at runtime from existing workspace data — they
+  do **not** duplicate authoritative data and are **not** persisted into workspace snapshots
+  (older snapshots remain importable). No backend, auth, cloud DB, `localStorage`, `IndexedDB`,
+  auto-save, sync, durable persistence, roster/game/coach-assignment mutation, opponent object
+  model, destructive identity merge, or charting library was added. See `docs/ui-workflow.md`.
+
 ## Coding agent guardrails
 
 The coding agent should:
