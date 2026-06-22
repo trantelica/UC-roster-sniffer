@@ -74,3 +74,24 @@ export const systemColors = {
 ## Accessibility note
 
 Before final UI implementation, contrast should be checked for text, badges, and card accents. Some color combinations may be better suited for borders or backgrounds than text.
+
+## Visual intelligence components (Phase 9 slice 31)
+
+Slice 31 adds lightweight, display-only visual components built entirely from the existing
+tokens (no charting library, no new design language):
+
+- **District/team brand badge** — a compact colored initials badge produced by the pure
+  `teamBrandingDisplay` helper from the existing district fields (mascot, primary/secondary
+  color, name). Because the workspace ships no logo/helmet image files, the badge always uses a
+  text/initials fallback colored with the district's brand colors (when both are present),
+  rather than an `<img>` — so there is never a broken logo. When a district has no brand colors,
+  the badge falls back to neutral tokens. Branding is display-only and never mutates data.
+- **Scanning chips/badges** — `metric-chip` (records), `diff-chip` (point differential, green for
+  non-negative / bronze for negative), and `rank-badge` (steel-blue rank pill). These improve
+  scanning in Analytics, Standings, My Team, and the coach views.
+- **Inline link buttons** (`link-button-inline`) — steel-blue underlined buttons used for
+  cross-tab navigation (open a team in My Team, a coach in Coaches, or an opponent team). They
+  change selection/view state only.
+
+District branding influences badges and accents while the system palette continues to own the
+overall app structure and readability.

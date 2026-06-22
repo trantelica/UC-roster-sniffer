@@ -626,6 +626,39 @@ The whole view is read-only and recomputes from the in-memory workspace — it r
 schedule / coach import execution, result edits, and workspace snapshot restore, and shows clean
 empty/unavailable states for older snapshots that lack games or coaches.
 
+## Visual intelligence polish & cross-tab navigation (Phase 9 slice 31)
+
+Slice 31 improves how the existing intelligence surfaces are scanned and moved through, without
+adding persistence, a new data model, or a charting library. All additions are display-only and
+derived from existing workspace data.
+
+District/team branding (a colored initials badge from the pure `teamBrandingDisplay` helper)
+appears in the My Team header, Analytics team/district rows, Standings rows, and the TeamView
+header. There are no logo/helmet image files in the workspace, so the badge is always a colored
+initials fallback (never a broken image).
+
+Compact indicators improve scanning: record `metric-chip`s, `diff-chip`s (green/bronze point
+differential), `rank-badge` pills, and the existing playoff/championship/neutral/unresolved tags.
+
+Cross-tab navigation (selection/view state only — never mutates data; disabled when the target no
+longer resolves):
+
+- Analytics team row → opens the team in My Team; Analytics coach row → opens that coach's detail
+  in Coaches.
+- Standings team row → opens the team in My Team.
+- My Team next/last game opponent → opens the opponent team; My Team coach names → open that coach
+  in Coaches.
+- TeamView schedule opponent → opens the opponent team.
+- Coach Directory assignment-history team → opens that team in My Team.
+
+The Coaches tab's selected-coach detail is now externally addressable: App holds the selected
+coach id (component/app state only, not persisted) so navigation can open a specific coach, and it
+is cleared automatically if that coach is no longer in the workspace after a snapshot import.
+
+Empty/unavailable states remain plain-language and never fabricate zeros (e.g. "— (no prior)" for
+roster movement without a prior-season team, "—" for an unavailable rank/retention, and an
+"(unresolved)" tag when an opponent reference cannot be resolved).
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

@@ -14,6 +14,8 @@ import {
 } from '../engine/myTeamSummary';
 import type { TeamScheduleGameView } from '../engine/teamScheduleSummary';
 import type { CoachPerformanceRecord } from '../engine/coachPerformanceSummary';
+import { getTeamBranding } from '../engine/teamBrandingDisplay';
+import TeamBrandBadge from './TeamBrandBadge';
 
 /**
  * Phase 8 slice 29: read-only MY TEAM command center.
@@ -43,11 +45,45 @@ function pct(value: number): string {
   return value.toFixed(3);
 }
 
-function formatGameLine(game: TeamScheduleGameView): string {
+/**
+ * One game line whose opponent is a navigation button when the opponent team resolves to an
+ * existing team and a handler is provided; otherwise the opponent renders as plain text (with an
+ * unresolved tag when the reference could not be resolved).
+ */
+function GameLine({
+  game,
+  teamIds,
+  onOpenTeam,
+}: {
+  game: TeamScheduleGameView;
+  teamIds: Set<string>;
+  onOpenTeam?: (teamId: string) => void;
+}) {
   const date = game.scheduledDate ?? 'TBD';
   const place = game.homeAway === 'home' ? 'vs' : 'at';
   const score = game.scoreDisplay ? ` (${game.scoreDisplay} ${game.resultDisplay})` : '';
-  return `${date} · ${game.weekLabel} · ${place} ${game.opponentDisplayName}${score}`;
+  const canOpen = !!onOpenTeam && !game.unresolvedReference && teamIds.has(game.opponentTeamId);
+  return (
+    <span>
+      {date} · {game.weekLabel} · {place}{' '}
+      {canOpen ? (
+        <button
+          type="button"
+          className="link-button-inline"
+          onClick={() => onOpenTeam!(game.opponentTeamId)}
+          title="Open opponent in My Team"
+        >
+          {game.opponentDisplayName}
+        </button>
+      ) : (
+        game.opponentDisplayName
+      )}
+      {game.unresolvedReference && (
+        <span className="schedule-unresolved"> (unresolved)</span>
+      )}
+      {score}
+    </span>
+  );
 }
 
 export default function MyTeamView({
@@ -60,6 +96,8 @@ export default function MyTeamView({
   selectedTeamId,
   onSelectTeam,
   onNavigate,
+  onOpenTeam,
+  onOpenCoach,
   importedWorkspace = false,
 }: {
   teams: Team[];
@@ -72,8 +110,22 @@ export default function MyTeamView({
   onSelectTeam: (teamId: string) => void;
   /** Optional read-only affordance to jump to an existing tab. */
   onNavigate?: (view: 'roster' | 'schedule' | 'standings' | 'coaches') => void;
+  /** Opens another team (e.g. an opponent) in My Team. Display-only; never mutates data. */
+  onOpenTeam?: (teamId: string) => void;
+  /** Opens a specific coach in the Coaches tab. Display-only; never mutates data. */
+  onOpenCoach?: (coachId: string) => void;
   importedWorkspace?: boolean;
 }) {
+  const teamIds = useMemo(() => new Set(teams.map((t) => t.teamId)), [teams]);
+  const coachIds = useMemo(() => new Set(coaches.map((c) => c.coachId)), [coaches]);
+  const selectedTeam = useMemo(
+    () => (selectedTeamId ? teams.find((t) => t.teamId === selectedTeamId) ?? null : null),
+    [teams, selectedTeamId]
+  );
+  const branding = useMemo(
+    () => (selectedTeam ? getTeamBranding(selectedTeam, districts, ageDivisions) : null),
+    [selectedTeam, districts, ageDivisions]
+  );
   const summary = useMemo(() => {
     if (!selectedTeamId) return null;
     return buildMyTeamSummary({
@@ -154,12 +206,20 @@ export default function MyTeamView({
         <div className="my-team-grid">
           {/* Header card */}
           <section className="my-team-card my-team-card-header">
-            <h3>{summary.identity.displayName}</h3>
+            <div className="my-team-header-title">
+              {branding && (
+                <TeamBrandBadge branding={branding} title={branding.districtName} />
+              )}
+              <h3>{summary.identity.displayName}</h3>
+            </div>
             <div className="team-meta">
               <span><strong>Season:</strong> {summary.identity.seasonId}</span>
               <span><strong>District:</strong> {summary.identity.districtName}</span>
               <span><strong>Age Division:</strong> {summary.identity.ageDivisionName}</span>
-              <span><strong>Class / Code:</strong> {summary.identity.teamCode}</span>
+              <span>
+                <strong>Class / Code:</strong>{' '}
+                {branding ? branding.classificationLabel : summary.identity.teamCode}
+              </span>
               {summary.identity.mascot && (
                 <span><strong>Mascot:</strong> {summary.identity.mascot}</span>
               )}
@@ -269,15 +329,27 @@ export default function MyTeamView({
                 </div>
                 <p className="schedule-highlight">
                   <strong>Next game:</strong>{' '}
-                  {summary.schedule.nextGame
-                    ? formatGameLine(summary.schedule.nextGame)
-                    : 'None scheduled'}
+                  {summary.schedule.nextGame ? (
+                    <GameLine
+                      game={summary.schedule.nextGame}
+                      teamIds={teamIds}
+                      onOpenTeam={onOpenTeam}
+                    />
+                  ) : (
+                    'None scheduled'
+                  )}
                 </p>
                 <p className="schedule-highlight">
                   <strong>Last result:</strong>{' '}
-                  {summary.schedule.lastGame
-                    ? formatGameLine(summary.schedule.lastGame)
-                    : 'No completed games'}
+                  {summary.schedule.lastGame ? (
+                    <GameLine
+                      game={summary.schedule.lastGame}
+                      teamIds={teamIds}
+                      onOpenTeam={onOpenTeam}
+                    />
+                  ) : (
+                    'No completed games'
+                  )}
                 </p>
               </>
             )}
@@ -338,15 +410,19 @@ export default function MyTeamView({
               <>
                 <p className="staff-line">
                   <strong>Head coach:</strong>{' '}
-                  {summary.coaches.headCoaches.length > 0
-                    ? summary.coaches.headCoaches.map((m) => m.displayName).join(', ')
-                    : '—'}
+                  <StaffNames
+                    members={summary.coaches.headCoaches}
+                    coachIds={coachIds}
+                    onOpenCoach={onOpenCoach}
+                  />
                 </p>
                 <p className="staff-line">
                   <strong>Assistants:</strong>{' '}
-                  {summary.coaches.assistantCoaches.length > 0
-                    ? summary.coaches.assistantCoaches.map((m) => m.displayName).join(', ')
-                    : '—'}
+                  <StaffNames
+                    members={summary.coaches.assistantCoaches}
+                    coachIds={coachIds}
+                    onOpenCoach={onOpenCoach}
+                  />
                 </p>
                 <div className="roster-status-summary">
                   <span className="roster-status-count">
@@ -406,6 +482,43 @@ export default function MyTeamView({
         </div>
       )}
     </div>
+  );
+}
+
+/** Renders staff coach names, each a navigation button to the Coaches tab when resolvable. */
+function StaffNames({
+  members,
+  coachIds,
+  onOpenCoach,
+}: {
+  members: { coachId: string; displayName: string }[];
+  coachIds: Set<string>;
+  onOpenCoach?: (coachId: string) => void;
+}) {
+  if (members.length === 0) return <>—</>;
+  return (
+    <>
+      {members.map((m, i) => {
+        const canOpen = !!onOpenCoach && coachIds.has(m.coachId);
+        return (
+          <span key={m.coachId}>
+            {i > 0 && ', '}
+            {canOpen ? (
+              <button
+                type="button"
+                className="link-button-inline"
+                onClick={() => onOpenCoach!(m.coachId)}
+                title="Open in Coaches"
+              >
+                {m.displayName}
+              </button>
+            ) : (
+              m.displayName
+            )}
+          </span>
+        );
+      })}
+    </>
   );
 }
 

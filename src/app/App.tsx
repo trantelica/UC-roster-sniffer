@@ -60,6 +60,9 @@ export default function App() {
   // True once the current workspace has been replaced by an imported snapshot. Used only as a
   // read-only durability cue in the My Team command center; not persisted anywhere.
   const [workspaceFromImport, setWorkspaceFromImport] = useState(false);
+  // Selected coach for the Coaches tab detail (slice 31). Component/app state only; cross-tab
+  // navigation can target a specific coach. Cleared if that coach leaves the workspace.
+  const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
@@ -93,6 +96,25 @@ export default function App() {
 
   function handleTeamChange(teamId: string) {
     setSelectedTeamId(teamId);
+  }
+
+  // Clear a selected coach that no longer exists (e.g. after a workspace snapshot import).
+  useEffect(() => {
+    if (selectedCoachId && !workspace.coaches.some((c) => c.coachId === selectedCoachId)) {
+      setSelectedCoachId(null);
+    }
+  }, [selectedCoachId, workspace.coaches]);
+
+  // Cross-tab navigation (slice 31): open a team in My Team, or a coach in Coaches. These only
+  // change selection/view state — they never mutate source data and persist nothing.
+  function handleOpenTeam(teamId: string) {
+    handleSelectMyTeam(teamId);
+    setView('my-team');
+  }
+
+  function handleOpenCoach(coachId: string) {
+    setSelectedCoachId(coachId);
+    setView('coaches');
   }
 
   // My Team selection: set the team and sync the season/district/age-division cascade to that
@@ -259,6 +281,7 @@ export default function App() {
           coachAssignments={workspace.coachAssignments}
           priorSeasonTeamId={priorTeam?.teamId ?? null}
           onUpdateGameResult={handleUpdateGameResult}
+          onOpenTeam={handleOpenTeam}
         />
       ) : (
         <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
@@ -361,6 +384,8 @@ export default function App() {
           selectedTeamId={selectedTeamId}
           onSelectTeam={handleSelectMyTeam}
           onNavigate={(target) => setView(target)}
+          onOpenTeam={handleOpenTeam}
+          onOpenCoach={handleOpenCoach}
           importedWorkspace={workspaceFromImport}
         />
       </div>
@@ -387,6 +412,7 @@ export default function App() {
           districts={workspace.districts}
           ageDivisions={workspace.ageDivisions}
           defaultSeasonId={selectedSeason}
+          onOpenTeam={handleOpenTeam}
         />
       </div>
       <div hidden={view !== 'coach-import'}>
@@ -407,6 +433,9 @@ export default function App() {
           coaches={workspace.coaches}
           coachAssignments={workspace.coachAssignments}
           games={workspace.games}
+          selectedCoachId={selectedCoachId}
+          onSelectCoach={setSelectedCoachId}
+          onOpenTeam={handleOpenTeam}
         />
       </div>
       <div hidden={view !== 'analytics'}>
@@ -418,11 +447,8 @@ export default function App() {
           games={workspace.games}
           coaches={workspace.coaches}
           coachAssignments={workspace.coachAssignments}
-          onOpenTeam={(teamId) => {
-            handleSelectMyTeam(teamId);
-            setView('my-team');
-          }}
-          onOpenCoaches={() => setView('coaches')}
+          onOpenTeam={handleOpenTeam}
+          onOpenCoach={handleOpenCoach}
         />
       </div>
     </div>

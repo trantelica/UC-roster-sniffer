@@ -1178,3 +1178,115 @@ h1 {
   min-width: 1.5rem;
   text-align: right;
 }
+
+/* Visual intelligence polish & navigation (Phase 9 slice 31) */
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  border: 1px solid var(--color-carbon-black);
+  background-color: var(--color-alabaster-grey);
+  color: var(--color-carbon-black);
+  vertical-align: middle;
+}
+
+.brand-badge-md {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.8rem;
+}
+
+.brand-badge-sm {
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 0.65rem;
+  margin-right: 0.4rem;
+}
+
+.brand-badge-fallback {
+  background-color: var(--color-alabaster-grey);
+  color: var(--color-carbon-black);
+  border-color: var(--color-steel-blue);
+}
+
+.team-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.my-team-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.team-name .brand-badge {
+  margin-right: 0.5rem;
+}
+
+/* Inline link-style button: navigates without looking like a heavy control. */
+.link-button-inline {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-steel-blue);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link-button-inline:hover {
+  color: var(--color-bronze-spice);
+}
+
+/* Compact scanning chips. */
+.metric-chip {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  background-color: var(--color-mint-cream);
+  border: 1px solid var(--color-alabaster-grey);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.diff-chip {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-pos {
+  color: #1f6b2e;
+  background-color: #e7f3ea;
+}
+
+.diff-neg {
+  color: var(--color-bronze-spice);
+  background-color: #f7e9df;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background-color: var(--color-steel-blue);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
