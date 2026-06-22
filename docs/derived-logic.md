@@ -2015,3 +2015,24 @@ A team record should include:
 - championship wins
 
 A game marked `isChampionship: true` is also expected to be a playoff game unless the data source indicates otherwise.
+
+## Workspace data quality / review derivation (Phase 10 slice 32)
+
+The Review Center derives a consolidated, read-only list of data-quality review items from the
+existing workspace via the pure `buildWorkspaceDataQualitySummary` helper. It composes the
+existing deterministic helpers (prior-season comparison, duplicate-identity detection, current
+roster status, cohort reclassification signals, team schedule, standings, coach staff/performance,
+and the schedule/coach reference validators) — it adds no new identity-matching rules and never
+alters, removes, suppresses, merges, or reorders source records. Ambiguity affects derived review
+metadata only.
+
+Each review item carries a stable `issueId` (`${code}|${entityKey}`), a machine-readable `code`,
+a `severity` (`blocker` / `warning` / `info`), a `category`
+(`roster` / `import` / `schedule` / `coach` / `standings` / `analytics` / `workspace`), an
+`entityType`, optional entity references (team/coach/game/season ids), a plain-language
+title/message, an optional detail and recommended action, and an optional navigation target.
+Items are ordered deterministically: severity (blocker > warning > info), then category (fixed
+order), then season descending, then team display name, then code, then issueId. Values that
+cannot be derived (no prior-season team, no final games) are surfaced as info/unavailable, never
+fabricated. Review items are recomputed at runtime and are never persisted into workspace
+snapshots.

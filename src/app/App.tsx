@@ -24,6 +24,7 @@ import CoachImportWorkbench from '../components/CoachImportWorkbench';
 import CoachDirectoryView from '../components/CoachDirectoryView';
 import MyTeamView from '../components/MyTeamView';
 import AnalyticsView from '../components/AnalyticsView';
+import ReviewCenterView from '../components/ReviewCenterView';
 
 const initialAppData = loadSampleData();
 
@@ -35,7 +36,8 @@ type AppView =
   | 'standings'
   | 'coach-import'
   | 'coaches'
-  | 'analytics';
+  | 'analytics'
+  | 'review';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -357,6 +359,14 @@ export default function App() {
         >
           Analytics
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'review' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'review'}
+          onClick={() => setView('review')}
+        >
+          Review Center
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -386,6 +396,7 @@ export default function App() {
           onNavigate={(target) => setView(target)}
           onOpenTeam={handleOpenTeam}
           onOpenCoach={handleOpenCoach}
+          onOpenReview={() => setView('review')}
           importedWorkspace={workspaceFromImport}
         />
       </div>
@@ -449,6 +460,25 @@ export default function App() {
           coachAssignments={workspace.coachAssignments}
           onOpenTeam={handleOpenTeam}
           onOpenCoach={handleOpenCoach}
+          onOpenReview={() => setView('review')}
+        />
+      </div>
+      <div hidden={view !== 'review'}>
+        <ReviewCenterView
+          key={workspaceEpoch}
+          teams={liveTeams}
+          districts={workspace.districts}
+          ageDivisions={workspace.ageDivisions}
+          games={workspace.games}
+          coaches={workspace.coaches}
+          coachAssignments={workspace.coachAssignments}
+          importState={{
+            inMemoryRosterImportActive: inMemoryImport !== null,
+            importedWorkspace: workspaceFromImport,
+          }}
+          onOpenTeam={handleOpenTeam}
+          onOpenCoach={handleOpenCoach}
+          onNavigate={(target) => setView(target)}
         />
       </div>
     </div>

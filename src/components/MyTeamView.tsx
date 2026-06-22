@@ -98,6 +98,7 @@ export default function MyTeamView({
   onNavigate,
   onOpenTeam,
   onOpenCoach,
+  onOpenReview,
   importedWorkspace = false,
 }: {
   teams: Team[];
@@ -114,6 +115,8 @@ export default function MyTeamView({
   onOpenTeam?: (teamId: string) => void;
   /** Opens a specific coach in the Coaches tab. Display-only; never mutates data. */
   onOpenCoach?: (coachId: string) => void;
+  /** Opens the workspace-wide Review Center. Display-only; never mutates data. */
+  onOpenReview?: () => void;
   importedWorkspace?: boolean;
 }) {
   const teamIds = useMemo(() => new Set(teams.map((t) => t.teamId)), [teams]);
@@ -467,6 +470,11 @@ export default function MyTeamView({
                   <AttentionRow key={item.code} item={item} />
                 ))}
               </ul>
+            )}
+            {onOpenReview && (
+              <button type="button" className="import-link-button" onClick={onOpenReview}>
+                Open Review Center →
+              </button>
             )}
           </section>
 
