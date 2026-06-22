@@ -1290,3 +1290,152 @@ h1 {
   font-weight: 700;
   font-size: 0.8rem;
 }
+
+/* Data Quality / Review Center (Phase 10 slice 32) */
+.review-summary {
+  align-items: center;
+  margin: 0.75rem 0;
+}
+
+.review-status {
+  font-weight: 600;
+  margin-left: auto;
+  padding: 0.15rem 0.6rem;
+  border-radius: 3px;
+}
+
+.review-status-clean {
+  color: #1f6b2e;
+  background-color: #e7f3ea;
+}
+
+.review-status-review-recommended {
+  color: var(--color-bronze-spice);
+  background-color: #f7e9df;
+}
+
+.review-status-blocking {
+  color: #fff;
+  background-color: var(--color-carbon-black);
+}
+
+.review-category-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.review-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 5.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-alabaster-grey);
+  border-radius: 6px;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.review-category-card-active {
+  border-color: var(--color-steel-blue);
+  background-color: var(--color-mint-cream);
+}
+
+.review-category-card-count {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-steel-blue);
+}
+
+.review-category-card-label {
+  font-size: 0.78rem;
+  color: var(--color-carbon-black);
+}
+
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.review-item {
+  border: 1px solid var(--color-alabaster-grey);
+  border-left-width: 4px;
+  border-radius: 4px;
+  padding: 0.55rem 0.75rem;
+  background-color: #fff;
+}
+
+.review-item-blocker {
+  border-left-color: var(--color-carbon-black);
+}
+
+.review-item-warning {
+  border-left-color: var(--color-bronze-spice);
+}
+
+.review-item-info {
+  border-left-color: var(--color-steel-blue);
+}
+
+.review-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.review-category-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background-color: var(--color-alabaster-grey);
+  color: var(--color-carbon-black);
+}
+
+.review-item-title {
+  font-weight: 600;
+  color: var(--color-carbon-black);
+}
+
+.review-item-open {
+  margin-left: auto;
+}
+
+.review-item-open-disabled {
+  color: var(--color-alabaster-grey);
+  font-size: 0.85rem;
+}
+
+.review-item-message {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+}
+
+.review-item-detail {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: #555;
+}
+
+.review-item-action {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+}
+
+.analytics-filters input[type='text'] {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--color-carbon-black);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  min-width: 9rem;
+  font-weight: 400;
+}

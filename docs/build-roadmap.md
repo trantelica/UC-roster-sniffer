@@ -856,6 +856,18 @@ helpers; navigation changes selection/view state only and never mutates data, an
 states stay plain-language without fabricated zeros. No persistence, storage, or charting library
 was added. District helmet/logo artwork (real image assets) remains future Phase 9 work.
 
+**Phase 10 has begun.** Slice 32 adds a read-only **Data Quality / Review Center**: a new tab that
+consolidates the data-quality issues already detected across rosters, imports, schedules, coaches,
+standings, and analytics into one filterable, navigable list grouped by severity and category.
+Review items are derived at runtime by the pure `buildWorkspaceDataQualitySummary` helper (which
+composes the existing roster, schedule, standings, cohort, and coach helpers), each with a stable
+id/code, severity, category, entity references, plain-language message, recommended action, and a
+navigation target back to the relevant tab. The Review Center is read-only — it never mutates
+rosters, games, coaches, or imports — navigation changes view/selection state only, and review
+items are recomputed at runtime and never persisted into snapshots. No backend/browser/cloud
+persistence, automated fixes, or charting library was added. Surfacing transient import-workbench
+review rows (which live in child-component state) remains future work.
+
 ## Phase 8: My Team panel
 
 Goal: support season-specific favorite team workflows.

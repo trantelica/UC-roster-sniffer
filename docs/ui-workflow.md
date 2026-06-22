@@ -659,6 +659,40 @@ Empty/unavailable states remain plain-language and never fabricate zeros (e.g. "
 roster movement without a prior-season team, "—" for an unavailable rank/retention, and an
 "(unresolved)" tag when an opponent reference cannot be resolved).
 
+## Data Quality / Review Center (Phase 10 slice 32)
+
+Phase 10 begins with a read-only **Review Center** tab: one operational place to see the
+data-quality issues already detected across rosters, imports, schedules, coaches, standings, and
+analytics. It is derived at runtime by the pure `buildWorkspaceDataQualitySummary` engine and is
+read-only — it never mutates rosters, games, coaches, or imports, and persists nothing (including
+its filters).
+
+Layout:
+
+- **Header summary** — total issue count, blocker/warning/info counts, and a plain-language status
+  ("No major issues found." / "Review recommended." / "Blocking issues need attention before a
+  future durable import.").
+- **Category cards** — clickable Roster / Schedule / Coach / Workspace counts that filter the list.
+- **Filters** — severity, category, season, team, and text search. Component state only; not
+  persisted.
+- **Issue list** — each item shows a severity chip (Info/Review/Blocker), a category chip, a title,
+  a plain-language message, optional detail, a recommended action, and an "Open →" button that
+  navigates to the relevant tab when the target resolves (My Team for a team, Coaches for a coach,
+  Standings/Analytics for a view). When a target no longer resolves, the control renders as a
+  disabled "Unavailable" affordance rather than navigating to a missing entity.
+- **Empty states** — "No data-quality issues detected in the current workspace." when there are no
+  issues, or "No review items found for the current filters." when filters exclude everything.
+
+Issue coverage (composed from the existing helpers): roster (no players, duplicate identities,
+no prior-season team, ambiguous movement, low-confidence identity matches, y-up/z-down candidate
+signals); schedule (unresolved game references, final games missing scores, no schedule, no final
+results); standings (provisional when a season/age-division group has no final games); coach (no
+coach data, unresolved coach assignments, coaches with assignments but no final-game record); and
+workspace/import (sparse seasons, in-memory import active, imported-workspace cue). Review items
+are recomputed after in-memory roster/schedule/coach changes and after a workspace snapshot
+restore, and are never persisted into snapshots. The My Team attention card and the Analytics
+attention summary each include an "Open Review Center →" link.
+
 ## Import collision UI
 
 During roster import, low-confidence identity matches should be surfaced before final commit.

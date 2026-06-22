@@ -1311,6 +1311,27 @@ System colors remain centralized.
   identity merge, duplicated authoritative model, or charting library was added. See
   `docs/ui-workflow.md` and `docs/design-system.md`.
 
+- **Slice 32 (done): Data Quality / Review Center.** Phase 10 begins. Adds a read-only **Review
+  Center** tab that consolidates the data-quality issues already detected across rosters, imports,
+  schedules, coaches, standings, and analytics into one filterable, navigable list. The pure
+  engine `workspaceDataQualitySummary.ts` (`buildWorkspaceDataQualitySummary`) composes the
+  existing helpers (prior-season comparison, duplicate detection, current roster status, cohort
+  reclassification signals, team schedule, standings, coach staff/performance, and the
+  schedule/coach reference validators) to emit deterministic review items, each with a stable
+  `issueId`/`code`, severity (blocker/warning/info), category (roster/import/schedule/coach/
+  standings/analytics/workspace), entity references, plain-language message, recommended action,
+  and a navigation target where resolvable. Counts are aggregated by severity and category, and
+  items are ordered deterministically (severity → category → season desc → team name → code →
+  issueId). The Review Center UI provides severity/category/season/team/text filters (component
+  state only, not persisted), category cards, and per-item navigation (team → My Team, coach →
+  Coaches, view → Standings/Analytics); a stale target renders as a disabled "Unavailable"
+  affordance. My Team and Analytics gained "Open Review Center →" links. Review items recompute
+  after in-memory changes and snapshot restore, are surfaced calmly without fabricating values,
+  and are never persisted into snapshots. No backend, auth, cloud DB, `localStorage`, `IndexedDB`,
+  auto-save, sync, durable persistence, roster/game/coach-assignment mutation, automated fixes,
+  destructive identity merge, persisted review model, opponent object model, or charting library
+  was added. See `docs/ui-workflow.md` and `docs/derived-logic.md`.
+
 ## Coding agent guardrails
 
 The coding agent should:

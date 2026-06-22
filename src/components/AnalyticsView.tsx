@@ -60,6 +60,7 @@ export default function AnalyticsView({
   coachAssignments,
   onOpenTeam,
   onOpenCoach,
+  onOpenReview,
 }: {
   teams: Team[];
   districts: District[];
@@ -70,6 +71,8 @@ export default function AnalyticsView({
   onOpenTeam?: (teamId: string) => void;
   /** Opens a specific coach in the Coaches tab. Display-only; never mutates data. */
   onOpenCoach?: (coachId: string) => void;
+  /** Opens the workspace-wide Review Center. Display-only; never mutates data. */
+  onOpenReview?: () => void;
 }) {
   const [seasonFilter, setSeasonFilter] = useState<string>(''); // '' = all
   const [districtFilter, setDistrictFilter] = useState<string>('');
@@ -473,6 +476,11 @@ export default function AnalyticsView({
               </li>
             ))}
           </ul>
+        )}
+        {onOpenReview && (
+          <button type="button" className="import-link-button" onClick={onOpenReview}>
+            Open Review Center →
+          </button>
         )}
       </section>
     </div>
