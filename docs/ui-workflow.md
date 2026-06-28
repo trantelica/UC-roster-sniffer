@@ -480,9 +480,10 @@ separate, later, explicitly approved slice.
 ### Read-only scraped JSON import UI shell (Phase 5 slice 16)
 
 Slice 16 adds the **first visible import UI**: a read-only scraped JSON import preview
-shell (`src/components/ScrapedImportPreview.tsx`), reachable from a top-level
-"Import preview (read-only)" view toggle in `App.tsx` alongside the existing roster
-view. It is a thin renderer over the existing engine: it builds a slice 14 import
+shell (`src/components/ScrapedImportPreview.tsx`), reachable from a top-level import
+view toggle in `App.tsx` alongside the existing roster view (the toggle was originally
+labelled "Import preview (read-only)" and was renamed to "Roster import" once B1/B2
+added explicit commit actions). It is a thin renderer over the existing engine: it builds a slice 14 import
 session from a chosen **demo source** (the existing scraped JSON test fixtures, plus
 two small inline payloads so the blocked and invalid-source states are visible), lets
 the user select one target, and renders the readiness/preview/review state via a pure

@@ -475,8 +475,11 @@ export default function App() {
         setWorkspace(restored.workspace);
         setWorkspaceFromImport(true);
         setInMemoryImport(null);
-        // The whole workspace was replaced, so a prior committed-import undo is now stale.
+        // The whole workspace was replaced, so any prior committed-import undo (single-team
+        // B1 or whole-file B2) and any whole-file error are now stale and must be cleared.
         setCommittedImportUndo(null);
+        setWholeFileImportUndo(null);
+        setWholeFileImportError(null);
         setSelectedSeason(restored.selection.seasonId);
         setSelectedDistrict(restored.selection.districtId);
         setSelectedAgeDivision(restored.selection.ageDivisionId);
@@ -580,7 +583,7 @@ export default function App() {
           aria-pressed={view === 'import'}
           onClick={() => setView('import')}
         >
-          Import preview (read-only)
+          Roster import
         </button>
         <button
           type="button"
