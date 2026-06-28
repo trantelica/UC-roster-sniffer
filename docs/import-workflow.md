@@ -1084,7 +1084,49 @@ This is the first write boundary, but the write is to current runtime/session st
 **No durable persistence exists**; no `localStorage`, `IndexedDB`, backend, auth, or cloud
 database is involved; prior seasons are never mutated and identities are never destructively
 merged. Reloading or resetting the app must not be treated as preserving the in-memory
-execution. **Durable import persistence remains a future, explicitly approved slice.**
+execution. (Durable import persistence arrived later in Completion Milestone B1 — see below.)
+
+## Commit a previewed scraped-JSON team to the workspace (Completion Milestone B1)
+
+B1 turns a reviewed, ready **player** team import into committed workspace data. It reuses
+the slice 22 pipeline unchanged — the same transaction plan, the same
+`executeUteConferenceScrapedJsonImportTransaction`, and the same
+`evaluateScrapedJsonImportExecutionAvailability` readiness gate — and adds only a small pure
+workspace transformation plus the app wiring.
+
+**Distinct from the slice 22 in-memory execution.** The in-memory execution writes the
+`executedTeam` into the transient runtime overlay (`inMemoryImport`); it is preview-only and
+does not survive a reload. B1 **commit** instead writes that same `executedTeam` into the
+committed `workspace` state, which then auto-saves to IndexedDB via Completion Milestone A1
+and is included by the A2 Export Dataset. The two are not stacked: committing clears any
+active in-memory overlay.
+
+Engine (`src/engine/workspaceImportCommit.ts`, pure, tested):
+
+- `commitImportedTeamToWorkspace(workspace, committedTeam)` — replaces ONLY the team that
+  shares `committedTeam.teamId`, preserving every other team, game, coach, coach assignment,
+  district, age division, and selection exactly. Returns the new workspace plus the previous
+  team value (for undo). Refuses (`committed: false`) when no team with that id exists — it
+  updates an existing team only and never silently creates a new team. It never re-implements
+  the add/link/defer roster semantics: those belong to the execution helper, which produced
+  `committedTeam`.
+- `undoImportedTeamCommitInWorkspace(workspace, previousTeam)` — restores the previous team
+  value into the CURRENT workspace, replacing only that team, so any unrelated later changes
+  are preserved.
+
+In the workbench: after load → select → review → stage, the user clicks **Commit Import to
+Workspace** (offered only when the readiness gate passes; disabled for unresolved / blocked /
+needs-review / missing-context / not-staged targets, and while an in-memory preview is
+active). The committed team appears in the normal roster view, a top banner reads
+"Committed import saved locally" with the before→after counts, and **Undo Committed Import**
+reverts it for the current session (the undo affordance itself is session-only; the committed
+data is durable via A1 and survives reload). Loaded roster records remain authoritative:
+existing names are preserved exactly and in order, duplicates are not merged, links are
+no-ops, and deferred/rejected rows are never added — nothing is silently resolved.
+
+**Scope:** B1 commits **player roster teams** only. Coach scraped-JSON commit needs a new
+engine path beyond the existing helpers and is deferred to a later slice. No backend, auth,
+cloud DB, `localStorage`, whole-file multi-team import, or district registry is introduced.
 
 ## Portable workspace snapshot export / import (Phase 5 slice 23)
 

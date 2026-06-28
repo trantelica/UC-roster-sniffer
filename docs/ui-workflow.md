@@ -46,6 +46,28 @@ commit; committing previewed imports is a later slice.)
 After a successful import, a summary line reports seasons, districts, teams, players, games,
 and coaches.
 
+## Commit a scraped-JSON team import (Completion Milestone B1)
+
+The import workbench can now commit a reviewed **player** team into the workspace (not just
+preview it in memory):
+
+- After loading a source, selecting a ready target, resolving identity rows, and staging the
+  preview, a **Commit Import to Workspace** button is offered. It is disabled (with a reason)
+  for unresolved, blocked, needs-review, missing-context, or not-yet-staged targets, and
+  while a separate in-memory preview is active — so an unready import can never be committed.
+- Committing writes the team into the committed workspace: it appears in the normal roster
+  view, **auto-saves to this browser** (IndexedDB, A1), and is included in an exported
+  dataset (A2). A banner reads **"Committed import saved locally"** with the before→after
+  player counts.
+- **Undo Committed Import** (in that banner) reverts the team to its exact pre-commit state.
+  The undo affordance is **current-session only** — the committed data itself is durable and
+  survives a reload, but the undo button does not reappear after a reload.
+- Existing roster records are preserved exactly and in order; duplicate names are not merged,
+  confirmed matches are no-ops, and deferred rows are not added. Nothing is silently resolved.
+- The separate **Execute In-Memory Import** action remains for a non-saving preview in the
+  roster view; commit is the durable counterpart. Coach scraped-JSON commit is not yet
+  available.
+
 ## Primary navigation
 
 The primary navigation path is:
