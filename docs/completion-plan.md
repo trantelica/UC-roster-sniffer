@@ -1,6 +1,6 @@
 # Completion Plan
 
-Status: **in progress — A1 (IndexedDB persistence) landed; A2 next**
+Status: **in progress — A1 + A2 (durable persistence + portable dataset) landed; B1 next**
 Date: 2026-06-27 (last updated 2026-06-27)
 Owner: product owner (novice vibe coder)
 
@@ -124,6 +124,16 @@ finishes the roadmap (D) and hardens (E).
     (`build → export JSON → parse → restore` yields equivalent workspace data) in
     addition to a manual cross-browser check.
   - *Acceptance:* Owner can see data is saved at a glance.
+  - **Landed (2026-06-27).** Toolbar now reads **Export Dataset (.json)** / **Import
+    Dataset (.json)** with copy distinguishing browser auto-save (this machine) from the
+    portable file. **Export uses the committed `workspace` only** (never the transient
+    `inMemoryImport` overlay); when an overlay is active the copy says the preview is not
+    included. Import goes through `parseWorkspaceSnapshotJson` + `restoreWorkspaceFromSnapshot`
+    (replace, never merge), clears the overlay, and auto-saves via A1. The imported summary
+    now includes coaches. Automated round-trip proof in
+    `src/test/workspaceDatasetRoundTrip.test.ts` (export JSON → parse → restore → re-export
+    yields canonically equivalent workspace data, ignoring only the volatile timestamp). No
+    second export format; no import commit.
 
 ### Workstream B — Make scraped-JSON import actually commit (end-to-end)
 
@@ -215,7 +225,7 @@ up exactly where the last one stopped.
 
 **Milestone 1 — "It's a real tool"**
 - [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: #65 · landed 2026-06-27
-- [ ] **A2** — One-click portable export/import + save indicator (round-trip test) · PR: _ · _
+- [x] **A2** — One-click portable export/import + save indicator (round-trip test) · branch: `milestoneA2-portable-dataset-export-import` · PR: _pending_ · landed 2026-06-27
 - [ ] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · PR: _ · _
 - [ ] **C1** — District registry model + persistence (seed Ute Conference districts) · PR: _ · _
 - [ ] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · PR: _ · _

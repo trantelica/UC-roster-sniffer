@@ -263,18 +263,21 @@ export default function App() {
     setWorkspace((current) => ({ ...current, coaches, coachAssignments }));
   }
 
-  // --- Slice 23: portable workspace snapshot export / import ---------------
+  // --- Slice 23 + A2: portable dataset export / import --------------------
 
+  // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
+  // not `liveTeams`, so a transient/undoable in-memory import overlay is never written into
+  // the portable file as if it were committed data (A2 critical product rule). The toolbar
+  // copy tells the user the active import preview is excluded when an overlay is active.
   function handleExportSnapshot() {
     const snapshot = buildWorkspaceSnapshot({
       workspace: {
         districts: workspace.districts,
         ageDivisions: workspace.ageDivisions,
-        // The CURRENT in-memory roster, including any executed in-memory import additions.
-        teams: liveTeams,
-        // Schedules/results travel with the workspace snapshot (slice 24).
+        teams: workspace.teams,
+        // Schedules/results travel with the dataset (slice 24).
         games: workspace.games,
-        // Coaches/assignments travel with the workspace snapshot (slice 27).
+        // Coaches/assignments travel with the dataset (slice 27).
         coaches: workspace.coaches,
         coachAssignments: workspace.coachAssignments,
         selection: {
@@ -291,7 +294,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `uc-roster-sniffer-workspace-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `uc-roster-sniffer-dataset-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -633,10 +636,10 @@ function WorkspaceToolbar({
     <div className="workspace-toolbar">
       <div className="workspace-toolbar-actions">
         <button type="button" className="workspace-button" onClick={onExport}>
-          Export Workspace Snapshot
+          Export Dataset (.json)
         </button>
         <label className="workspace-button workspace-import-label">
-          Import Workspace Snapshot
+          Import Dataset (.json)
           <input
             ref={importInputRef}
             type="file"
@@ -647,27 +650,31 @@ function WorkspaceToolbar({
         </label>
         <PersistenceIndicator status={persistenceStatus} />
         <span className="workspace-toolbar-note">
-          Auto-saves to this browser (IndexedDB) · Export for a portable backup you can share
+          Auto-save (IndexedDB) keeps your work in this browser · Export Dataset makes a
+          portable file you can hand to another coach
         </span>
       </div>
       <p className="workspace-toolbar-warning">
-        Your workspace auto-saves to this browser (local IndexedDB) and reloads automatically
-        next time. Importing a snapshot <strong>replaces</strong> the current workspace after
-        validation and clears any active in-memory import (including undo).
+        <strong>Two separate things:</strong> your workspace <em>auto-saves to this browser</em>
+        {' '}(local IndexedDB) and reloads automatically next time — that stays on this machine.
+        {' '}<strong>Export Dataset</strong> writes a portable <code>.json</code> of your whole
+        committed dataset that someone else can <strong>Import Dataset</strong> in their own
+        browser to get the same workspace; nothing is sent off this machine.{' '}
+        <strong>Import Dataset replaces</strong> the current workspace after validation and
+        clears any active in-memory import (including undo).
         {inMemoryImportActive
-          ? ' An in-memory import is currently active — importing will discard it.'
-          : ''}{' '}
-        Export saves a portable JSON backup file you can hand to someone else; nothing is sent
-        off this machine.
+          ? ' Note: an in-memory import preview is active — it is NOT part of an exported' +
+            ' dataset (only committed data is exported), and importing will discard it.'
+          : ''}
       </p>
 
       {notice && notice.kind === 'restored' && (
         <div className="workspace-notice workspace-notice-ok">
-          <strong>Workspace restored from “{notice.fileName}”.</strong>{' '}
+          <strong>Dataset imported from “{notice.fileName}”.</strong>{' '}
           {notice.summary.seasonCount} seasons · {notice.summary.districtCount} districts ·{' '}
           {notice.summary.teamCount} teams · {notice.summary.playerCount} players ·{' '}
-          {notice.summary.gameCount} games. The current workspace was replaced and saved
-          locally to this browser.
+          {notice.summary.gameCount} games · {notice.summary.coachCount} coaches. The current
+          workspace was replaced and saved locally to this browser.
           <button type="button" className="import-link-button" onClick={onDismissNotice}>
             Dismiss
           </button>
