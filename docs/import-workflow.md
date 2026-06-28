@@ -1128,6 +1128,43 @@ no-ops, and deferred/rejected rows are never added — nothing is silently resol
 engine path beyond the existing helpers and is deferred to a later slice. No backend, auth,
 cloud DB, `localStorage`, whole-file multi-team import, or district registry is introduced.
 
+## Registry-backed district mapping + confirm/add unknown district (Completion Milestone C1/C3)
+
+The scraped-JSON canonical mapping already accepts an exact-name `districtRegistry`
+(`name` → `districtId`). C3 feeds the **committed workspace district registry** into it:
+the import workbench builds the lookup from the **active** districts (matching on `name`
+and any `sourceLabels`) via `buildDistrictNameRegistryLookup` and passes it as the import
+session's `districtRegistry` option.
+
+- **Registered districts resolve at `high` confidence** and no longer emit the
+  `district-mapping-provisional` warning.
+- Matching is **exact only** — never fuzzy. `Bingham` and `Bingham Girls` stay distinct.
+- **Active matches are preferred over inactive ones.** Inactive districts are excluded from
+  the lookup, so they are never preferred for new import mapping.
+- An **unknown** scraped district label is preserved exactly and stays `provisional` until
+  confirmed.
+
+**Confirm/add unknown district (narrow — not full District Maintenance).** When a selected
+target's district is provisional, the workbench shows an **Add district to registry** action.
+Confirming calls `confirmUnknownScrapedDistrict`, which always yields an **active** registry
+outcome (so the action is never a dead no-op):
+
+- An exact **active** match is reused unchanged (idempotent).
+- When the only exact match(es) are **inactive**, the existing inactive record is
+  **reactivated** (status flipped back to active) — it is reactivated, not duplicated or
+  deleted, so a previously-retired district keeps its id and branding and the scraped label
+  resolves again. (`outcome: 'reactivated'`.)
+- When there is **no** exact match, a new **active** record is appended with a deterministic
+  id (the name slug, disambiguated on collision), the exact scraped name, the scraped name
+  recorded as a `sourceLabel`, and **placeholder/provisional branding**
+  (`brandingProvisional: true`). (`outcome: 'added'`.)
+
+Matching stays exact (never fuzzy). The updated registry lands in committed `workspace` state (auto-saved via A1, exported by A2), and
+the workbench **re-derives its mapping reactively** (the district prop changes; no remount,
+so the loaded source and selected target are preserved) — the district is then no longer
+provisional. Full branding/image/inactivate editing remains the **C2 District Maintenance**
+screen; this slice adds no edit forms, image pickers, or color pickers.
+
 ## Portable workspace snapshot export / import (Phase 5 slice 23)
 
 Slice 23 adds **portable workspace snapshots**: the user can explicitly export the current

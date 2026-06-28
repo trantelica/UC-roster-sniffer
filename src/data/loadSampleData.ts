@@ -2,8 +2,9 @@ import districtConfig from '../../data-samples/district-config.sample.json';
 import rosterImport2026 from '../../data-samples/roster-import.sample.json';
 import rosterImport2025 from '../../data-samples/roster-import-2025.sample.json';
 import gamesSample from '../../data-samples/games.sample.json';
-import type { AppData, Game, Team, Coach } from '../domain/types';
+import type { AppData, District, Game, Team, Coach } from '../domain/types';
 import { deriveCoachesAndAssignmentsFromTeams } from '../engine/coachModel';
+import { coerceDistrictRecord, ensureSeedDistricts } from '../engine/districtRegistry';
 
 function toCoach(raw: { name: string }): Coach {
   return { name: raw.name };
@@ -65,8 +66,16 @@ export function loadSampleData(): AppData {
   // returns the next year is one coach with two assignments). This never mutates rosters.
   const { coaches, coachAssignments } = deriveCoachesAndAssignmentsFromTeams(teams);
 
+  // C1: the workspace `districts` collection IS the district registry. Coerce the sample
+  // districts (defaulting a missing status to active) and ensure the known seed districts
+  // are present, so scraped imports can resolve districts against a real registry.
+  const sampleDistricts = districtConfig.districts
+    .map(coerceDistrictRecord)
+    .filter((d): d is District => d !== null);
+  const districts = ensureSeedDistricts(sampleDistricts);
+
   return {
-    districts: districtConfig.districts,
+    districts,
     ageDivisions: districtConfig.ageDivisions,
     teams,
     games,

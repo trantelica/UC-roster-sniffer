@@ -1,6 +1,6 @@
 # Completion Plan
 
-Status: **in progress — A1 + A2 + B1 (persistence, portable dataset, scraped-JSON team commit) landed; C1 next**
+Status: **in progress — A1 + A2 + B1 + C1 + C3 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping) landed; B2 / C2 next**
 Date: 2026-06-27 (last updated 2026-06-28)
 Owner: product owner (novice vibe coder)
 
@@ -170,6 +170,16 @@ finishes the roadmap (D) and hardens (E).
   workspace. Seed it with the known Ute Conference districts.
   - *Acceptance:* Registry persists across restarts; known districts resolve to `high`
     confidence instead of `provisional`.
+  - **Landed (2026-06-28).** The workspace `districts` collection IS the registry (no second
+    system). `District` gained optional `status` (`active`/`inactive`; absent = active),
+    optional `sourceLabels` (exact scraped-label aliases), and optional `brandingProvisional`
+    (placeholder branding flag). Pure helpers in `src/engine/districtRegistry.ts`
+    (coerce/validate, seed, ensure-without-duplicates, find active/inactive/by-id/by-exact-name,
+    build name→id lookup, confirm-unknown, inactivate — **no hard-delete**). Deterministic seed
+    in `src/data/districtRegistrySeed.ts` (Alta, Brighton — reusing repo branding, not invented).
+    Snapshot copy/validation carry the new fields; older snapshots without `status` restore as
+    active and round-trip unchanged. Auto-save (A1) and Export/Import (A2) carry the registry
+    naturally. Image references stay plain string paths (no bytes). Districts are never deleted.
 
 - **C2 — District Maintenance screen.**
   An in-app utility to list, add, edit, and inactivate districts; set name/mascot/colors;
@@ -184,6 +194,17 @@ finishes the roadmap (D) and hardens (E).
   (then it's remembered).
   - *Acceptance:* The "provisional district" warning disappears for registered
     districts; new districts can be confirmed during import.
+  - **Landed (2026-06-28).** The import workbench builds an exact-name lookup from the
+    **active** workspace registry (`buildDistrictNameRegistryLookup`) and passes it as the
+    existing `districtRegistry` option into the import session, so a registered district
+    resolves at `high` confidence with no `district-mapping-provisional` issue. Matching is
+    EXACT only (name or `sourceLabels`); active matches beat inactive; distinct names
+    ("Bingham" vs "Bingham Girls") are never collapsed. A provisional district shows an **Add
+    district to registry** action that calls `confirmUnknownScrapedDistrict` into committed
+    workspace state (auto-saved via A1); the workbench re-derives reactively (district prop
+    change — no remount, loaded source preserved) so the district is no longer provisional.
+    The full **District Maintenance** screen (edit branding, pick images, inactivate) remains
+    C2.
 
 ### Workstream D — Remaining roadmap polish (full-scope completion)
 
@@ -236,9 +257,9 @@ up exactly where the last one stopped.
 **Milestone 1 — "It's a real tool"**
 - [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: #65 · landed 2026-06-27
 - [x] **A2** — One-click portable export/import + save indicator (round-trip test) · branch: `milestoneA2-portable-dataset-export-import` · PR: #66 · landed 2026-06-27
-- [x] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · branch: `milestoneB1-scraped-json-team-commit` · PR: _pending_ · landed 2026-06-28
-- [ ] **C1** — District registry model + persistence (seed Ute Conference districts) · PR: _ · _
-- [ ] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · PR: _ · _
+- [x] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · branch: `milestoneB1-scraped-json-team-commit` · PR: #67 · landed 2026-06-28
+- [x] **C1** — District registry model + persistence (seed Ute Conference districts) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: _pending_ · landed 2026-06-28
+- [x] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: _pending_ · landed 2026-06-28
 
 **Milestone 2 — "Full data in, fully managed"**
 - [ ] **B2** — Whole-file import flow (multiple teams from readiness report) · PR: _ · _
@@ -256,6 +277,9 @@ up exactly where the last one stopped.
 
 ## Next slice
 
-**Slice A1 (IndexedDB persistence).** It is the foundation every other usable feature
-relies on, reuses your existing snapshot code, and immediately fixes the most painful
-gap (data not surviving a restart). No open questions remain — ready to start.
+**Milestone 1 is complete** (A1, A2, B1, C1, C3): scraped data loads, commits, persists
+across restarts, and districts resolve against a real registry. The next slices are in
+**Milestone 2 — "Full data in, fully managed":** **B2** (whole-file import of all ready
+teams in one guided pass) and **C2** (the full District Maintenance screen to add/edit/
+inactivate districts and point them at helmet/logo files in `public/districts/`). Either is
+ready to start; C2 builds directly on the C1 registry model.

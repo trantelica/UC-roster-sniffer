@@ -68,6 +68,27 @@ preview it in memory):
   roster view; commit is the durable counterpart. Coach scraped-JSON commit is not yet
   available.
 
+## Registry-backed districts + confirm/add unknown district (Completion Milestone C1/C3)
+
+The import workbench now resolves scraped district labels against the committed workspace
+**district registry** (the `districts` collection), so known districts stop showing as
+provisional:
+
+- When a selected target's district matches a registered district (by exact name or source
+  label), the detail panel reads **"District resolved from your registry: <id>"** and the
+  context confidence is `high` — the provisional-district warning is gone.
+- When the scraped district is **not** in the registry, the panel shows the exact scraped
+  name with an **Add district to registry** button. Clicking it adds an **active** district
+  with placeholder branding, remembers the exact scraped name, **auto-saves** (IndexedDB,
+  A1), and the workbench re-derives in place so the district immediately resolves at `high`
+  confidence — the loaded source and selected target are kept (no reset). Confirming the
+  same name again is a no-op.
+- This is intentionally **narrow**: it only adds/confirms a district from the import flow.
+  Editing branding (mascot, colors), pointing a district at helmet/logo files in
+  `public/districts/`, and marking a district **inactive** all live in the full **District
+  Maintenance** screen, which is **Completion Milestone C2** (not yet built). Districts are
+  never deleted — inactivation is the only retirement path.
+
 ## Primary navigation
 
 The primary navigation path is:

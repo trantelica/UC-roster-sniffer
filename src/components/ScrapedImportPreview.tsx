@@ -27,7 +27,8 @@ import {
   evaluateScrapedJsonImportExecutionAvailability,
   type ScrapedImportExecutionResult,
 } from '../engine/uteConferenceScrapedJsonImportExecution';
-import type { Team } from '../domain/types';
+import type { District, Team } from '../domain/types';
+import { buildDistrictNameRegistryLookup } from '../engine/districtRegistry';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
@@ -142,13 +143,19 @@ function ReadinessBadge({ status }: { status: string }) {
 
 export default function ScrapedImportPreview({
   baselineTeams,
+  districts,
   onInMemoryImportChange,
   onCommitImport,
+  onConfirmDistrict,
 }: {
   baselineTeams: Team[];
+  // C3: the committed workspace district registry; scraped district labels resolve against it.
+  districts: District[];
   onInMemoryImportChange: (state: InMemoryImportAppState | null) => void;
   // B1: commit the previewed/ready team into the committed workspace (durable via A1).
   onCommitImport: (payload: ScrapedImportCommitPayload) => void;
+  // C3: confirm/add an unknown scraped district into the registry (durable via A1).
+  onConfirmDistrict: (rawName: string) => void;
 }) {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
@@ -167,9 +174,20 @@ export default function ScrapedImportPreview({
   const executed =
     executionResult !== null && executionResult.status === 'executed';
 
+  // C3: exact-name lookup built from the active workspace district registry. When the
+  // registry changes (e.g. after confirming an unknown district), this recomputes and the
+  // session below re-derives so the district is no longer provisional — no remount needed.
+  const districtRegistry = useMemo(
+    () => buildDistrictNameRegistryLookup(districts),
+    [districts]
+  );
+
   const baseSession = useMemo(
-    () => (loaded ? createUteScrapedJsonImportSessionFromPayload(loaded.payload) : null),
-    [loaded]
+    () =>
+      loaded
+        ? createUteScrapedJsonImportSessionFromPayload(loaded.payload, { districtRegistry })
+        : null,
+    [loaded, districtRegistry]
   );
 
   const session = useMemo(() => {
@@ -452,6 +470,7 @@ export default function ScrapedImportPreview({
           onExecute={executeInMemory}
           onUndo={undoInMemory}
           onCommit={commitToWorkspace}
+          onConfirmDistrict={onConfirmDistrict}
         />
       )}
     </div>
@@ -477,6 +496,7 @@ function Workbench({
   onExecute,
   onUndo,
   onCommit,
+  onConfirmDistrict,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -492,6 +512,7 @@ function Workbench({
   onExecute: () => void;
   onUndo: () => void;
   onCommit: () => void;
+  onConfirmDistrict: (rawName: string) => void;
 }) {
   const executed = executionResult !== null && executionResult.status === 'executed';
   return (
@@ -568,6 +589,7 @@ function Workbench({
             onExecute={onExecute}
             onUndo={onUndo}
             onCommit={onCommit}
+            onConfirmDistrict={onConfirmDistrict}
           />
         </>
       )}
@@ -682,6 +704,7 @@ function SelectedTargetDetail({
   onExecute,
   onUndo,
   onCommit,
+  onConfirmDistrict,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -695,6 +718,7 @@ function SelectedTargetDetail({
   onExecute: () => void;
   onUndo: () => void;
   onCommit: () => void;
+  onConfirmDistrict: (rawName: string) => void;
 }) {
   const selected = vm.selected;
   const rosterReview = vm.rosterReview;
@@ -743,6 +767,30 @@ function SelectedTargetDetail({
             <strong>{selected.canonicalContext.contextConfidence}</strong>
           </div>
         </div>
+      )}
+
+      {selected.district?.isProvisional && selected.district.rawName && (
+        <div className="import-district-confirm">
+          <p className="import-warn">
+            District <strong>“{selected.district.rawName}”</strong> is not in your district
+            registry yet, so it is mapped provisionally. Add it once to remember it — future
+            imports of this district will then resolve automatically.
+          </p>
+          <button
+            type="button"
+            className="import-action-button"
+            onClick={() => onConfirmDistrict(selected.district!.rawName as string)}
+            disabled={executed}
+          >
+            Add district to registry
+          </button>
+        </div>
+      )}
+
+      {selected.district?.isRegistered && (
+        <p className="import-reasons">
+          District resolved from your registry: <strong>{selected.district.canonicalId}</strong>.
+        </p>
       )}
 
       {selected.readinessReasons.length > 0 && (

@@ -29,6 +29,7 @@ import {
   commitImportedTeamToWorkspace,
   undoImportedTeamCommitInWorkspace,
 } from '../engine/workspaceImportCommit';
+import { confirmUnknownScrapedDistrict } from '../engine/districtRegistry';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
@@ -327,6 +328,24 @@ export default function App() {
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
+  // --- Milestone C3: confirm/add an unknown scraped district into the registry ---
+
+  // Adds the exact scraped district name into the committed workspace district registry as an
+  // active, placeholder-branded record (idempotent — an existing exact match is reused). The
+  // workspace-data change auto-saves via A1 and is included by A2 Export Dataset. No epoch
+  // bump: the import workbench takes `workspace.districts` as a prop and re-derives its
+  // mapping reactively, so the just-confirmed district resolves without losing the loaded
+  // source or selected target.
+  function handleConfirmScrapedDistrict(rawName: string) {
+    setWorkspace((current) => {
+      const result = confirmUnknownScrapedDistrict(current.districts, rawName);
+      // `changed` covers both appending a new district and reactivating an inactive-only
+      // exact match, so confirming an inactive district is never a dead no-op.
+      if (!result.changed) return current;
+      return { ...current, districts: result.districts };
+    });
+  }
+
   // --- Slice 23 + A2: portable dataset export / import --------------------
 
   // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
@@ -595,8 +614,10 @@ export default function App() {
         <ScrapedImportPreview
           key={workspaceEpoch}
           baselineTeams={workspace.teams}
+          districts={workspace.districts}
           onInMemoryImportChange={setInMemoryImport}
           onCommitImport={handleCommitScrapedImport}
+          onConfirmDistrict={handleConfirmScrapedDistrict}
         />
       </div>
       <div hidden={view !== 'schedule'}>
