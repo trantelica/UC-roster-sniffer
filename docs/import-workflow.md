@@ -1214,6 +1214,27 @@ undo affordance does not. B1 single-team commit and the C3 confirm/add district 
 to work alongside the batch action; the batch action is disabled while a single-target
 in-memory preview is executed.
 
+## Two import paths & wrong-file guidance (Completion Milestone E2)
+
+There are deliberately **two distinct import paths**, and a file belongs in exactly one:
+
+- **Import Dataset** (top toolbar) — opens a portable **UC Roster Sniffer dataset export**
+  (`.json` from Export Dataset) and **replaces** the whole workspace.
+- **Roster import** (tab) — loads a **scraped Ute Conference** players/coaches JSON and
+  previews/commits per-team or whole-file.
+
+A small pure classifier (`classifyImportFileShape`) lets each path recognise when it was handed
+the OTHER kind of file and say so in plain language (no auto-routing — guidance only):
+
+- A **scraped** file dropped into Import Dataset → “This looks like a scraped Ute Conference
+  file… use Roster import instead.”
+- A **dataset export** dropped into Roster import → “This looks like a UC Roster Sniffer
+  dataset export… use Import Dataset instead.”
+- A **coaches** scrape in the Roster workbench is previewable per target, but the whole-file
+  import path is **player-only** (coach commit is not yet available) and says so.
+
+See `docs/ui-workflow.md` for the message structure (Title / What happened / Try this).
+
 ## Portable workspace snapshot export / import (Phase 5 slice 23)
 
 Slice 23 adds **portable workspace snapshots**: the user can explicitly export the current

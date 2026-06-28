@@ -16,6 +16,7 @@ import type { TeamScheduleGameView } from '../engine/teamScheduleSummary';
 import type { CoachPerformanceRecord } from '../engine/coachPerformanceSummary';
 import { getTeamBranding } from '../engine/teamBrandingDisplay';
 import TeamBrandBadge from './TeamBrandBadge';
+import EmptyState from './EmptyState';
 
 /**
  * Phase 8 slice 29: read-only MY TEAM command center.
@@ -110,7 +111,7 @@ export default function MyTeamView({
   selectedTeamId: string | null;
   onSelectTeam: (teamId: string) => void;
   /** Optional read-only affordance to jump to an existing tab. */
-  onNavigate?: (view: 'roster' | 'schedule' | 'standings' | 'coaches') => void;
+  onNavigate?: (view: 'roster' | 'schedule' | 'standings' | 'coaches' | 'import') => void;
   /** Opens another team (e.g. an opponent) in My Team. Display-only; never mutates data. */
   onOpenTeam?: (teamId: string) => void;
   /** Opens a specific coach in the Coaches tab. Display-only; never mutates data. */
@@ -177,23 +178,35 @@ export default function MyTeamView({
         export a workspace snapshot to keep changes.
       </p>
 
-      <div className="my-team-picker">
-        <label htmlFor="my-team-select">Team</label>
-        <select
-          id="my-team-select"
-          value={selectedTeamId ?? ''}
-          onChange={(e) => onSelectTeam(e.target.value)}
-        >
-          <option value="">Select a team</option>
-          {teamOptions.map((o) => (
-            <option key={o.teamId} value={o.teamId}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {teams.length === 0 ? (
+        <EmptyState
+          title="No teams to show yet"
+          message="Import a roster first and your teams will appear here as a consolidated command center."
+          actions={
+            onNavigate
+              ? [{ label: 'Go to Roster import', onClick: () => onNavigate('import'), primary: true }]
+              : []
+          }
+        />
+      ) : (
+        <div className="my-team-picker">
+          <label htmlFor="my-team-select">Team</label>
+          <select
+            id="my-team-select"
+            value={selectedTeamId ?? ''}
+            onChange={(e) => onSelectTeam(e.target.value)}
+          >
+            <option value="">Select a team</option>
+            {teamOptions.map((o) => (
+              <option key={o.teamId} value={o.teamId}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      {!selectedTeamId && (
+      {teams.length > 0 && !selectedTeamId && (
         <p className="empty-state">
           Select a team above to see its consolidated command center.
         </p>

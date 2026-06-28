@@ -141,6 +141,40 @@ registry (`workspace.districts`).
   (C3/B2) immediately. There is **no district deletion** and **no image upload / file picker**
   — logo/helmet are plain filename references into `public/districts/`.
 
+## First-run & empty states (Completion Milestone E1)
+
+Driven by the pure `assessWorkspaceEmptiness` / `recommendedFirstRunActions` helpers
+(`src/engine/workspaceEmptyState.ts`), so the UI is not littered with `length === 0` checks.
+
+- **First-run (no teams):** the Roster tab shows a calm explainer card (a reusable
+  `EmptyState` component) instead of an empty filter bar. Copy makes clear the workspace is
+  **local to this browser, auto-saves here, and nothing is uploaded**, and offers next-action
+  buttons that switch views via existing state (no routing, no wizard): **Go to Roster
+  import**, **Import Dataset (.json)** (opens the toolbar file picker), and **Manage
+  Districts**.
+- **Other empty states:** My Team shows a no-teams card with a Roster-import button; the
+  Roster tab, when teams exist but none is selected, prompts to pick a season/district/age/
+  team. Existing per-view empty copy (schedule, standings, coaches, review, import targets) is
+  kept.
+- The bundled **sample workspace has teams, so it is never treated as empty** — the first-run
+  state appears only for a genuinely team-less workspace.
+
+## Plain-language file-error handling (Completion Milestone E2)
+
+Both import paths translate the existing deterministic validators into a calm, structured
+message — **Title / “What happened” / “Try this”** with an optional small technical detail
+line — instead of raw codes or parser internals. Validation itself is unchanged (nothing is
+loosened to accept bad files).
+
+- **Import Dataset (top toolbar):** invalid JSON, wrong shape / not a dataset export,
+  unsupported schema version, missing/invalid workspace sections, and file-read failure each
+  get plain guidance. If the file is actually a scraped Ute Conference file, the message says
+  to use **Roster import** instead.
+- **Roster import:** empty file, invalid JSON, and parsed-but-unsupported sources get plain
+  guidance. If the file is actually a UC Roster Sniffer **dataset export**, the message says to
+  use **Import Dataset**; an unsupported scraped `record_type` and unrecognized files are
+  explained. A loaded **coaches** file notes that whole-file import is player-only.
+
 ## Primary navigation
 
 The primary navigation path is:
