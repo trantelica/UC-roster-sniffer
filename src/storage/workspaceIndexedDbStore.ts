@@ -164,7 +164,9 @@ export function resolvePersistedWorkspaceLoad(
     };
   }
 
-  const validation = validateWorkspaceSnapshot(record.snapshot);
+  // A persisted reset-to-empty workspace is a legitimate state to restore (unlike a
+  // hand-shared Dataset Import, which still rejects an empty file).
+  const validation = validateWorkspaceSnapshot(record.snapshot, { allowEmptyWorkspace: true });
   if (!validation.ok) {
     return {
       status: 'error',

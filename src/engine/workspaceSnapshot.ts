@@ -536,13 +536,24 @@ function validSelection(value: unknown): WorkspaceSnapshotSelection {
   };
 }
 
+export type ValidateWorkspaceSnapshotOptions = {
+  /**
+   * When true, a snapshot with zero teams is accepted instead of rejected with
+   * `empty-workspace`. Used by the automatic persistence restore (a reset-to-empty workspace
+   * is a legitimate persisted state). User-facing Dataset Import keeps the default (reject
+   * empty — "nothing to import").
+   */
+  allowEmptyWorkspace?: boolean;
+};
+
 /**
  * Validates an already-parsed value as a workspace snapshot. Pure; never mutates input.
  * Returns a rejected result (never throws) for expected validation failures, with stable
  * reason codes. On success, returns a snapshot rebuilt from validated, deep-copied data.
  */
 export function validateWorkspaceSnapshot(
-  value: unknown
+  value: unknown,
+  options?: ValidateWorkspaceSnapshotOptions
 ): WorkspaceSnapshotParseResult {
   if (!isObject(value)) {
     return { ok: false, errors: [err('not-an-object', 'Snapshot is not a JSON object.')] };
@@ -627,7 +638,7 @@ export function validateWorkspaceSnapshot(
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  if (teams.length === 0) {
+  if (teams.length === 0 && options?.allowEmptyWorkspace !== true) {
     return {
       ok: false,
       errors: [

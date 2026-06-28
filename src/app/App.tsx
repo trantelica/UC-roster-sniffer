@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { loadSampleData } from '../data/loadSampleData';
+import { loadSampleData, loadEmptyWorkspace } from '../data/loadSampleData';
 import { getDistinctSeasons } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import {
@@ -56,7 +56,9 @@ import MyTeamView from '../components/MyTeamView';
 import AnalyticsView from '../components/AnalyticsView';
 import ReviewCenterView from '../components/ReviewCenterView';
 
-const initialAppData = loadSampleData();
+// Production startup is an EMPTY workspace (Part 3): a fresh browser opens to the first-run
+// state, not bundled sample data. Sample data is available via an explicit action.
+const initialAppData = loadEmptyWorkspace();
 
 type AppView =
   | 'roster'
@@ -470,6 +472,49 @@ export default function App() {
     });
   }
 
+  // --- Part 3: reset to an empty workspace / load bundled sample data ----------
+
+  // Clears all transient session state and selection after a wholesale workspace replacement.
+  function resetTransientStateForWorkspaceReplace() {
+    setInMemoryImport(null);
+    setCommittedImportUndo(null);
+    setWholeFileImportUndo(null);
+    setWholeFileImportError(null);
+    setSnapshotNotice(null);
+    setWorkspaceFromImport(false);
+    setSelectedSeason(null);
+    setSelectedDistrict(null);
+    setSelectedAgeDivision(null);
+    setSelectedTeamId(null);
+    setSelectedCoachId(null);
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
+  // Replaces THIS browser's workspace with an empty one (baseline registries kept). The change
+  // auto-saves via A1, so the empty state survives reload. Confirmed because it is destructive
+  // to local data. Export a dataset first to keep a backup.
+  function handleResetWorkspace() {
+    const confirmed = window.confirm(
+      'Reset this browser’s workspace to empty?\n\nThis replaces all roster, team, game, and ' +
+        'coach data saved in THIS browser. The district registry and age divisions are kept. ' +
+        'Export a dataset first if you want a backup. This cannot be undone.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadEmptyWorkspace());
+    resetTransientStateForWorkspaceReplace();
+  }
+
+  // Loads the bundled sample/demo data into this browser's workspace (replaces current data).
+  function handleLoadSampleData() {
+    const confirmed = window.confirm(
+      'Load bundled sample/demo data into this browser’s workspace?\n\nThis replaces the ' +
+        'current local workspace data. Export a dataset first if you want a backup.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadSampleData());
+    resetTransientStateForWorkspaceReplace();
+  }
+
   // --- Slice 23 + A2: portable dataset export / import --------------------
 
   // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
@@ -756,6 +801,8 @@ export default function App() {
         onExport={handleExportSnapshot}
         onImportFileChange={handleImportFileChange}
         onDismissNotice={() => setSnapshotNotice(null)}
+        onResetWorkspace={handleResetWorkspace}
+        onLoadSampleData={handleLoadSampleData}
         inMemoryImportActive={inMemoryImport !== null}
         persistenceStatus={persistenceStatus}
       />
@@ -966,6 +1013,8 @@ function WorkspaceToolbar({
   onExport,
   onImportFileChange,
   onDismissNotice,
+  onResetWorkspace,
+  onLoadSampleData,
   inMemoryImportActive,
   persistenceStatus,
 }: {
@@ -974,6 +1023,8 @@ function WorkspaceToolbar({
   onExport: () => void;
   onImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDismissNotice: () => void;
+  onResetWorkspace: () => void;
+  onLoadSampleData: () => void;
   inMemoryImportActive: boolean;
   persistenceStatus: PersistenceStatus;
 }) {
@@ -993,6 +1044,16 @@ function WorkspaceToolbar({
             className="workspace-import-input"
           />
         </label>
+        <button type="button" className="workspace-button" onClick={onLoadSampleData}>
+          Load sample data
+        </button>
+        <button
+          type="button"
+          className="workspace-button workspace-button-danger"
+          onClick={onResetWorkspace}
+        >
+          Reset workspace
+        </button>
         <PersistenceIndicator status={persistenceStatus} />
         <span className="workspace-toolbar-note">
           Auto-save (IndexedDB) keeps your work in this browser · Export Dataset makes a

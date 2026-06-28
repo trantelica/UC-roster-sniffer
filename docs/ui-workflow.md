@@ -119,12 +119,16 @@ A top-level **Districts** tab opens the District Maintenance screen
 (`src/components/DistrictMaintenanceView.tsx`) — an in-app manager for the canonical district
 registry (`workspace.districts`).
 
-- **List (left/top):** every district, **active and inactive** (inactive are never hidden
-  here). Columns: name (with a “provisional” flag when branding is placeholder), `districtId`,
-  mascot, status badge (Active/Inactive), primary/secondary color chips, logo & helmet path
-  references, and exact import aliases (`sourceLabels`). An **All / Active / Inactive** filter
-  toggles the list.
-- **Add / Edit form (right/below):**
+- **List (the resting state):** every district, **active and inactive** (inactive are never
+  hidden here). Columns: name (with a “provisional” flag when branding is placeholder),
+  `districtId`, mascot, status badge (Active/Inactive), primary/secondary color chips, logo &
+  helmet path references, and exact import aliases (`sourceLabels`). An **All / Active /
+  Inactive** filter and a **+ Add district** button sit above the list.
+- **Add / Edit form (opens on demand — production-blocker correction):** the form is
+  **hidden by default** so it never crowds or obscures the list. It opens as a side panel only
+  after **+ Add district** or a row’s **Edit**, and has a **Cancel** action; after a successful
+  create or update it closes and returns to the list. At common desktop widths the list stays
+  visible beside the form (no overlay/modal).
   - **Add** — name and mascot are required; primary/secondary color, logo path, helmet path,
     exact aliases (comma/newline separated), and a “branding is placeholder/provisional”
     checkbox are optional. The `districtId` is **generated automatically** from the name (a
@@ -174,6 +178,26 @@ loosened to accept bad files).
   guidance. If the file is actually a UC Roster Sniffer **dataset export**, the message says to
   use **Import Dataset**; an unsupported scraped `record_type` and unrecognized files are
   explained. A loaded **coaches** file notes that whole-file import is player-only.
+
+## Flat-source normalization note (production-blocker correction)
+
+When a loaded Roster-import file is a **flat row-list** (the Claude-scrape drift shape), the
+workbench normalizes it into the standard nested shape on load and shows a small note:
+“Normalized a flat row-list … grouped by district + age group + team. Player names were
+preserved exactly,” plus which metadata was **inferred** (organization, age division,
+season year from filename) and any **warnings** (mixed age groups, no filename year). A flat
+file whose rows are missing required fields gets a plain-language error instead. There is no
+inline metadata editor in this pass.
+
+## Empty startup, Reset, and Load sample data (production-blocker correction)
+
+- A fresh browser (no persisted workspace) opens to an **empty** workspace and the first-run
+  state — the bundled sample data is no longer forced into startup.
+- The top toolbar adds **Load sample data** (loads the bundled demo data into this browser)
+  and **Reset workspace** (returns to empty). Both **confirm first** and make clear they
+  **replace this browser’s local workspace data**; exporting a dataset first is the backup
+  path. A reset persists (auto-save), so the empty state survives reload.
+- An existing persisted workspace still restores normally on load.
 
 ## Primary navigation
 

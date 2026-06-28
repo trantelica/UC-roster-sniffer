@@ -38,6 +38,11 @@ import {
   buildScrapedImportErrorGuidance,
   type UserFacingFileError,
 } from '../app/fileImportGuidance';
+import {
+  normalizeUteConferenceImportSource,
+  type NormalizationInferredInfo,
+  type NormalizationWarning,
+} from '../engine/uteConferenceImportSourceNormalization';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
@@ -134,16 +139,39 @@ const rosterAwareDemoPayload = {
   ],
 };
 
+// A FLAT player row-list demo (the Claude-scrape drift shape), to show that the normalizer
+// accepts it and groups by district/team. Filename carries a year so the year is inferred.
+const flatPlayersDemoRows = [
+  { district: 'Alta', age_group: 'GI League 12', team: 'GridIron A3', player_name: 'Cary, Hudson' },
+  { district: 'Alta', age_group: 'GI League 12', team: 'GridIron A3', player_name: 'Lee, Sam' },
+  { district: 'Alta', age_group: 'GI League 12', team: 'GridIron B1', player_name: 'Park, Jamie' },
+  { district: 'Brighton', age_group: 'GI League 12', team: 'GridIron A1', player_name: 'Nguyen, Bao' },
+];
+
 const DEMO_SOURCES: DemoSource[] = [
   { id: 'roster-aware-2026', label: 'Players — 2026 alta GR B1 (matches existing roster)', payload: rosterAwareDemoPayload },
   { id: 'players-2023-pw', label: 'Players — PeeWee, 2023 (no existing roster)', payload: playersPw },
   { id: 'coaches-2022-pw', label: 'Coaches — PeeWee, 2022 (demo fixture)', payload: coachesPw },
+  { id: 'flat-players-2025', label: 'Players — flat row-list, 2025 (Claude scrape shape)', payload: flatPlayersDemoRows },
 ];
+
+/** Demo file names carry a year so filename year inference is exercised for flat demos. */
+const DEMO_FILE_NAMES: Record<string, string> = {
+  'flat-players-2025': 'ute-players-2025.json',
+};
+
+type LoadedSourceInfo = {
+  /** True when a flat row-list was normalized into the nested shape. */
+  changed: boolean;
+  inferred: NormalizationInferredInfo;
+  warnings: NormalizationWarning[];
+};
 
 type LoadedSource = {
   sourceKind: 'file' | 'demo';
   name: string;
   payload: unknown;
+  sourceInfo: LoadedSourceInfo;
 };
 
 type FileError = { name: string; guidance: UserFacingFileError };
@@ -161,6 +189,38 @@ function ReadinessBadge({ status }: { status: string }) {
     <span className={`import-badge import-badge-${status}`}>
       {READINESS_LABELS[status] ?? status}
     </span>
+  );
+}
+
+/**
+ * Shows when a flat row-list was normalized into the nested shape and/or when metadata was
+ * inferred — so it is clear what the app filled in, without an inline metadata editor.
+ */
+function SourceInfoNote({ info }: { info: LoadedSourceInfo }) {
+  if (!info.changed && info.warnings.length === 0) return null;
+  const inferredParts: string[] = [];
+  if (info.inferred.organization) inferredParts.push('organization');
+  if (info.inferred.ageDivision) inferredParts.push('age division');
+  if (info.inferred.year) inferredParts.push('season year (from filename)');
+  return (
+    <div className="import-note import-source-info">
+      {info.changed && (
+        <p>
+          <strong>Normalized a flat row-list</strong> into the standard scraped shape, grouped
+          by district + age group + team. Player names were preserved exactly.
+        </p>
+      )}
+      {inferredParts.length > 0 && (
+        <p>Inferred metadata: {inferredParts.join(', ')}.</p>
+      )}
+      {info.warnings.length > 0 && (
+        <ul className="import-issues">
+          {info.warnings.map((w) => (
+            <li key={w.code} className="import-issue import-issue-warning">{w.message}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -418,6 +478,36 @@ export default function ScrapedImportPreview({
     onInMemoryImportChange(null);
   }
 
+  // Normalizes a raw parsed payload (flat row-list -> nested scraped shape; nested/other pass
+  // through) and either loads the normalized payload or surfaces plain-language guidance.
+  function loadRawPayload(
+    sourceKind: 'file' | 'demo',
+    name: string,
+    rawPayload: unknown,
+    fileName: string
+  ) {
+    const norm = normalizeUteConferenceImportSource(rawPayload, { fileName });
+    if (norm.ok) {
+      setFileError(null);
+      setLoaded({
+        sourceKind,
+        name,
+        payload: norm.payload,
+        sourceInfo: { changed: norm.changed, inferred: norm.inferred, warnings: norm.warnings },
+      });
+    } else {
+      setLoaded(null);
+      setFileError({
+        name,
+        guidance: buildScrapedImportErrorGuidance({
+          kind: 'normalize',
+          reason: norm.reason,
+          message: norm.message,
+        }),
+      });
+    }
+  }
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (executed) {
       // Re-sync the input value so a locked change is not silently swallowed.
@@ -432,8 +522,7 @@ export default function ScrapedImportPreview({
       const text = typeof reader.result === 'string' ? reader.result : '';
       const parsed = parseScrapedJsonImportFileText(text);
       if (parsed.ok) {
-        setFileError(null);
-        setLoaded({ sourceKind: 'file', name: file.name, payload: parsed.payload });
+        loadRawPayload('file', file.name, parsed.payload, file.name);
       } else {
         setLoaded(null);
         setFileError({
@@ -469,7 +558,7 @@ export default function ScrapedImportPreview({
       return;
     }
     const demo = DEMO_SOURCES.find((s) => s.id === id);
-    if (demo) setLoaded({ sourceKind: 'demo', name: demo.label, payload: demo.payload });
+    if (demo) loadRawPayload('demo', demo.label, demo.payload, DEMO_FILE_NAMES[demo.id] ?? demo.label);
   }
 
   function handleClearFile() {
@@ -550,6 +639,8 @@ export default function ScrapedImportPreview({
           Dataset” in the top toolbar instead.
         </p>
       )}
+
+      {loaded && <SourceInfoNote info={loaded.sourceInfo} />}
 
       {loaded && wholeFilePlan && wholeFilePlan.isPlayerFile && (
         <WholeFilePlayerImportPanel

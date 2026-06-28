@@ -1173,6 +1173,16 @@ Loaded roster records are authoritative.
 - Ambiguity affects derived metadata only — such as identity confidence and roster status — never the source roster record.
 - Derived logic must not alter, remove, suppress, merge, nullify, rewrite, or ignore a rostered player record because of duplication or ambiguity.
 
+### Source-shape normalization preserves authority (production-blocker correction)
+
+`normalizeUteConferenceImportSource` (which converts a flat scraped row-list into the nested
+scraped payload before import) is bound by the same rule. It only **regroups** rows (by
+district + age group + team) and **infers absent metadata** (organization, age-division alias,
+filename year) — it never trims, deduplicates, merges, suppresses, reorders within a team, or
+rewrites player/coach names or titles. Player names are placed into `players[].name` exactly
+as provided (commas, spacing, and trailing source flags preserved), so identity confidence and
+collision review still see the raw source values. The original payload is never mutated.
+
 ## Identity confidence
 
 Initial matching is name-based.

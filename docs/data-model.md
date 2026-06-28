@@ -1276,6 +1276,15 @@ It is **not** an internal record and is never persisted; the adapter converts a
 selected team into the existing `Roster Import Preview` input (players) or a separate
 coach preview shape (coaches).
 
+> **Two accepted source modes (production-blocker correction).** The import workbench
+> accepts BOTH the nested payload below AND a **flat row-list** (one object per player/coach
+> row; see “Real-world flat roster source shape” in `docs/import-workflow.md`).
+> `normalizeUteConferenceImportSource` converts a flat row-list into this nested shape before
+> the adapter runs, grouping rows by district + age group + team and inferring missing
+> metadata (organization, age-division alias when rows agree, year/event from the filename).
+> Names are preserved exactly; the original payload is never mutated. The nested shape remains
+> the single internal source contract the rest of the pipeline reads.
+
 ```json
 {
   "metadata": {
@@ -1780,9 +1789,21 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
   database, or sync. See `docs/completion-plan.md` (Workstream A) and `docs/ui-workflow.md`
   ("Automatic save-state indicator").
 
+> **Empty default startup + reset (production-blocker correction).** The default startup
+> workspace is now **empty** (`loadEmptyWorkspace` — no teams/games/coaches; the fixed age
+> divisions and seeded district registry are kept so import can still resolve districts), so a
+> fresh browser opens to the first-run state rather than sample data. A user can **Reset
+> workspace** (confirmed) to return to empty, or **Load sample data** explicitly. Because a
+> reset-to-empty workspace is a legitimate persisted state, the persistence restore validates
+> with `allowEmptyWorkspace: true`; user-facing **Dataset Import** keeps the default (an empty
+> dataset file is still rejected with `empty-workspace`).
+
 ## Sample data fixtures
 
-Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
+Local sample data under `data-samples/` exists to prove the data contract and to exercise
+derived behavior during development. It is **no longer loaded into production startup** (see
+the empty-default-startup note above); it remains available to tests and to the explicit
+"Load sample data" action via `loadSampleData`.
 
 ### Notes
 

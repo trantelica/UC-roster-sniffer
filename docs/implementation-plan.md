@@ -18,6 +18,25 @@ sample data; a corrupt/unrestorable record falls back calmly (visible warning, n
 never auto-deleted). No `localStorage`, backend, or sync. The portable JSON export/import
 path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and follow-on A2.
 
+## Production-blocker correction pass (landed 2026-06-28)
+
+A focused three-part correction after Milestones 1–2:
+
+1. **Robust scraped-source normalization.** Two pure engine helpers
+   (`uteConferenceImportSourceShape.ts` classify, `uteConferenceImportSourceNormalization.ts`
+   normalize) accept a **flat player/coach row-list** in addition to the nested scraped
+   payload, converting it to the nested shape before the existing import session/readiness/
+   whole-file path. Names preserved exactly; deterministic grouping by district + age group +
+   team; metadata inferred only when missing (organization, age-division alias, filename year)
+   and reported. See `docs/import-workflow.md` (“Robust scraped-source normalization”).
+2. **District Maintenance form-on-demand.** The add/edit form is hidden by default; it opens on
+   **+ Add district** / **Edit**, has **Cancel**, and closes back to the list after save.
+3. **Empty default startup + reset.** Startup is now an **empty** workspace (baseline
+   age divisions + seeded district registry kept), so a fresh browser reaches the first-run
+   state. New **Reset workspace** / **Load sample data** toolbar actions (confirmed). The
+   persistence restore accepts an empty workspace (`allowEmptyWorkspace`); user Dataset Import
+   still rejects an empty file. Sample data files are retained for tests + the explicit action.
+
 ## Guiding principles
 
 1. **Spec-first**: the coding agent should treat files in `docs/` as the source of truth.

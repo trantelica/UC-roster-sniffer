@@ -957,6 +957,46 @@ h1 {
   font-size: 0.85rem;
 }
 
+/* C2 + correction: list toolbar (filter + Add district) and gated form actions. */
+.district-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.district-filter {
+  margin-bottom: 0;
+}
+
+.district-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+/* Correction: destructive workspace action (Reset). */
+.workspace-button-danger {
+  border-color: var(--color-bronze-spice);
+  color: var(--color-bronze-spice);
+}
+
+/* Correction: source-normalization / inferred-metadata note in the import workbench. */
+.import-source-info {
+  border: 1px solid var(--color-steel-blue);
+  border-left: 4px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: var(--color-mint-cream);
+  padding: 0.5rem 0.8rem;
+}
+
+.import-source-info p {
+  margin: 0.25rem 0;
+}
+
 /* E1: first-run / empty states. */
 .empty-state-card {
   border: 1px solid var(--color-steel-blue);

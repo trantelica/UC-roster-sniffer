@@ -92,6 +92,53 @@ Known implications:
 
 This source shape is an import input contract, not the preferred internal storage shape.
 
+### Robust scraped-source normalization (production-blocker correction)
+
+Claude-generated scrape output can drift between the nested scraped payload and this flat
+row-list. Two pure engine helpers run BEFORE the existing import session so both shapes feed
+the same pipeline (no parallel import system):
+
+- `classifyUteConferenceImportSource(payload)` (`src/engine/uteConferenceImportSourceShape.ts`)
+  → `nested-players` | `nested-coaches` | `flat-players` | `flat-coaches` | `flat-unsupported`
+  | `empty-source` | `dataset` | `unknown`.
+- `normalizeUteConferenceImportSource(payload, { fileName })`
+  (`src/engine/uteConferenceImportSourceNormalization.ts`) → converts a flat row-list into the
+  nested `{ metadata, districts[].teams[] }` payload; nested and unrecognized object payloads
+  **pass through unchanged**; flat rows missing required keys (or an empty array) return a
+  clear, non-throwing failure for plain-language UI guidance.
+
+Accepted flat-row key aliases (exact, never fuzzy):
+
+```text
+district     : district, district_name
+age group    : age_group, ageDivision, age_division, league
+team         : team, team_name
+player name  : player_name, player, name
+coach name   : coach_name, coach, name
+coach title  : coach_title, title
+```
+
+Normalization rules (carry the roster-authority rule, see `docs/derived-logic.md`):
+
+- The original payload is never mutated; player/coach names and titles are placed into the
+  nested payload **exactly** as provided (no trim, dedupe, merge, suppress, or rewrite).
+- Flat rows are grouped deterministically by **district + age group + team**, preserving
+  source row order inside each team and first-seen order of districts/teams.
+- `record_type` is derived (`players` for flat player rows; `coaches` when explicit coach
+  signals are present and no player-name key).
+- Metadata is **inferred only when missing** and the inference is reported (never silent):
+  organization (`Ute Conference`); `age_division` + `age_division_alias` when all rows agree on
+  one age group (e.g. `GI League 12` → `GI` via the fixed age-division map); `year` + `event`
+  from a clear 4-digit filename year (e.g. `2025` → “2025 Season”).
+- Disagreements do not reject the file: mixed age groups or a missing year surface a
+  **warning** and still import what can be grouped (teams whose names start with an age word —
+  e.g. `GridIron`, `Gremlin` — still resolve their division from the team name).
+- Required-key gaps return `unsupported-flat-rows`; an empty array returns `empty-source`.
+
+The Roster import workbench runs this normalizer on every loaded file/demo and shows a note
+when a flat list was normalized and/or metadata was inferred. Coaches still preview per team;
+whole-file commit remains player-only.
+
 ## Roster import preview (Phase 5 slice 1)
 
 Phase 5 begins with a pure, deterministic **import preview state/contract**
@@ -1220,14 +1267,16 @@ There are deliberately **two distinct import paths**, and a file belongs in exac
 
 - **Import Dataset** (top toolbar) — opens a portable **UC Roster Sniffer dataset export**
   (`.json` from Export Dataset) and **replaces** the whole workspace.
-- **Roster import** (tab) — loads a **scraped Ute Conference** players/coaches JSON and
-  previews/commits per-team or whole-file.
+- **Roster import** (tab) — loads a **scraped Ute Conference** players/coaches JSON (either the
+  nested shape or a **flat row-list**, normalized on load) and previews/commits per-team or
+  whole-file.
 
 A small pure classifier (`classifyImportFileShape`) lets each path recognise when it was handed
-the OTHER kind of file and say so in plain language (no auto-routing — guidance only):
+the OTHER kind of file and say so in plain language (no auto-routing — guidance only). It
+recognises a flat player/coach row-list as a scraped source too:
 
-- A **scraped** file dropped into Import Dataset → “This looks like a scraped Ute Conference
-  file… use Roster import instead.”
+- A **scraped** file (nested or flat row-list) dropped into Import Dataset → “This looks like a
+  scraped Ute Conference file… use Roster import instead.”
 - A **dataset export** dropped into Roster import → “This looks like a UC Roster Sniffer
   dataset export… use Import Dataset instead.”
 - A **coaches** scrape in the Roster workbench is previewable per target, but the whole-file
