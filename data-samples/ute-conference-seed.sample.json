@@ -1,14 +1,53 @@
 {
-  "schemaVersion": "0.1",
-  "note": "Ute Conference baseline SEED source. Defines EMPTY team shells (no rosters) by season + district + age division + team code, so real player rosters can be imported into existing teams. This is real baseline structure, NOT demo/sample content. Districts are limited to those in the repo's seeded district registry (Alta, Brighton); expand this file as more of the real league structure is confirmed. No player/coach data lives here.",
-  "seasonId": "2026",
-  "districtIds": ["alta", "brighton"],
-  "teamCodesByAgeDivision": {
-    "SC": ["A1", "B1"],
-    "GR": ["A1", "A2", "B1", "B2", "C1"],
-    "PW": ["A1", "A2", "B1", "B2", "C1"],
-    "MM": ["A1", "A2", "B1", "B2", "C1"],
-    "GI": ["A1", "A2", "A3", "B1", "B2", "C1"],
-    "BA": ["A1", "B1"]
-  }
+  "schemaVersion": "0.2",
+  "note": "Ute Conference baseline SEED source. Builds the real pre-import workspace: a district registry of the known Ute Conference districts plus EMPTY team shells (no rosters) per season + age division + team code, so real player files import into existing teams. NO player/coach data lives here. districtId is derived deterministically from the name (districtIdSlug); districts not already in the seeded registry get provisional blank branding (brandingProvisional: true). Team codes are the classification codes the parser supports (A1..A4, B1..B4, C1, C2, D2); parenthetical sub-labels like 'GridIron A1 (Bonneville)' are NOT distinguished by the current classification parser (future work). Expand by adding district names, seasons, or per-age-division code lists.",
+  "districtNames": [
+    "Alta",
+    "Bingham",
+    "Bountiful",
+    "Brighton",
+    "Cedar Valley",
+    "Clearfield",
+    "Copper Hills",
+    "Corner Canyon",
+    "Cyprus",
+    "Deseret Peak",
+    "East",
+    "Farmington",
+    "Fremont",
+    "Grantsville",
+    "Herriman",
+    "Highland",
+    "Hunter",
+    "Juan Diego",
+    "Kearns",
+    "Mountain Ridge",
+    "Murray",
+    "Northridge",
+    "Olympus",
+    "Orem",
+    "Park City",
+    "Riverton",
+    "Skyline",
+    "South Summit",
+    "Stansbury",
+    "Syracuse",
+    "Taylorsville",
+    "Tooele",
+    "Viewmont",
+    "Wasatch",
+    "Weber",
+    "West",
+    "West Field",
+    "West Jordan",
+    "Woods Cross"
+  ],
+  "seasons": [
+    {
+      "seasonId": "2026",
+      "teamCodesByAgeDivision": {
+        "GI": ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4", "C1", "C2", "D2"]
+      }
+    }
+  ]
 }

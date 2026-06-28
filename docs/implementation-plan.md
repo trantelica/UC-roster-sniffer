@@ -41,9 +41,13 @@ A focused three-part correction after Milestones 1–2:
    rosters) — from the committed fixture `data-samples/ute-conference-seed.sample.json`, with a
    **Load Ute Conference seed** toolbar action (confirmed). Real roster files then import into
    the existing shells via the unchanged pipeline; **no dynamic team creation on import**.
-   Empty / seed / sample stay three distinct concepts. Seed coverage is limited to the repo's
-   known districts (Alta, Brighton) and a template team-code set; expand the fixture as the
-   real league structure is confirmed.
+   Empty / seed / sample stay three distinct concepts. Coverage: the **39 known Ute Conference
+   districts** (deterministic `districtIdSlug` ids; Alta/Brighton keep their real registry
+   branding, the rest get provisional blank branding `brandingProvisional: true`) and **GI/2026
+   empty team shells** for codes `A1–A4, B1–B4, C1, C2, D2` (429 shells). Parenthetical
+   sub-labels like `GridIron A1 (Bonneville)` are not distinguished by the classification
+   parser yet (future work) and are not seeded. Expand by adding district names, seasons, or
+   per-age-division code lists to the fixture — no runtime change needed.
 
 ## Guiding principles
 

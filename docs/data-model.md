@@ -1801,12 +1801,20 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
 > **Three distinct workspace builders (do not conflate):**
 > - **Empty** (`loadEmptyWorkspace`) — production fresh start: districts + age divisions, **no
 >   teams**.
-> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — real **baseline**: districts +
->   age divisions + **empty team shells** (no players/coaches), so roster imports land into
->   existing teams. Built deterministically from the committed seed-source fixture
->   `data-samples/ute-conference-seed.sample.json` (season + district + age + team-code shells);
->   `divisionTeamCount`/`draftOrder` are internally consistent and every district/age reference
->   is valid. It is a clean workspace builder, **not** a runtime scrape parser.
+> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — real **baseline**: a registry
+>   of the **39 known Ute Conference districts** + age divisions + **empty team shells** (no
+>   players/coaches), so roster imports land into existing teams. Built deterministically from
+>   the committed seed-source fixture `data-samples/ute-conference-seed.sample.json` (district
+>   names + per-season per-age-division team codes). District ids derive from
+>   `districtIdSlug(name)`; Alta/Brighton keep their seeded-registry branding and the rest get
+>   **provisional blank branding** (`brandingProvisional: true`, `status: 'active'`,
+>   `sourceLabels: [name]`) — incomplete branding never blocks seeding. Currently seeds **GI /
+>   season 2026** codes `A1–A4, B1–B4, C1, C2, D2` (429 shells); `divisionTeamCount`/`draftOrder`
+>   are internally consistent and every reference is valid. It is a clean workspace builder,
+>   **not** a runtime scrape parser, and is expandable (add district names / seasons /
+>   age-division code lists in the fixture). Parenthetical team sub-labels (e.g.
+>   `GridIron A1 (Bonneville)`) are not distinguished by the classification parser yet and are
+>   not seeded (future work).
 > - **Sample** (`loadSampleData`) — **demo/testing** content (teams with players); retained for
 >   tests and the explicit "Load sample data" action only.
 >

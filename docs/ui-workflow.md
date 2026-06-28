@@ -198,8 +198,11 @@ workspace; export a dataset first for a backup; the change auto-saves and surviv
 
 - **Reset workspace** → **empty** workspace: a production fresh start with **no teams**
   (baseline age divisions + seeded district registry kept).
-- **Load Ute Conference seed** → the **real baseline**: district registry + age divisions +
-  **empty team shells** (no rosters), so real player files import into existing teams.
+- **Load Ute Conference seed** → the **real baseline**: a registry of the **39 known Ute
+  Conference districts** (Alta/Brighton keep their branding; the rest are seeded with
+  **provisional** blank branding, editable later in District Maintenance) + age divisions +
+  **empty team shells** (GI/2026 codes `A1–A4, B1–B4, C1, C2, D2`, no rosters), so real player
+  files import into existing teams.
 - **Load sample data** → **demo/testing** content only (bundled multi-season sample teams with
   players). Not for production use.
 - **Import Dataset** / **Export Dataset** → portable full-dataset JSON round-trip (unchanged).

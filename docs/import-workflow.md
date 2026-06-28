@@ -148,8 +148,13 @@ or nested, normalized as above) then imports into those existing teams through t
 pipeline: per-team B1 commit or B2 whole-file import locate the matching shell by season +
 district + age division + team code, and add only the player rows.
 
-- The seed season must match the import's season (the flat path infers the year from the
-  filename) for a shell to match.
+- The current seed covers the **39 known Ute Conference districts** and **GI / season 2026**
+  team shells (codes `A1–A4, B1–B4, C1, C2, D2`). The seed season must match the import's season
+  (the flat path infers the year from the filename) and the age division/code must be seeded
+  for a shell to match. Expand the fixture for more seasons/divisions.
+- **Parenthetical sub-labels** like `GridIron A1 (Bonneville)` are not distinguished by the
+  classification parser (the trailing token isn't a code), so they don't resolve a team code
+  and aren't seeded — distinguishing them is future work.
 - A district/team **not** in the seed surfaces as "no workspace team" / provisional and is
   **not** auto-created in this pass; the existing **Add district to registry** confirm/add path
   still handles unknown districts. **Future work:** dynamic create-new district/team-on-import.
