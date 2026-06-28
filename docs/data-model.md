@@ -73,6 +73,28 @@ active/provisional record when there is no exact match. The deterministic seed l
 lives in `src/data/districtRegistrySeed.ts`. The registry persists with the workspace
 (IndexedDB auto-save A1) and round-trips through the portable dataset export/import (A2).
 
+### District Maintenance (Completion Milestone C2)
+
+The **Districts** screen manages the registry directly. The maintenance helpers
+(`createDistrictFromInput`, `updateDistrict`, `inactivateDistrict`, `reactivateDistrict` in
+`src/engine/districtRegistry.ts`) enforce the data rules:
+
+- **Immutable on edit:** `districtId` and `status`. The id is generated once on create
+  (deterministic name slug, collision-disambiguated) and never changes — so team
+  `districtId` references stay valid forever. Status changes only via inactivate/reactivate.
+- **Mutable fields:** `name`, `mascot`, `primaryColor`, `secondaryColor`, `logoAssetPath`,
+  `helmetAssetPath`, `sourceLabels`, `brandingProvisional`. `sourceLabels` are trimmed,
+  blank-stripped, and de-duped, and matched **exactly** (never fuzzy).
+- **No destructive delete.** There is no delete/remove/destroy helper. Inactivation is the
+  only retirement path and always **preserves** the record; reactivation restores it under
+  the same id. A district referenced by existing teams may still be inactivated (the rosters
+  keep their `districtId` and remain valid/displayable); only new import matching ignores it.
+- **Image references are strings only** — `logoAssetPath` / `helmetAssetPath` are
+  filenames/paths into `public/districts/`. No bytes are uploaded, embedded, or stored.
+
+All maintenance edits write committed `workspace.districts`, so A1 auto-saves them, A2
+exports/imports them, and active districts feed C3/B2 import mapping immediately.
+
 ## Age Division
 
 ```json

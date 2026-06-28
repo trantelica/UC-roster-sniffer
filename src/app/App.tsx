@@ -32,7 +32,16 @@ import {
   commitImportedTeamsToWorkspace,
   undoImportedTeamsCommitInWorkspace,
 } from '../engine/workspaceImportCommit';
-import { confirmUnknownScrapedDistrict } from '../engine/districtRegistry';
+import {
+  confirmUnknownScrapedDistrict,
+  createDistrictFromInput,
+  updateDistrict,
+  inactivateDistrict,
+  reactivateDistrict,
+  type DistrictMaintenanceInput,
+  type DistrictUpdatePatch,
+} from '../engine/districtRegistry';
+import DistrictMaintenanceView from '../components/DistrictMaintenanceView';
 import { executeWholeFilePlayerImportBatch } from '../engine/uteConferenceScrapedJsonWholeFileImport';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
@@ -53,7 +62,8 @@ type AppView =
   | 'coach-import'
   | 'coaches'
   | 'analytics'
-  | 'review';
+  | 'review'
+  | 'districts';
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
@@ -420,6 +430,41 @@ export default function App() {
     });
   }
 
+  // --- Milestone C2: District Maintenance (add / edit / inactivate / reactivate) ---
+  // All four update committed `workspace.districts`, so A1 auto-saves and A2 exports them,
+  // and the import workbench (C3/B2) re-derives its active-registry lookup from the districts
+  // prop. No epoch bump — district edits never disturb a loaded import session.
+  function handleCreateDistrict(input: DistrictMaintenanceInput) {
+    setWorkspace((current) => {
+      const result = createDistrictFromInput(current.districts, input);
+      return { ...current, districts: result.districts };
+    });
+  }
+
+  function handleUpdateDistrict(districtId: string, patch: DistrictUpdatePatch) {
+    setWorkspace((current) => {
+      const result = updateDistrict(current.districts, districtId, patch);
+      if (!result.changed) return current;
+      return { ...current, districts: result.districts };
+    });
+  }
+
+  function handleInactivateDistrict(districtId: string) {
+    setWorkspace((current) => {
+      const result = inactivateDistrict(current.districts, districtId);
+      if (!result.changed) return current;
+      return { ...current, districts: result.districts };
+    });
+  }
+
+  function handleReactivateDistrict(districtId: string) {
+    setWorkspace((current) => {
+      const result = reactivateDistrict(current.districts, districtId);
+      if (!result.changed) return current;
+      return { ...current, districts: result.districts };
+    });
+  }
+
   // --- Slice 23 + A2: portable dataset export / import --------------------
 
   // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
@@ -633,6 +678,14 @@ export default function App() {
         >
           Review Center
         </button>
+        <button
+          type="button"
+          className={`app-nav-button ${view === 'districts' ? 'app-nav-button-active' : ''}`}
+          aria-pressed={view === 'districts'}
+          onClick={() => setView('districts')}
+        >
+          Districts
+        </button>
       </nav>
 
       <WorkspaceToolbar
@@ -804,6 +857,16 @@ export default function App() {
           onOpenTeam={handleOpenTeam}
           onOpenCoach={handleOpenCoach}
           onNavigate={(target) => setView(target)}
+        />
+      </div>
+      <div hidden={view !== 'districts'}>
+        <DistrictMaintenanceView
+          districts={workspace.districts}
+          teams={workspace.teams}
+          onCreate={handleCreateDistrict}
+          onUpdate={handleUpdateDistrict}
+          onInactivate={handleInactivateDistrict}
+          onReactivate={handleReactivateDistrict}
         />
       </div>
     </div>

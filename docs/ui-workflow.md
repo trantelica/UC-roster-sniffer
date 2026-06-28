@@ -113,6 +113,34 @@ commit all ready teams at once — the per-target B1 flow still works for case-b
   is durable via A1 and survives reload). A failed batch shows a calm error and changes
   nothing.
 
+## District Maintenance screen (Completion Milestone C2)
+
+A top-level **Districts** tab opens the District Maintenance screen
+(`src/components/DistrictMaintenanceView.tsx`) — an in-app manager for the canonical district
+registry (`workspace.districts`).
+
+- **List (left/top):** every district, **active and inactive** (inactive are never hidden
+  here). Columns: name (with a “provisional” flag when branding is placeholder), `districtId`,
+  mascot, status badge (Active/Inactive), primary/secondary color chips, logo & helmet path
+  references, and exact import aliases (`sourceLabels`). An **All / Active / Inactive** filter
+  toggles the list.
+- **Add / Edit form (right/below):**
+  - **Add** — name and mascot are required; primary/secondary color, logo path, helmet path,
+    exact aliases (comma/newline separated), and a “branding is placeholder/provisional”
+    checkbox are optional. The `districtId` is **generated automatically** from the name (a
+    preview of the slug is shown) and disambiguated on collision — the user never types it.
+    Aliases default to the district name when left blank.
+  - **Edit** — changes the mutable fields only; the **districtId and status are never changed
+    on edit**, so team references stay valid. A note shows how many teams reference the
+    district.
+  - **Inactivate / Reactivate** — per-row actions. Inactivation preserves the record (no
+    delete) and only stops new import matching; reactivation restores it under the same id.
+    Copy: “Inactive districts are preserved for history but ignored for new import matching.”
+- **Persistence/feedback:** every change auto-saves to this browser (A1) and is included in an
+  exported dataset (A2); active edits/creates/reactivations feed scraped-import mapping
+  (C3/B2) immediately. There is **no district deletion** and **no image upload / file picker**
+  — logo/helmet are plain filename references into `public/districts/`.
+
 ## Primary navigation
 
 The primary navigation path is:

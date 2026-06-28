@@ -1162,8 +1162,16 @@ outcome (so the action is never a dead no-op):
 Matching stays exact (never fuzzy). The updated registry lands in committed `workspace` state (auto-saved via A1, exported by A2), and
 the workbench **re-derives its mapping reactively** (the district prop changes; no remount,
 so the loaded source and selected target are preserved) — the district is then no longer
-provisional. Full branding/image/inactivate editing remains the **C2 District Maintenance**
-screen; this slice adds no edit forms, image pickers, or color pickers.
+provisional. Full branding/image/inactivate editing lives in the **C2 District Maintenance**
+screen; this confirm/add flow itself adds no edit forms, image pickers, or color pickers.
+
+**District Maintenance (C2) feeds this mapping immediately.** Districts added, edited
+(including changed `sourceLabels`), or reactivated on the Districts screen update committed
+`workspace.districts`, so the workbench's active-registry lookup (`buildDistrictNameRegistryLookup`)
+re-derives from the districts prop and a newly active/registered district resolves
+high-confidence on the next mapping — for both the single-target preview and the B2 whole-file
+plan. Inactivated districts drop out of the lookup, so new imports stop matching them (existing
+rosters that reference them remain valid).
 
 ## Whole-file player import (Completion Milestone B2)
 
