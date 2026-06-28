@@ -103,6 +103,14 @@ documentation/spec-alignment checkpoint):
   auto-save/sync, and no prior-season mutation; browser/database persistence remains a
   future, explicitly approved decision.
 
+> **Update (Completion Milestone A1, landed 2026-06-27):** browser persistence has since
+> been explicitly approved and implemented. Automatic **IndexedDB** workspace persistence
+> now auto-saves the existing workspace snapshot after workspace-data changes and
+> auto-restores it on startup (isolated module `src/storage/workspaceIndexedDbStore.ts`;
+> the snapshot contract is reused, not replaced). The Phase 5 statements above describe the
+> historical pre-A1 status. Still no `localStorage`, backend, auth, cloud database, or sync.
+> See `docs/completion-plan.md` (Workstream A).
+
 Boundary rule carried forward: loaded roster records are authoritative; derived
 metadata never alters, removes, suppresses, merges, nullifies, rewrites, reorders,
 or ignores source roster records. Ambiguity affects derived metadata only.

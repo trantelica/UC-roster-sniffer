@@ -2,6 +2,25 @@
 
 This document defines the initial user experience model.
 
+## Automatic save-state indicator (Completion Milestone A1)
+
+The workspace toolbar shows a small save-state indicator reflecting automatic IndexedDB
+persistence. It is informational only (no controls) and uses design-system tokens. States:
+
+- **Loading saved workspace…** — reading any saved workspace on startup.
+- **Auto-save on (this browser)** — startup finished; nothing saved yet this session
+  (e.g. a fresh/empty store using the default sample data).
+- **Saving…** — a debounced auto-save is in flight after a workspace change.
+- **Saved locally** — the current workspace is saved in this browser.
+- **Save failed** — the most recent auto-save failed (data remains in memory; the manual
+  export still works as a backup).
+- **Saved workspace could not be loaded** — a stored workspace existed but was corrupt or
+  unrestorable; the app falls back to the default startup state and does not delete the
+  stored record.
+
+The existing portable workspace snapshot Export/Import remains the way to move data between
+machines or hand it to another person; it is unchanged.
+
 ## Primary navigation
 
 The primary navigation path is:

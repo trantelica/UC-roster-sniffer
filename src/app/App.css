@@ -806,6 +806,42 @@ h1 {
   color: #555;
 }
 
+/* Slice A1: automatic IndexedDB save-state indicator. */
+.persistence-indicator {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.persistence-indicator-info {
+  color: var(--color-carbon-black);
+  background-color: var(--color-mint-cream);
+  border-color: var(--color-alabaster-grey);
+}
+
+.persistence-indicator-busy {
+  color: #fff;
+  background-color: var(--color-steel-blue);
+  border-color: var(--color-steel-blue);
+}
+
+.persistence-indicator-ok {
+  color: #fff;
+  background-color: var(--color-steel-blue);
+  border-color: var(--color-steel-blue);
+}
+
+.persistence-indicator-warn {
+  color: #fff;
+  background-color: var(--color-bronze-spice);
+  border-color: var(--color-bronze-spice);
+}
+
 .workspace-toolbar-warning {
   font-size: 0.78rem;
   color: #555;
