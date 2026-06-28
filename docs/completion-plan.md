@@ -1,6 +1,6 @@
 # Completion Plan
 
-Status: **in progress — A1 + A2 + B1 + C1 + C3 + B2 + C2 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping, whole-file player import, District Maintenance screen) landed; E1 / E2 next**
+Status: **in progress — A1 + A2 + B1 + C1 + C3 + B2 + C2 + E1 + E2 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping, whole-file player import, District Maintenance screen, first-run/empty states, plain-language file-error handling) landed; Milestone 2 complete — Milestone 3 (D1–D4, E3, E4) next**
 Date: 2026-06-27 (last updated 2026-06-28)
 Owner: product owner (novice vibe coder)
 
@@ -250,8 +250,25 @@ finishes the roadmap (D) and hardens (E).
 
 - **E1 — First-run + empty states.** Friendly empty/onboarding states so a fresh,
   data-less app explains what to do (import a file) instead of looking broken.
+  - **Landed (2026-06-28).** Pure helper `assessWorkspaceEmptiness` /
+    `recommendedFirstRunActions` (`src/engine/workspaceEmptyState.ts`) drives a first-run
+    state: when the workspace has no teams, the Roster tab shows a calm explainer (local-only,
+    auto-saves here, nothing uploaded) with next-action buttons — **Go to Roster import**,
+    **Import Dataset**, **Manage Districts** — via existing view switching (no routing, no
+    wizard). My Team gains a no-teams state with a Roster-import CTA. A reusable presentational
+    `EmptyState` component carries the pattern. The bundled sample data (which has teams) is
+    not treated as empty.
 - **E2 — File-error handling.** Clear, plain-language messages for malformed or
   wrong-shape JSON files instead of silent failure.
+  - **Landed (2026-06-28).** Pure `classifyImportFileShape` (`src/engine/importFileShape.ts`)
+    + `buildDatasetImportErrorGuidance` / `buildScrapedImportErrorGuidance`
+    (`src/app/fileImportGuidance.ts`) translate the existing deterministic validators (never
+    loosened) into a Title / “What happened” / “Try this” (+ optional technical detail)
+    structure. Dataset Import and Roster import each show this, and detect a file that belongs
+    in the OTHER path (scraped file → Roster import; dataset export → Import Dataset) plus
+    unsupported record type, empty file, invalid JSON, and wrong shape. A coaches file in the
+    Roster workbench notes that whole-file import is player-only. No engine code names as the
+    headline; validation logic unchanged.
 - **E3 — Launcher polish.** Optional: have the `.command` launcher wait for the server
   before opening the browser (removes the brief "can't connect" flash).
 - **E4 — Full regression pass.** Confirm `npm test` and `npm run build` green; smoke-test
@@ -293,9 +310,9 @@ up exactly where the last one stopped.
 
 **Milestone 2 — "Full data in, fully managed"**
 - [x] **B2** — Whole-file import flow (multiple teams from readiness report) · branch: `milestoneB2-whole-file-player-import` · PR: #69 · landed 2026-06-28
-- [x] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · branch: `milestoneC2-district-maintenance-screen` · PR: _pending_ · landed 2026-06-28
-- [ ] **E1** — First-run + empty states · PR: _ · _
-- [ ] **E2** — File-error handling (malformed/wrong-shape JSON) · PR: _ · _
+- [x] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · branch: `milestoneC2-district-maintenance-screen` · PR: #70 · landed 2026-06-28
+- [x] **E1** — First-run + empty states · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: _pending_ · landed 2026-06-28
+- [x] **E2** — File-error handling (malformed/wrong-shape JSON) · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: _pending_ · landed 2026-06-28
 
 **Milestone 3 — "Roadmap complete"**
 - [ ] **D1** — District branding artwork in views · PR: _ · _
@@ -307,10 +324,13 @@ up exactly where the last one stopped.
 
 ## Next slice
 
-**Milestone 1 is complete** (A1, A2, B1, C1, C3) and **B2 (whole-file player import) + C2
-(District Maintenance screen) have landed**: scraped data loads, commits per-team or
-whole-file, persists across restarts, and districts can be fully managed in-app (add / edit /
-inactivate / reactivate, never deleted) with edits feeding import mapping immediately. The
-remaining Milestone-2 polish is **E1** (first-run / empty states) and **E2** (file-error
-handling); then Milestone 3 is the D-series roadmap polish (D1 district branding artwork in
-views builds directly on C2) and the E3/E4 hardening.
+**Milestones 1 and 2 are complete** (A1, A2, B1, C1, C3, B2, C2, E1, E2): scraped data loads,
+commits per-team or whole-file, persists across restarts; districts are fully managed in-app
+(add / edit / inactivate / reactivate, never deleted) and feed import mapping immediately; and
+the app now has first-run/empty-state guidance plus plain-language file-error handling. The
+remaining work is **Milestone 3 — "Roadmap complete":** **D1** (district branding artwork in
+team/standings views — builds directly on the C2-managed branding), **D2** (coach
+Scout-to-Scout continuous-cohort exception), **D3** (My Team favorites persistence + opponent
+profile links), **D4** (surface transient import-workbench review rows in the Review Center),
+then **E3** (launcher wait-for-server polish) and **E4** (full regression + smoke test). D1 is
+the natural next slice.

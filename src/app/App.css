@@ -957,6 +957,84 @@ h1 {
   font-size: 0.85rem;
 }
 
+/* E1: first-run / empty states. */
+.empty-state-card {
+  border: 1px solid var(--color-steel-blue);
+  border-left: 4px solid var(--color-steel-blue);
+  border-radius: 4px;
+  background-color: var(--color-mint-cream);
+  padding: 1rem 1.1rem;
+  margin: 0.75rem 0;
+}
+
+.empty-state-title {
+  margin: 0 0 0.5rem 0;
+  color: var(--color-carbon-black);
+}
+
+.empty-state-message {
+  font-size: 0.9rem;
+  color: var(--color-carbon-black);
+}
+
+.empty-state-list {
+  margin: 0.4rem 0 0 0;
+  padding-left: 1.1rem;
+}
+
+.empty-state-list li {
+  margin-bottom: 0.3rem;
+}
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.empty-state-button {
+  border: 1px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: white;
+  color: var(--color-steel-blue);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+.empty-state-button-primary {
+  background-color: var(--color-steel-blue);
+  color: white;
+}
+
+/* E2: plain-language file-error panels (toolbar dataset import + roster import). */
+.file-error-panel {
+  border: 1px solid var(--color-bronze-spice);
+  border-left: 4px solid var(--color-bronze-spice);
+  border-radius: 3px;
+  background-color: #fff6ef;
+  padding: 0.6rem 0.85rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+
+.file-error-file {
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.file-error-what,
+.file-error-try {
+  margin: 0.35rem 0 0 0;
+}
+
+.file-error-detail {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.72rem;
+  color: #666;
+}
+
 /* Workspace snapshot toolbar (portable JSON export/import) */
 .workspace-toolbar {
   border: 1px solid var(--color-alabaster-grey);

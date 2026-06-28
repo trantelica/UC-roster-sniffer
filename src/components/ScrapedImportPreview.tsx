@@ -34,6 +34,10 @@ import {
   type WholeFilePlayerImportPlan,
   type WholeFileCommittableTarget,
 } from '../engine/uteConferenceScrapedJsonWholeFileImport';
+import {
+  buildScrapedImportErrorGuidance,
+  type UserFacingFileError,
+} from '../app/fileImportGuidance';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
@@ -142,7 +146,7 @@ type LoadedSource = {
   payload: unknown;
 };
 
-type FileError = { name: string; message: string };
+type FileError = { name: string; guidance: UserFacingFileError };
 
 const READINESS_LABELS: Record<string, string> = {
   ready: 'Ready',
@@ -157,6 +161,29 @@ function ReadinessBadge({ status }: { status: string }) {
     <span className={`import-badge import-badge-${status}`}>
       {READINESS_LABELS[status] ?? status}
     </span>
+  );
+}
+
+/** E2: plain-language, user-facing file-error panel (no engine code names as the headline). */
+function FileErrorPanel({
+  fileName,
+  guidance,
+}: {
+  fileName: string;
+  guidance: UserFacingFileError;
+}) {
+  return (
+    <div className="file-error-panel">
+      <strong>{guidance.title}</strong>{' '}
+      <span className="file-error-file">(“{fileName}”)</span>
+      <p className="file-error-what">
+        <strong>What happened:</strong> {guidance.what}
+      </p>
+      <p className="file-error-try">
+        <strong>Try this:</strong> {guidance.tryThis}
+      </p>
+      {guidance.detail && <p className="file-error-detail">Details: {guidance.detail}</p>}
+    </div>
   );
 }
 
@@ -409,12 +436,26 @@ export default function ScrapedImportPreview({
         setLoaded({ sourceKind: 'file', name: file.name, payload: parsed.payload });
       } else {
         setLoaded(null);
-        setFileError({ name: file.name, message: parsed.message });
+        setFileError({
+          name: file.name,
+          guidance: buildScrapedImportErrorGuidance({
+            kind: 'parse',
+            reason: parsed.reason,
+            message: parsed.message,
+          }),
+        });
       }
     };
     reader.onerror = () => {
       setLoaded(null);
-      setFileError({ name: file.name, message: 'The file could not be read locally.' });
+      setFileError({
+        name: file.name,
+        guidance: {
+          title: 'We could not read this file.',
+          what: 'The file could not be read from your computer.',
+          tryThis: 'Try choosing the file again, or pick a different copy of it.',
+        },
+      });
     };
     reader.readAsText(file);
   }
@@ -499,13 +540,15 @@ export default function ScrapedImportPreview({
       </div>
 
       {fileError && (
-        <p className="import-warn">
-          Could not load “{fileError.name}”: {fileError.message}
-        </p>
+        <FileErrorPanel fileName={fileError.name} guidance={fileError.guidance} />
       )}
 
       {!loaded && !fileError && (
-        <p className="import-empty">No source loaded. Choose a local JSON file to begin.</p>
+        <p className="import-empty">
+          No source loaded. Choose a scraped Ute Conference players or coaches JSON file (read
+          locally — never uploaded) to begin. To load a dataset you exported, use “Import
+          Dataset” in the top toolbar instead.
+        </p>
       )}
 
       {loaded && wholeFilePlan && wholeFilePlan.isPlayerFile && (
@@ -519,6 +562,7 @@ export default function ScrapedImportPreview({
       {loaded && vm && (
         <Workbench
           vm={vm}
+          sourcePayload={loaded.payload}
           sourceName={loaded.name}
           sourceKind={loaded.sourceKind}
           selectedTargetId={selectedTargetId}
@@ -682,6 +726,7 @@ function demoIdForLabel(label: string): string {
 
 function Workbench({
   vm,
+  sourcePayload,
   sourceName,
   sourceKind,
   selectedTargetId,
@@ -698,6 +743,7 @@ function Workbench({
   onConfirmDistrict,
 }: {
   vm: ScrapedImportPreviewViewModel;
+  sourcePayload: unknown;
   sourceName: string;
   sourceKind: 'file' | 'demo';
   selectedTargetId: string | null;
@@ -749,12 +795,22 @@ function Workbench({
       </div>
 
       {vm.invalidSource ? (
-        <p className="import-empty">
-          This source is not a supported scraped JSON players or coaches file, so there are
-          no importable targets.
-        </p>
+        <FileErrorPanel
+          fileName={sourceName}
+          guidance={buildScrapedImportErrorGuidance({
+            kind: 'invalid-source',
+            payload: sourcePayload,
+          })}
+        />
       ) : (
         <>
+          {vm.recordType === 'coaches' && (
+            <p className="import-note">
+              This is a <strong>coaches</strong> file. You can preview each team's coaches
+              below, but committing coaches into the workspace isn't available yet — the
+              one-click <strong>whole-file import</strong> commits player teams only.
+            </p>
+          )}
           <TargetSection
             title="Ready targets"
             targets={vm.readyTargets}

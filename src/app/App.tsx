@@ -10,7 +10,6 @@ import {
   type WorkspaceData,
   type WorkspaceSnapshotSelection,
   type WorkspaceSnapshotSummary,
-  type WorkspaceSnapshotValidationError,
 } from '../engine/workspaceSnapshot';
 import { updateGameResult, type GameResultPatch } from '../engine/gameResultUpdate';
 import {
@@ -42,6 +41,12 @@ import {
   type DistrictUpdatePatch,
 } from '../engine/districtRegistry';
 import DistrictMaintenanceView from '../components/DistrictMaintenanceView';
+import EmptyState from '../components/EmptyState';
+import { assessWorkspaceEmptiness } from '../engine/workspaceEmptyState';
+import {
+  buildDatasetImportErrorGuidance,
+  type UserFacingFileError,
+} from './fileImportGuidance';
 import { executeWholeFilePlayerImportBatch } from '../engine/uteConferenceScrapedJsonWholeFileImport';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
@@ -67,7 +72,7 @@ type AppView =
 
 type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
-  | { kind: 'error'; fileName: string; errors: WorkspaceSnapshotValidationError[] };
+  | { kind: 'error'; fileName: string; guidance: UserFacingFileError };
 
 // Automatic IndexedDB persistence status, surfaced as a small save-state indicator (A1).
 type PersistenceStatus =
@@ -511,8 +516,13 @@ export default function App() {
       const text = typeof reader.result === 'string' ? reader.result : '';
       const result = parseWorkspaceSnapshotJson(text);
       if (!result.ok) {
-        // Invalid snapshot: current workspace state is left completely unchanged.
-        setSnapshotNotice({ kind: 'error', fileName: file.name, errors: result.errors });
+        // Invalid snapshot: current workspace state is left completely unchanged. The
+        // validation verdict is translated into plain-language, actionable guidance (E2).
+        setSnapshotNotice({
+          kind: 'error',
+          fileName: file.name,
+          guidance: buildDatasetImportErrorGuidance(text, result.errors),
+        });
       } else {
         // Valid snapshot: REPLACE the workspace (never merge) and clear all transient
         // import-execution / workbench state.
@@ -542,7 +552,11 @@ export default function App() {
       setSnapshotNotice({
         kind: 'error',
         fileName: file.name,
-        errors: [{ code: 'invalid-json', message: 'The file could not be read locally.' }],
+        guidance: {
+          title: 'We could not read this file.',
+          what: 'The file could not be read from your computer.',
+          tryThis: 'Try choosing the file again, or pick a different copy of it.',
+        },
       });
       if (importInputRef.current) importInputRef.current.value = '';
     };
@@ -557,6 +571,46 @@ export default function App() {
     ? findPriorSeasonTeam(liveTeams, selectedTeam)
     : null;
 
+  // E1: workspace emptiness drives the first-run / empty states.
+  const emptiness = assessWorkspaceEmptiness(workspace);
+  function triggerDatasetImport() {
+    importInputRef.current?.click();
+  }
+
+  // The first-run / no-roster-data state: a calm explainer of what this tool is and the next
+  // actions to get data in. Reachable whenever the workspace has no teams.
+  const firstRunState = (
+    <EmptyState
+      title="No roster data yet"
+      message={
+        <>
+          <p>
+            Everything here stays <strong>local to this browser</strong> — nothing is uploaded
+            anywhere, and your work auto-saves on this machine. To get started:
+          </p>
+          <ul className="empty-state-list">
+            <li>
+              <strong>Roster import</strong> — load a scraped Ute Conference players JSON file
+              and commit a team (or all ready teams).
+            </li>
+            <li>
+              <strong>Import Dataset</strong> — open a portable <code>.json</code> dataset
+              someone exported (e.g. another coach).
+            </li>
+            <li>
+              <strong>Districts</strong> — set up the district registry imports match against.
+            </li>
+          </ul>
+        </>
+      }
+      actions={[
+        { label: 'Go to Roster import', onClick: () => setView('import'), primary: true },
+        { label: 'Import Dataset (.json)', onClick: triggerDatasetImport },
+        { label: 'Manage Districts', onClick: () => setView('districts') },
+      ]}
+    />
+  );
+
   const rosterContent = (
     <>
       {inMemoryImport && (
@@ -569,35 +623,43 @@ export default function App() {
           tab to restore the baseline roster.
         </div>
       )}
-      <FilterBar
-        teams={liveTeams}
-        districts={workspace.districts}
-        ageDivisions={workspace.ageDivisions}
-        selectedSeason={selectedSeason}
-        selectedDistrict={selectedDistrict}
-        selectedAgeDivision={selectedAgeDivision}
-        selectedTeamId={selectedTeamId}
-        onSeasonChange={handleSeasonChange}
-        onDistrictChange={handleDistrictChange}
-        onAgeDivisionChange={handleAgeDivisionChange}
-        onTeamChange={handleTeamChange}
-      />
-      {selectedTeam ? (
-        <TeamView
-          team={selectedTeam}
-          districts={workspace.districts}
-          ageDivisions={workspace.ageDivisions}
-          priorPlayers={priorTeam?.players ?? null}
-          teams={liveTeams}
-          games={workspace.games}
-          coaches={workspace.coaches}
-          coachAssignments={workspace.coachAssignments}
-          priorSeasonTeamId={priorTeam?.teamId ?? null}
-          onUpdateGameResult={handleUpdateGameResult}
-          onOpenTeam={handleOpenTeam}
-        />
+      {!emptiness.hasTeams ? (
+        firstRunState
       ) : (
-        <p className="no-selection">Select a season, district, age division, and team to view the roster.</p>
+        <>
+          <FilterBar
+            teams={liveTeams}
+            districts={workspace.districts}
+            ageDivisions={workspace.ageDivisions}
+            selectedSeason={selectedSeason}
+            selectedDistrict={selectedDistrict}
+            selectedAgeDivision={selectedAgeDivision}
+            selectedTeamId={selectedTeamId}
+            onSeasonChange={handleSeasonChange}
+            onDistrictChange={handleDistrictChange}
+            onAgeDivisionChange={handleAgeDivisionChange}
+            onTeamChange={handleTeamChange}
+          />
+          {selectedTeam ? (
+            <TeamView
+              team={selectedTeam}
+              districts={workspace.districts}
+              ageDivisions={workspace.ageDivisions}
+              priorPlayers={priorTeam?.players ?? null}
+              teams={liveTeams}
+              games={workspace.games}
+              coaches={workspace.coaches}
+              coachAssignments={workspace.coachAssignments}
+              priorSeasonTeamId={priorTeam?.teamId ?? null}
+              onUpdateGameResult={handleUpdateGameResult}
+              onOpenTeam={handleOpenTeam}
+            />
+          ) : (
+            <p className="no-selection">
+              Pick a season, district, age division, and team above to view a roster.
+            </p>
+          )}
+        </>
       )}
     </>
   );
@@ -965,15 +1027,17 @@ function WorkspaceToolbar({
       )}
       {notice && notice.kind === 'error' && (
         <div className="workspace-notice workspace-notice-error">
-          <strong>Could not import “{notice.fileName}”.</strong> The current workspace was
-          left unchanged.
-          <ul className="import-issues">
-            {notice.errors.map((e, index) => (
-              <li key={`${e.code}-${index}`} className="import-issue import-issue-error">
-                <strong>{e.code}</strong>: {e.message}
-              </li>
-            ))}
-          </ul>
+          <strong>{notice.guidance.title}</strong>{' '}
+          <span className="file-error-file">(“{notice.fileName}” — your current workspace was left unchanged.)</span>
+          <p className="file-error-what">
+            <strong>What happened:</strong> {notice.guidance.what}
+          </p>
+          <p className="file-error-try">
+            <strong>Try this:</strong> {notice.guidance.tryThis}
+          </p>
+          {notice.guidance.detail && (
+            <p className="file-error-detail">Details: {notice.guidance.detail}</p>
+          )}
           <button type="button" className="import-link-button" onClick={onDismissNotice}>
             Dismiss
           </button>
