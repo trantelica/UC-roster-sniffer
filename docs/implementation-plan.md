@@ -36,6 +36,14 @@ A focused three-part correction after Milestones 1–2:
    state. New **Reset workspace** / **Load sample data** toolbar actions (confirmed). The
    persistence restore accepts an empty workspace (`allowEmptyWorkspace`); user Dataset Import
    still rejects an empty file. Sample data files are retained for tests + the explicit action.
+4. **Ute Conference baseline seed (correction direction).** `loadUteConferenceSeedWorkspace`
+   builds the real baseline — district registry + age divisions + **empty team shells** (no
+   rosters) — from the committed fixture `data-samples/ute-conference-seed.sample.json`, with a
+   **Load Ute Conference seed** toolbar action (confirmed). Real roster files then import into
+   the existing shells via the unchanged pipeline; **no dynamic team creation on import**.
+   Empty / seed / sample stay three distinct concepts. Seed coverage is limited to the repo's
+   known districts (Alta, Brighton) and a template team-code set; expand the fixture as the
+   real league structure is confirmed.
 
 ## Guiding principles
 

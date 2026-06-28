@@ -139,6 +139,21 @@ The Roster import workbench runs this normalizer on every loaded file/demo and s
 when a flat list was normalized and/or metadata was inferred. Coaches still preview per team;
 whole-file commit remains player-only.
 
+### Ute Conference seed → import into existing team shells (correction direction)
+
+The recommended workflow for real data is to first **Load Ute Conference seed**
+(`loadUteConferenceSeedWorkspace`), which creates the baseline workspace of **empty team
+shells** (district registry + age divisions + teams with no rosters). A real player file (flat
+or nested, normalized as above) then imports into those existing teams through the unchanged
+pipeline: per-team B1 commit or B2 whole-file import locate the matching shell by season +
+district + age division + team code, and add only the player rows.
+
+- The seed season must match the import's season (the flat path infers the year from the
+  filename) for a shell to match.
+- A district/team **not** in the seed surfaces as "no workspace team" / provisional and is
+  **not** auto-created in this pass; the existing **Add district to registry** confirm/add path
+  still handles unknown districts. **Future work:** dynamic create-new district/team-on-import.
+
 ## Roster import preview (Phase 5 slice 1)
 
 Phase 5 begins with a pure, deterministic **import preview state/contract**

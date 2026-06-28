@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { loadSampleData, loadEmptyWorkspace } from '../data/loadSampleData';
+import { loadUteConferenceSeedWorkspace } from '../data/loadUteConferenceSeedWorkspace';
 import { getDistinctSeasons } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import {
@@ -515,6 +516,21 @@ export default function App() {
     resetTransientStateForWorkspaceReplace();
   }
 
+  // Loads the real Ute Conference BASELINE seed: district registry + age divisions + EMPTY team
+  // shells (no rosters), so real player files import into existing teams. Distinct from sample
+  // (demo) and empty (no teams). Replaces this browser's workspace; auto-saves via A1.
+  function handleLoadUteConferenceSeed() {
+    const confirmed = window.confirm(
+      'Load the Ute Conference baseline seed into this browser’s workspace?\n\nThis replaces ' +
+        'the current local workspace data with district + team shells that have EMPTY rosters, ' +
+        'ready for you to import real player files into. Export a dataset first if you want a ' +
+        'backup.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadUteConferenceSeedWorkspace());
+    resetTransientStateForWorkspaceReplace();
+  }
+
   // --- Slice 23 + A2: portable dataset export / import --------------------
 
   // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
@@ -803,6 +819,7 @@ export default function App() {
         onDismissNotice={() => setSnapshotNotice(null)}
         onResetWorkspace={handleResetWorkspace}
         onLoadSampleData={handleLoadSampleData}
+        onLoadUteConferenceSeed={handleLoadUteConferenceSeed}
         inMemoryImportActive={inMemoryImport !== null}
         persistenceStatus={persistenceStatus}
       />
@@ -1015,6 +1032,7 @@ function WorkspaceToolbar({
   onDismissNotice,
   onResetWorkspace,
   onLoadSampleData,
+  onLoadUteConferenceSeed,
   inMemoryImportActive,
   persistenceStatus,
 }: {
@@ -1025,6 +1043,7 @@ function WorkspaceToolbar({
   onDismissNotice: () => void;
   onResetWorkspace: () => void;
   onLoadSampleData: () => void;
+  onLoadUteConferenceSeed: () => void;
   inMemoryImportActive: boolean;
   persistenceStatus: PersistenceStatus;
 }) {
@@ -1044,6 +1063,9 @@ function WorkspaceToolbar({
             className="workspace-import-input"
           />
         </label>
+        <button type="button" className="workspace-button" onClick={onLoadUteConferenceSeed}>
+          Load Ute Conference seed
+        </button>
         <button type="button" className="workspace-button" onClick={onLoadSampleData}>
           Load sample data
         </button>

@@ -1797,6 +1797,22 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
 > reset-to-empty workspace is a legitimate persisted state, the persistence restore validates
 > with `allowEmptyWorkspace: true`; user-facing **Dataset Import** keeps the default (an empty
 > dataset file is still rejected with `empty-workspace`).
+>
+> **Three distinct workspace builders (do not conflate):**
+> - **Empty** (`loadEmptyWorkspace`) — production fresh start: districts + age divisions, **no
+>   teams**.
+> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — real **baseline**: districts +
+>   age divisions + **empty team shells** (no players/coaches), so roster imports land into
+>   existing teams. Built deterministically from the committed seed-source fixture
+>   `data-samples/ute-conference-seed.sample.json` (season + district + age + team-code shells);
+>   `divisionTeamCount`/`draftOrder` are internally consistent and every district/age reference
+>   is valid. It is a clean workspace builder, **not** a runtime scrape parser.
+> - **Sample** (`loadSampleData`) — **demo/testing** content (teams with players); retained for
+>   tests and the explicit "Load sample data" action only.
+>
+> **Roster import** adds player content into existing seeded teams; a district/team absent from
+> the seed shows as "no existing team"/provisional. **Future work:** dynamic create-new
+> district/team-on-import is intentionally **not** part of this pass.
 
 ## Sample data fixtures
 

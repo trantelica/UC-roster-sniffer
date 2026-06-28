@@ -189,15 +189,26 @@ season year from filename) and any **warnings** (mixed age groups, no filename y
 file whose rows are missing required fields gets a plain-language error instead. There is no
 inline metadata editor in this pass.
 
-## Empty startup, Reset, and Load sample data (production-blocker correction)
+## Empty startup, Reset, Seed, and Sample data (production-blocker correction)
 
-- A fresh browser (no persisted workspace) opens to an **empty** workspace and the first-run
-  state — the bundled sample data is no longer forced into startup.
-- The top toolbar adds **Load sample data** (loads the bundled demo data into this browser)
-  and **Reset workspace** (returns to empty). Both **confirm first** and make clear they
-  **replace this browser’s local workspace data**; exporting a dataset first is the backup
-  path. A reset persists (auto-save), so the empty state survives reload.
-- An existing persisted workspace still restores normally on load.
+A fresh browser (no persisted workspace) opens to an **empty** workspace and the first-run
+state — bundled sample data is no longer forced into startup. The top toolbar offers four
+**distinct, separately-confirmed** workspace actions (each replaces this browser’s local
+workspace; export a dataset first for a backup; the change auto-saves and survives reload):
+
+- **Reset workspace** → **empty** workspace: a production fresh start with **no teams**
+  (baseline age divisions + seeded district registry kept).
+- **Load Ute Conference seed** → the **real baseline**: district registry + age divisions +
+  **empty team shells** (no rosters), so real player files import into existing teams.
+- **Load sample data** → **demo/testing** content only (bundled multi-season sample teams with
+  players). Not for production use.
+- **Import Dataset** / **Export Dataset** → portable full-dataset JSON round-trip (unchanged).
+
+These are deliberately **not** collapsed into one concept. After loading the seed, a real
+flat/nested roster import lands its players into the matching seeded team shells via the normal
+import pipeline; a district/team not in the seed shows as “no workspace team” / provisional
+(no team is auto-created in this pass). An existing persisted workspace still restores normally
+on load.
 
 ## Primary navigation
 
