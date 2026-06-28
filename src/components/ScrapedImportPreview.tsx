@@ -49,6 +49,22 @@ export type InMemoryImportAppState = {
 };
 
 /**
+ * Completion Milestone B1: payload of an explicit commit of a previewed scraped-JSON team
+ * into the committed workspace. The committed team is the pure `executedTeam` (existing
+ * records preserved + planned additions appended) produced by the existing execution helper.
+ */
+export type ScrapedImportCommitPayload = {
+  committedTeam: Team;
+  summary: {
+    teamId: string;
+    teamName: string | null;
+    addedCount: number;
+    beforeCount: number;
+    afterCount: number;
+  };
+};
+
+/**
  * Phase 5 slice 17–18: a local-first, roster-aware scraped JSON import workbench.
  *
  * This component is a thin renderer over the existing engine. It lets the user choose a
@@ -127,9 +143,12 @@ function ReadinessBadge({ status }: { status: string }) {
 export default function ScrapedImportPreview({
   baselineTeams,
   onInMemoryImportChange,
+  onCommitImport,
 }: {
   baselineTeams: Team[];
   onInMemoryImportChange: (state: InMemoryImportAppState | null) => void;
+  // B1: commit the previewed/ready team into the committed workspace (durable via A1).
+  onCommitImport: (payload: ScrapedImportCommitPayload) => void;
 }) {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
@@ -252,6 +271,43 @@ export default function ScrapedImportPreview({
     });
   }
 
+  // B1: explicit DURABLE commit of the staged, ready import into the committed workspace.
+  // Reuses the exact same transaction-plan + execution helpers as the in-memory preview, but
+  // hands the resulting executedTeam up to the app to write into committed workspace state
+  // (which then auto-saves via A1). Gated by the same readiness gate as in-memory execution.
+  function commitToWorkspace() {
+    if (!vm || executed) return;
+    const targetTeamId = vm.artifactTarget.existingTeamId;
+    if (!targetTeamId) return;
+    const existingTeam = baselineTeams.find((t) => t.teamId === targetTeamId) ?? null;
+    const generatedAt = new Date().toISOString();
+    const transactionPlan = buildScrapedJsonImportTransactionPlan({
+      transactionId: `import-commit:${Date.now()}`,
+      generatedAt,
+      source: { ...vm.artifactSource },
+      target: vm.artifactTarget,
+      review: vm.rosterReview,
+      stagedProjection: vm.stagedProjection,
+      readiness: vm.futureReadiness,
+    });
+    const result = executeUteConferenceScrapedJsonImportTransaction({
+      transactionPlan,
+      existingTeam,
+      executedAt: generatedAt,
+    });
+    if (result.status !== 'executed') return;
+    onCommitImport({
+      committedTeam: result.executedTeam,
+      summary: {
+        teamId: result.afterRosterSummary.teamId,
+        teamName: vm.artifactTarget.teamName,
+        addedCount: result.rosterDeltaSummary.addedCount,
+        beforeCount: result.beforeRosterSummary.playerCount,
+        afterCount: result.afterRosterSummary.playerCount,
+      },
+    });
+  }
+
   // Explicit in-memory undo: restores the baseline roster and unlocks the workflow.
   function undoInMemory() {
     if (!executionResult || executionResult.status !== 'executed') return;
@@ -314,14 +370,15 @@ export default function ScrapedImportPreview({
   return (
     <div className="import-preview">
       <div className="import-preview-header">
-        <h2 className="import-title">Import preview workbench</h2>
-        <span className="import-tag">Preview only · nothing applied</span>
+        <h2 className="import-title">Import workbench</h2>
+        <span className="import-tag">Review &amp; explicit commit</span>
       </div>
       <p className="import-note">
         Choose a Ute Conference scraped JSON file from your computer. It is read locally in
-        your browser only — never uploaded, saved, or committed. You can inspect readiness,
-        select a target, review rows, and see a dry-run projection of what an import would
-        do.
+        your browser only — never uploaded anywhere. You can inspect readiness, select a
+        target, review rows, and see a dry-run projection. Nothing changes your workspace
+        until you explicitly <strong>Commit Import to Workspace</strong> for a ready team —
+        and a committed import can be undone for the rest of the session.
       </p>
 
       {executed && (
@@ -394,6 +451,7 @@ export default function ScrapedImportPreview({
           executionResult={executionResult}
           onExecute={executeInMemory}
           onUndo={undoInMemory}
+          onCommit={commitToWorkspace}
         />
       )}
     </div>
@@ -418,6 +476,7 @@ function Workbench({
   executionResult,
   onExecute,
   onUndo,
+  onCommit,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -432,6 +491,7 @@ function Workbench({
   executionResult: ScrapedImportExecutionResult | null;
   onExecute: () => void;
   onUndo: () => void;
+  onCommit: () => void;
 }) {
   const executed = executionResult !== null && executionResult.status === 'executed';
   return (
@@ -507,6 +567,7 @@ function Workbench({
             executed={executed}
             onExecute={onExecute}
             onUndo={onUndo}
+            onCommit={onCommit}
           />
         </>
       )}
@@ -620,6 +681,7 @@ function SelectedTargetDetail({
   executed,
   onExecute,
   onUndo,
+  onCommit,
 }: {
   vm: ScrapedImportPreviewViewModel;
   sourceName: string;
@@ -632,6 +694,7 @@ function SelectedTargetDetail({
   executed: boolean;
   onExecute: () => void;
   onUndo: () => void;
+  onCommit: () => void;
 }) {
   const selected = vm.selected;
   const rosterReview = vm.rosterReview;
@@ -806,6 +869,70 @@ function SelectedTargetDetail({
           onUndo={onUndo}
         />
       )}
+
+      {selected.recordType === 'players' && (
+        <CommitToWorkspacePanel
+          vm={vm}
+          staged={staged}
+          executed={executed}
+          onCommit={onCommit}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * B1: explicit, durable commit of the staged/ready import into the committed workspace.
+ * Reuses the same readiness gate as the in-memory execution. Distinct from the in-memory
+ * preview above: this WRITES into the workspace, which auto-saves locally (IndexedDB) and is
+ * included in an exported dataset. Undo is offered at the app level for the current session.
+ */
+function CommitToWorkspacePanel({
+  vm,
+  staged,
+  executed,
+  onCommit,
+}: {
+  vm: ScrapedImportPreviewViewModel;
+  staged: boolean;
+  executed: boolean;
+  onCommit: () => void;
+}) {
+  const availability = evaluateScrapedJsonImportExecutionAvailability({
+    transactionPlan: vm.transactionPlan,
+    staged,
+    alreadyExecuted: executed,
+  });
+  const canCommit = availability.canExecute;
+  return (
+    <div className="import-section import-commit">
+      <div className="import-section-head">
+        <h3>Commit import to workspace</h3>
+        <span className="import-tag">
+          Writes to your workspace · auto-saves to this browser
+        </span>
+      </div>
+      <p className="import-reasons">
+        Commit the staged, ready import into your committed workspace. The team then appears in
+        the normal roster view, auto-saves locally (IndexedDB), and is included when you Export
+        Dataset. You can undo it for the rest of this session from the banner at the top.
+      </p>
+      {executed ? (
+        <p className="import-empty">
+          An in-memory preview is active. Undo it above before committing to the workspace.
+        </p>
+      ) : (
+        !canCommit && <p className="import-empty">{availability.message}</p>
+      )}
+      <button
+        type="button"
+        className="import-decision-button import-commit-button"
+        onClick={onCommit}
+        disabled={!canCommit}
+      >
+        Commit Import to Workspace
+      </button>
     </div>
   );
 }

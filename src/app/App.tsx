@@ -18,12 +18,17 @@ import {
   resolvePersistedWorkspaceLoad,
   saveWorkspaceSnapshot,
 } from '../storage/workspaceIndexedDbStore';
-import type { Game, StaffCoach, TeamCoachAssignment } from '../domain/types';
+import type { Game, StaffCoach, TeamCoachAssignment, Team } from '../domain/types';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
 import ScrapedImportPreview, {
   type InMemoryImportAppState,
+  type ScrapedImportCommitPayload,
 } from '../components/ScrapedImportPreview';
+import {
+  commitImportedTeamToWorkspace,
+  undoImportedTeamCommitInWorkspace,
+} from '../engine/workspaceImportCommit';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
@@ -73,6 +78,17 @@ export default function App() {
   // Non-durable, in-memory import execution state (null = showing the baseline roster).
   const [inMemoryImport, setInMemoryImport] =
     useState<InMemoryImportAppState | null>(null);
+  // B1: current-session undo for a committed scraped-JSON team import. Holds the pre-commit
+  // team value. Not persisted: the committed import itself is durable via A1, but this undo
+  // affordance is session-only and does not survive a reload.
+  const [committedImportUndo, setCommittedImportUndo] = useState<{
+    previousTeam: Team;
+    committedTeamId: string;
+    teamName: string | null;
+    addedCount: number;
+    beforeCount: number;
+    afterCount: number;
+  } | null>(null);
   // Bumped on a snapshot restore to force-remount the import workbench, clearing its
   // transient state (loaded source, review decisions, staged preview, execution/undo).
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
@@ -263,6 +279,54 @@ export default function App() {
     setWorkspace((current) => ({ ...current, coaches, coachAssignments }));
   }
 
+  // --- Milestone B1: commit a previewed scraped-JSON team into the workspace ---
+
+  // Writes the committed (executed) team into the committed workspace, replacing only that
+  // team. The workspace state change triggers the A1 auto-save naturally; the committed team
+  // is then plain workspace data (and is included by A2 Export Dataset). Clears any transient
+  // in-memory preview overlay, remembers the pre-commit team for a session undo, and selects
+  // the committed team so it is visible in the roster view.
+  function handleCommitScrapedImport(payload: ScrapedImportCommitPayload) {
+    const result = commitImportedTeamToWorkspace(workspace, payload.committedTeam);
+    if (!result.committed) return;
+    setWorkspace(result.workspace);
+    setInMemoryImport(null);
+    setCommittedImportUndo({
+      previousTeam: result.previousTeam,
+      committedTeamId: payload.committedTeam.teamId,
+      teamName: payload.summary.teamName,
+      addedCount: payload.summary.addedCount,
+      beforeCount: payload.summary.beforeCount,
+      afterCount: payload.summary.afterCount,
+    });
+    const committed = result.workspace.teams.find(
+      (t) => t.teamId === payload.committedTeam.teamId
+    );
+    if (committed) {
+      setSelectedSeason(committed.seasonId);
+      setSelectedDistrict(committed.districtId);
+      setSelectedAgeDivision(committed.ageDivisionId);
+      setSelectedTeamId(committed.teamId);
+    }
+    // Remount the import workbench so it re-derives against the new baseline (the committed
+    // import is no longer a pending preview).
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
+  // B1: current-session undo. Restores the affected team to its exact pre-commit state in the
+  // CURRENT workspace (preserving any unrelated later changes), auto-saves via A1, and clears
+  // the undo affordance.
+  function handleUndoCommittedImport() {
+    if (!committedImportUndo) return;
+    const result = undoImportedTeamCommitInWorkspace(
+      workspace,
+      committedImportUndo.previousTeam
+    );
+    if (result.restored) setWorkspace(result.workspace);
+    setCommittedImportUndo(null);
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
   // --- Slice 23 + A2: portable dataset export / import --------------------
 
   // Export the COMMITTED workspace dataset only. We deliberately use `workspace.teams`,
@@ -318,6 +382,8 @@ export default function App() {
         setWorkspace(restored.workspace);
         setWorkspaceFromImport(true);
         setInMemoryImport(null);
+        // The whole workspace was replaced, so a prior committed-import undo is now stale.
+        setCommittedImportUndo(null);
         setSelectedSeason(restored.selection.seasonId);
         setSelectedDistrict(restored.selection.districtId);
         setSelectedAgeDivision(restored.selection.ageDivisionId);
@@ -483,6 +549,26 @@ export default function App() {
         persistenceStatus={persistenceStatus}
       />
 
+      {committedImportUndo && (
+        <div className="committed-import-banner">
+          <div>
+            <strong>Committed import saved locally.</strong>{' '}
+            {committedImportUndo.teamName ?? committedImportUndo.committedTeamId}:{' '}
+            {committedImportUndo.beforeCount} → {committedImportUndo.afterCount} players (
+            {committedImportUndo.addedCount} added). This is now part of your workspace and
+            auto-saves to this browser (it survives reload). Undo is available only for this
+            session.
+          </div>
+          <button
+            type="button"
+            className="committed-import-undo-button"
+            onClick={handleUndoCommittedImport}
+          >
+            Undo Committed Import
+          </button>
+        </div>
+      )}
+
       {/*
         Both views stay mounted (visibility toggled) so an in-memory import execution and
         its Undo control are never lost by switching tabs while an execution is active.
@@ -510,6 +596,7 @@ export default function App() {
           key={workspaceEpoch}
           baselineTeams={workspace.teams}
           onInMemoryImportChange={setInMemoryImport}
+          onCommitImport={handleCommitScrapedImport}
         />
       </div>
       <div hidden={view !== 'schedule'}>

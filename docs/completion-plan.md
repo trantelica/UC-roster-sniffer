@@ -1,7 +1,7 @@
 # Completion Plan
 
-Status: **in progress — A1 + A2 (durable persistence + portable dataset) landed; B1 next**
-Date: 2026-06-27 (last updated 2026-06-27)
+Status: **in progress — A1 + A2 + B1 (persistence, portable dataset, scraped-JSON team commit) landed; C1 next**
+Date: 2026-06-27 (last updated 2026-06-28)
 Owner: product owner (novice vibe coder)
 
 > **Live document.** Update the [Progress tracker](#progress-tracker) as each slice
@@ -144,6 +144,16 @@ finishes the roadmap (D) and hardens (E).
   - *Acceptance:* Load the coaches/players JSON you were testing, click commit, and see
     that team and its coaches/players appear in the normal viewer — and still be there
     after a restart.
+  - **Landed (2026-06-28).** A **Commit Import to Workspace** action in the import
+    workbench writes the staged, ready **player** team (the existing execution helper's
+    `executedTeam`: existing records preserved + planned additions appended) into the
+    committed `workspace` via the new pure helper `src/engine/workspaceImportCommit.ts`.
+    It is gated by the same readiness gate as the in-memory preview, so unresolved /
+    blocked / needs-review / missing-context targets cannot be committed. Commit
+    auto-saves via A1 and is included by A2 Export Dataset; a session-only **Undo
+    Committed Import** restores the exact pre-commit team. The transient in-memory overlay
+    is cleared on commit. **Coach scraped-JSON commit is deferred** — the execution helper
+    only commits player roster teams, and a coach commit needs a new engine (next slice).
 
 - **B2 — Whole-file import flow (multiple teams).**
   Let the readiness report drive importing all ready teams in a file at once (the
@@ -225,8 +235,8 @@ up exactly where the last one stopped.
 
 **Milestone 1 — "It's a real tool"**
 - [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: #65 · landed 2026-06-27
-- [x] **A2** — One-click portable export/import + save indicator (round-trip test) · branch: `milestoneA2-portable-dataset-export-import` · PR: _pending_ · landed 2026-06-27
-- [ ] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · PR: _ · _
+- [x] **A2** — One-click portable export/import + save indicator (round-trip test) · branch: `milestoneA2-portable-dataset-export-import` · PR: #66 · landed 2026-06-27
+- [x] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · branch: `milestoneB1-scraped-json-team-commit` · PR: _pending_ · landed 2026-06-28
 - [ ] **C1** — District registry model + persistence (seed Ute Conference districts) · PR: _ · _
 - [ ] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · PR: _ · _
 
