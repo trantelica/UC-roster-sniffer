@@ -143,9 +143,11 @@ whole-file commit remains player-only.
 
 The primary workflow does **not** require pre-seeded team shells. Roster imports **create**
 teams (see "Roster import: create OR update teams"). What an import needs in place first is the
-**districts** (infrastructure): set them up once via the Districts tab, the in-flow "Add
-district to registry" action, or the optional **Load Ute Conference seed**. Once a district is
-registered, importing a real player file for it creates the season's teams and adds the players.
+**districts** (infrastructure) — and a fresh empty workspace already contains the **full
+39-district Ute Conference registry** by default, so a real roster file (Riverton, Bingham,
+Herriman, …) can create teams immediately with no seed step. A district not in that registry
+(or a custom one) can be added via the Districts tab or the in-flow "Add district to registry"
+action; once registered, importing a player file for it creates the season's teams and players.
 
 The **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) is now **optional**: it loads the
 39 known districts plus a set of GI/2026 empty team shells. With teams created on import the

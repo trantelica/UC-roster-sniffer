@@ -196,13 +196,14 @@ state — bundled sample data is no longer forced into startup. The top toolbar 
 **distinct, separately-confirmed** workspace actions (each replaces this browser’s local
 workspace; export a dataset first for a backup; the change auto-saves and survives reload):
 
-- **Reset workspace** → **empty** workspace: a production fresh start with **no teams**
-  (baseline age divisions + seeded district registry kept).
-- **Load Ute Conference seed** → an **optional baseline**: a registry of the **39 known Ute
-  Conference districts** (Alta/Brighton keep their branding; the rest provisional, editable in
-  District Maintenance) + age divisions + some GI/2026 empty team shells. With teams now created
-  on import, the team shells are **no longer required** — they're a convenience; what matters is
-  that the districts are registered.
+- **Reset workspace** → **empty** workspace: a production fresh start with **no teams** but the
+  **full 39-district Ute Conference registry** + age divisions, so a real roster file can create
+  teams immediately (Alta/Brighton keep confirmed branding; the rest are provisional, editable
+  in District Maintenance).
+- **Load Ute Conference seed** → an **optional** convenience: the same 39-district registry plus
+  some GI/2026 empty team shells. Since the districts already exist in a fresh workspace and
+  teams are created on import, the shells are **not required** — a roster import simply updates
+  them instead of creating teams.
 - **Load sample data** → **demo/testing** content only (bundled multi-season sample teams with
   players). Not for production use.
 - **Import Dataset** / **Export Dataset** → portable full-dataset JSON round-trip (unchanged).

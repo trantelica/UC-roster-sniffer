@@ -60,6 +60,17 @@ describe('roster import creates missing teams from an empty workspace', () => {
     expect(commit.createdTeamIds).toEqual(['2026-alta-GI-A3']);
   });
 
+  it('creates a team for a non-demo district (Riverton) without loading the optional seed', () => {
+    // Fresh empty workspace only — no Ute Conference seed loaded.
+    const ws = emptyWorkspace();
+    const plan = planFromFlat([flatRow('Riverton', 'GridIron B1', 'Smith, Alex')], ws);
+    expect(plan.createCount).toBe(1);
+    expect(plan.targets[0].status).toBe('create');
+    const commit = commitPlan(ws, plan);
+    const team = commit.workspace.teams.find((t) => t.teamId === '2026-riverton-GI-B1');
+    expect(team?.players.map((p) => p.name)).toEqual(['Smith, Alex']);
+  });
+
   it('makes Alta GridIron A1 and Brighton GridIron A1 distinct teams', () => {
     const ws = emptyWorkspace();
     const plan = planFromFlat(

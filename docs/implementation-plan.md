@@ -66,6 +66,13 @@ district registry convenience), and the flat/nested normalizer, empty startup, a
 Maintenance panel fix are retained. **Future work:** dynamic create-new district-on-import and
 parenthetical sub-label disambiguation.
 
+Follow-up: the **default seeded district registry** (`src/data/districtRegistrySeed.ts`) now
+contains all **39 known Ute Conference districts** (districts are core infrastructure), so a
+fresh `loadEmptyWorkspace` can create teams from a real roster file with no seed step. Alta and
+Brighton keep confirmed branding; the rest are active with provisional blank branding. The
+optional seed workspace builds its team shells over this same registry; an unknown district is
+still blocked ("Add district first").
+
 ## Guiding principles
 
 1. **Spec-first**: the coding agent should treat files in `docs/` as the source of truth.

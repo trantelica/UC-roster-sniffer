@@ -69,8 +69,12 @@ name→id lookup, confirm an unknown scraped district, inactivate). There is del
 **no hard-delete helper**. `confirmUnknownScrapedDistrict` always produces an **active**
 outcome: it reuses an exact active match, **reactivates** an exact match that was only
 inactive (preserving the record — never duplicating or deleting it), or appends a new
-active/provisional record when there is no exact match. The deterministic seed list (known Ute Conference districts)
-lives in `src/data/districtRegistrySeed.ts`. The registry persists with the workspace
+active/provisional record when there is no exact match. The deterministic seed list lives in
+`src/data/districtRegistrySeed.ts` and contains the **39 known Ute Conference districts** —
+this full registry is the **default** for a fresh empty workspace (districts are core
+infrastructure), so a real roster file can create teams immediately. Alta and Brighton carry
+confirmed branding; the rest are seeded active with provisional blank branding
+(`brandingProvisional: true`, `sourceLabels: [name]`). The registry persists with the workspace
 (IndexedDB auto-save A1) and round-trips through the portable dataset export/import (A2).
 
 ### District Maintenance (Completion Milestone C2)
@@ -1791,21 +1795,22 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
 
 > **Empty default startup + reset (production-blocker correction).** The default startup
 > workspace is now **empty** (`loadEmptyWorkspace` — no teams/games/coaches; the fixed age
-> divisions and seeded district registry are kept so import can still resolve districts), so a
-> fresh browser opens to the first-run state rather than sample data. A user can **Reset
+> divisions and the **full 39-district seeded registry** are kept, so a real roster file can
+> create teams immediately without loading any seed), so a fresh browser opens to the first-run
+> state rather than sample data. A user can **Reset
 > workspace** (confirmed) to return to empty, or **Load sample data** explicitly. Because a
 > reset-to-empty workspace is a legitimate persisted state, the persistence restore validates
 > with `allowEmptyWorkspace: true`; user-facing **Dataset Import** keeps the default (an empty
 > dataset file is still rejected with `empty-workspace`).
 >
 > **Three distinct workspace builders (do not conflate):**
-> - **Empty** (`loadEmptyWorkspace`) — production fresh start: districts + age divisions, **no
->   teams**.
-> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — **optional** baseline: a
->   registry of the **39 known Ute Conference districts** + age divisions + some **empty team
->   shells** (no players/coaches). Teams are now CREATED from roster imports, so the shells are
->   a convenience, not a requirement — what the seed mainly provides is the district registry.
->   Built deterministically from
+> - **Empty** (`loadEmptyWorkspace`) — production fresh start: the **full 39-district registry**
+>   + age divisions, **no teams**. Real roster imports create teams against these districts.
+> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — **optional** baseline: the same
+>   39-district registry + age divisions + some **empty team shells** (no players/coaches). Since
+>   the districts are already in the default empty workspace and teams are CREATED from roster
+>   imports, the shells are a convenience (a roster import UPDATES them instead of creating),
+>   not a requirement. Built deterministically from
 >   the committed seed-source fixture `data-samples/ute-conference-seed.sample.json` (district
 >   names + per-season per-age-division team codes). District ids derive from
 >   `districtIdSlug(name)`; Alta/Brighton keep their seeded-registry branding and the rest get
