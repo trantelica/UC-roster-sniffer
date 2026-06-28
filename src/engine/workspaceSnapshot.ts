@@ -123,7 +123,7 @@ function copyTeam(team: Team): Team {
 }
 
 function copyDistrict(district: District): District {
-  return {
+  const copy: District = {
     districtId: district.districtId,
     name: district.name,
     mascot: district.mascot,
@@ -132,6 +132,13 @@ function copyDistrict(district: District): District {
     primaryColor: district.primaryColor,
     secondaryColor: district.secondaryColor,
   };
+  // C1 registry fields: only carried when present, so older snapshots stay byte-identical.
+  if (district.status !== undefined) copy.status = district.status;
+  if (district.sourceLabels !== undefined) copy.sourceLabels = [...district.sourceLabels];
+  if (district.brandingProvisional !== undefined) {
+    copy.brandingProvisional = district.brandingProvisional;
+  }
+  return copy;
 }
 
 function copyAgeDivision(ageDivision: AgeDivision): AgeDivision {
@@ -310,7 +317,7 @@ function isFiniteNumber(value: unknown): value is number {
 function validDistrict(value: unknown): District | null {
   if (!isObject(value)) return null;
   if (!isNonEmptyString(value.districtId) || typeof value.name !== 'string') return null;
-  return {
+  const district: District = {
     districtId: value.districtId,
     name: value.name,
     mascot: typeof value.mascot === 'string' ? value.mascot : '',
@@ -320,6 +327,22 @@ function validDistrict(value: unknown): District | null {
     primaryColor: typeof value.primaryColor === 'string' ? value.primaryColor : '',
     secondaryColor: typeof value.secondaryColor === 'string' ? value.secondaryColor : '',
   };
+  // C1 registry fields are optional. An ABSENT status is preserved as absent (treated as
+  // active by `isDistrictActive`), so older snapshots without these fields restore as active
+  // and round-trip unchanged; an explicit 'inactive' is preserved exactly.
+  if (value.status === 'active' || value.status === 'inactive') {
+    district.status = value.status;
+  }
+  if (Array.isArray(value.sourceLabels)) {
+    const labels = value.sourceLabels.filter(
+      (label): label is string => typeof label === 'string' && label.length > 0
+    );
+    if (labels.length > 0) district.sourceLabels = labels;
+  }
+  if (typeof value.brandingProvisional === 'boolean') {
+    district.brandingProvisional = value.brandingProvisional;
+  }
+  return district;
 }
 
 function validAgeDivision(value: unknown): AgeDivision | null {

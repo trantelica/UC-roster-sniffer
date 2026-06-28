@@ -1,3 +1,10 @@
+/**
+ * Completion Milestone C1: a district's registry lifecycle status. Districts are NEVER
+ * destructively deleted — `inactive` is the only retirement path. A record with no
+ * `status` field (e.g. an older snapshot or sample) is treated as `active` everywhere.
+ */
+export type DistrictStatus = 'active' | 'inactive';
+
 export interface District {
   districtId: string;
   name: string;
@@ -6,6 +13,25 @@ export interface District {
   helmetAssetPath: string;
   primaryColor: string;
   secondaryColor: string;
+  /**
+   * Completion Milestone C1: registry lifecycle status. Optional for backward
+   * compatibility — an absent value means `active` (see `isDistrictActive`). New seeded
+   * and confirmed districts always set it explicitly.
+   */
+  status?: DistrictStatus;
+  /**
+   * Completion Milestone C1/C3: exact scraped source labels that should resolve to this
+   * district during import mapping (in addition to `name`). Used ONLY for exact matching —
+   * never fuzzy. Optional; absent means match on `name` alone.
+   */
+  sourceLabels?: string[];
+  /**
+   * Completion Milestone C1: true when this district's mascot/colors/logo/helmet are
+   * placeholder values (e.g. a district confirmed during import, or a seed with no
+   * authoritative branding yet). Real branding can be filled in later via District
+   * Maintenance (C2). Absent means the branding is not flagged as placeholder.
+   */
+  brandingProvisional?: boolean;
 }
 
 export interface AgeDivision {

@@ -29,7 +29,10 @@ This document defines the initial conceptual data model. Field names are draft-l
   "logoAssetPath": "assets/districts/alta/logo.png",
   "helmetAssetPath": "assets/districts/alta/helmet.png",
   "primaryColor": "#000000",
-  "secondaryColor": "#FFFFFF"
+  "secondaryColor": "#FFFFFF",
+  "status": "active",
+  "sourceLabels": ["Alta"],
+  "brandingProvisional": false
 }
 ```
 
@@ -38,6 +41,34 @@ This document defines the initial conceptual data model. Field names are draft-l
 - Districts are standardized.
 - District branding is reusable across seasons.
 - Imports should preserve raw district labels before mapping them to standardized district IDs.
+
+### District registry (Completion Milestone C1)
+
+The workspace `districts` collection **is** the canonical district registry (there is no
+second district system). Three optional fields support the registry; all are backward
+compatible — a district record that omits them is still valid:
+
+- **`status`** — `"active"` or `"inactive"`. **An absent `status` is treated as `active`**
+  everywhere (older snapshots and the sample contract have no `status`). Districts are
+  **never destructively deleted** — marking a district `inactive` is the only retirement
+  path, and the record is always preserved.
+- **`sourceLabels`** — exact scraped source labels that should resolve to this district
+  during import mapping, in addition to `name`. Used for **exact matching only** (never
+  fuzzy). Distinct districts such as `"Bingham"` and `"Bingham Girls"` are never collapsed.
+- **`brandingProvisional`** — `true` when the mascot/colors/logo/helmet are placeholder
+  values (e.g. a district confirmed during import, or a seed with no authoritative branding
+  yet). Real branding is filled in later via District Maintenance (C2). Absent = not flagged.
+
+Image references (`logoAssetPath`, `helmetAssetPath`) are **plain string paths/filenames**
+that point at files in `public/districts/`. Image **bytes are never stored** in the
+workspace or snapshot — only the reference.
+
+Pure registry helpers live in `src/engine/districtRegistry.ts` (validate/coerce, seed,
+ensure-seeds-without-duplicates, find active/inactive/by-id/by-exact-name, build the
+name→id lookup, confirm an unknown scraped district, inactivate). There is deliberately
+**no hard-delete helper**. The deterministic seed list (known Ute Conference districts)
+lives in `src/data/districtRegistrySeed.ts`. The registry persists with the workspace
+(IndexedDB auto-save A1) and round-trips through the portable dataset export/import (A2).
 
 ## Age Division
 

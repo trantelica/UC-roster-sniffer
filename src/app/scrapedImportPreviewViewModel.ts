@@ -83,6 +83,21 @@ export type ScrapedImportCanonicalContextView = {
   contextConfidence: string;
 };
 
+/**
+ * C3: the selected target's district mapping, surfaced so the import UI can show whether the
+ * scraped district resolved against the registry (high confidence) or is still provisional
+ * (offering a confirm/add action). The raw scraped name is preserved exactly.
+ */
+export type ScrapedImportDistrictView = {
+  rawName: string | null;
+  canonicalId: string | null;
+  confidence: string;
+  /** True when the district resolved against the registry at high confidence. */
+  isRegistered: boolean;
+  /** True when no exact registry match was found and a provisional slug was derived. */
+  isProvisional: boolean;
+};
+
 export type ScrapedImportReviewSummaryView = {
   reviewedRowCount: number;
   unreviewedRowCount: number;
@@ -103,6 +118,8 @@ export type ScrapedImportSelectedView = {
   blocked: boolean;
   empty: boolean;
   canonicalContext: ScrapedImportCanonicalContextView | null;
+  /** C3: the district mapping for this target (null when no mapping was derived). */
+  district: ScrapedImportDistrictView | null;
   issues: ScrapedImportIssueView[];
   readinessReasons: string[];
   /** Player preview rows (empty for coach targets). Read-only; order preserved. */
@@ -349,6 +366,16 @@ function buildSelectedView(
       }
     : null;
 
+  const district: ScrapedImportDistrictView | null = mapping
+    ? {
+        rawName: mapping.district.rawValue,
+        canonicalId: mapping.district.canonicalValue,
+        confidence: mapping.district.confidence,
+        isRegistered: mapping.district.confidence === 'high',
+        isProvisional: mapping.district.confidence === 'provisional',
+      }
+    : null;
+
   const playerPreviewRows: ScrapedImportPreviewRowView[] = (
     session.selectedPlayerPreviewResult?.rows ?? []
   ).map((row) => ({
@@ -391,6 +418,7 @@ function buildSelectedView(
     blocked: status === 'blocked',
     empty: status === 'empty',
     canonicalContext,
+    district,
     issues: selectedTarget.issues.map((issue) => ({
       code: issue.code,
       severity: issue.severity,
