@@ -1683,6 +1683,44 @@ summary: { schemaVersion, generatedAt, seasonCount, districtCount,
   not `localStorage` / `IndexedDB` / backend / cloud. See `docs/import-workflow.md`
   ("Portable workspace snapshot export / import (Phase 5 slice 23)").
 
+> **Completion Milestone A1 (landed 2026-06-27):** automatic browser persistence was
+> subsequently approved and added on top of this same snapshot contract (see the persisted
+> record below). The "not automatic persistence / not IndexedDB" note above describes the
+> historical slice-23 status; the portable file export/import itself is unchanged.
+
+## Persisted Workspace Record (IndexedDB) — Completion Milestone A1
+
+The automatic local-persistence wrapper (`src/storage/workspaceIndexedDbStore.ts`) stores
+exactly one active workspace record in IndexedDB. It reuses the Portable Workspace Snapshot
+above as its payload — it does NOT define a second workspace format.
+
+IndexedDB layout:
+
+```text
+database:     uc-roster-sniffer   (version 1)
+object store: workspace           (keyPath "id")
+record key:   "active-workspace"  (single active record)
+```
+
+Record shape (`PersistedWorkspaceRecord`):
+
+```text
+id:                 "active-workspace"
+persistenceVersion: 1                 (envelope version, independent of snapshot schemaVersion)
+savedAt:            ISO string
+snapshot:           WorkspaceSnapshot  (the portable snapshot above)
+```
+
+- The app auto-saves (debounced) after workspace-data changes and auto-loads on startup,
+  validating the stored `snapshot` through the existing snapshot validator and restoring via
+  `restoreWorkspaceFromSnapshot`.
+- An empty store keeps the default startup workspace. A malformed record, an unsupported
+  `persistenceVersion`, or a snapshot that fails validation resolves to a calm error state
+  (visible warning, no crash); the stored record is never auto-deleted.
+- Storage is isolated from `src/engine` pure logic. No `localStorage`, backend, auth, cloud
+  database, or sync. See `docs/completion-plan.md` (Workstream A) and `docs/ui-workflow.md`
+  ("Automatic save-state indicator").
+
 ## Sample data fixtures
 
 Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.

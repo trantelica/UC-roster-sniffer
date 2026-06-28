@@ -8,6 +8,16 @@ Build this project in narrow, testable slices.
 
 The first coding pass should not attempt the full product. It should create a local static viewer that proves the sample data contract, navigation model, card layout, and basic summary display.
 
+## Completion Milestone A1 — IndexedDB workspace persistence (landed 2026-06-27)
+
+The workspace now persists automatically between sessions. A small isolated storage module
+(`src/storage/workspaceIndexedDbStore.ts`, kept out of `src/engine`) saves the existing
+workspace snapshot (`buildWorkspaceSnapshot`) to IndexedDB after workspace-data changes and
+restores it on startup via `restoreWorkspaceFromSnapshot`. An empty store keeps the default
+sample data; a corrupt/unrestorable record falls back calmly (visible warning, no crash,
+never auto-deleted). No `localStorage`, backend, or sync. The portable JSON export/import
+path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and follow-on A2.
+
 ## Guiding principles
 
 1. **Spec-first**: the coding agent should treat files in `docs/` as the source of truth.

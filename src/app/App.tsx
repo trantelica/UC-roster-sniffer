@@ -8,10 +8,16 @@ import {
   parseWorkspaceSnapshotJson,
   restoreWorkspaceFromSnapshot,
   type WorkspaceData,
+  type WorkspaceSnapshotSelection,
   type WorkspaceSnapshotSummary,
   type WorkspaceSnapshotValidationError,
 } from '../engine/workspaceSnapshot';
 import { updateGameResult, type GameResultPatch } from '../engine/gameResultUpdate';
+import {
+  loadWorkspaceRecord,
+  resolvePersistedWorkspaceLoad,
+  saveWorkspaceSnapshot,
+} from '../storage/workspaceIndexedDbStore';
 import type { Game, StaffCoach, TeamCoachAssignment } from '../domain/types';
 import FilterBar from '../components/FilterBar';
 import TeamView from '../components/TeamView';
@@ -43,6 +49,18 @@ type SnapshotNotice =
   | { kind: 'restored'; fileName: string; summary: WorkspaceSnapshotSummary }
   | { kind: 'error'; fileName: string; errors: WorkspaceSnapshotValidationError[] };
 
+// Automatic IndexedDB persistence status, surfaced as a small save-state indicator (A1).
+type PersistenceStatus =
+  | 'loading' // reading any saved workspace from IndexedDB on startup
+  | 'idle' // hydrated; nothing saved yet this session (e.g. fresh/empty store)
+  | 'saving' // a debounced auto-save is in flight
+  | 'saved' // the current workspace is saved locally in this browser
+  | 'save-failed' // the most recent auto-save failed
+  | 'load-failed'; // a stored workspace existed but could not be loaded/restored
+
+// Debounce window for auto-save after a workspace change (A1: ~500-1000ms).
+const AUTO_SAVE_DEBOUNCE_MS = 700;
+
 export default function App() {
   const [view, setView] = useState<AppView>('roster');
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
@@ -67,7 +85,90 @@ export default function App() {
   const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Slice A1: automatic IndexedDB workspace persistence -------------------
+  const [persistenceStatus, setPersistenceStatus] = useState<PersistenceStatus>('loading');
+  // Gate auto-save until the initial load/restore has completed, so we never overwrite a
+  // stored workspace before reading it, and never persist the untouched sample default.
+  const hydratedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest selection, captured by ref so auto-save (triggered by workspace-data changes)
+  // can include the current selection without firing on selection-only navigation.
+  const selectionRef = useRef<WorkspaceSnapshotSelection>({
+    seasonId: null,
+    districtId: null,
+    ageDivisionId: null,
+    teamId: null,
+  });
+  selectionRef.current = {
+    seasonId: selectedSeason,
+    districtId: selectedDistrict,
+    ageDivisionId: selectedAgeDivision,
+    teamId: selectedTeamId,
+  };
+
   const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
+
+  // Startup: restore the saved workspace from IndexedDB if one exists. An empty store keeps
+  // the default sample data; a corrupt/unrestorable record falls back calmly with a warning
+  // and is never auto-deleted. Runs once on mount.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const resolved = resolvePersistedWorkspaceLoad(await loadWorkspaceRecord());
+      if (cancelled) return;
+      if (resolved.status === 'restored') {
+        const { restore } = resolved;
+        setWorkspace(restore.workspace);
+        setSelectedSeason(restore.selection.seasonId);
+        setSelectedDistrict(restore.selection.districtId);
+        setSelectedAgeDivision(restore.selection.ageDivisionId);
+        setSelectedTeamId(restore.selection.teamId);
+        setInMemoryImport(null);
+        setWorkspaceEpoch((epoch) => epoch + 1);
+        setPersistenceStatus('saved');
+      } else if (resolved.status === 'error') {
+        setPersistenceStatus('load-failed');
+      } else {
+        setPersistenceStatus('idle');
+      }
+      // Enable auto-save only after the initial read has resolved.
+      hydratedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Auto-save the committed workspace (debounced) whenever its DATA changes. We persist
+  // `workspace` — not `liveTeams` — so a transient, undoable in-memory import is not silently
+  // committed by persistence. Selection rides along from `selectionRef` but does not itself
+  // trigger a save, so mere navigation never persists the untouched sample default.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setPersistenceStatus('saving');
+    saveTimerRef.current = setTimeout(() => {
+      const now = new Date().toISOString();
+      const snapshot = buildWorkspaceSnapshot({
+        workspace: {
+          districts: workspace.districts,
+          ageDivisions: workspace.ageDivisions,
+          teams: workspace.teams,
+          games: workspace.games,
+          coaches: workspace.coaches,
+          coachAssignments: workspace.coachAssignments,
+          selection: selectionRef.current,
+        },
+        generatedAt: now,
+      });
+      saveWorkspaceSnapshot(snapshot, now)
+        .then(() => setPersistenceStatus('saved'))
+        .catch(() => setPersistenceStatus('save-failed'));
+    }, AUTO_SAVE_DEBOUNCE_MS);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [workspace]);
 
   // Auto-select the most recent available season on load, so a season that can
   // show prior-season roster comparison is the default view.
@@ -376,6 +477,7 @@ export default function App() {
         onImportFileChange={handleImportFileChange}
         onDismissNotice={() => setSnapshotNotice(null)}
         inMemoryImportActive={inMemoryImport !== null}
+        persistenceStatus={persistenceStatus}
       />
 
       {/*
@@ -485,6 +587,31 @@ export default function App() {
   );
 }
 
+const PERSISTENCE_INDICATOR: Record<
+  PersistenceStatus,
+  { label: string; tone: 'info' | 'ok' | 'busy' | 'warn' }
+> = {
+  loading: { label: 'Loading saved workspace…', tone: 'info' },
+  idle: { label: 'Auto-save on (this browser)', tone: 'info' },
+  saving: { label: 'Saving…', tone: 'busy' },
+  saved: { label: 'Saved locally', tone: 'ok' },
+  'save-failed': { label: 'Save failed', tone: 'warn' },
+  'load-failed': { label: 'Saved workspace could not be loaded', tone: 'warn' },
+};
+
+function PersistenceIndicator({ status }: { status: PersistenceStatus }) {
+  const { label, tone } = PERSISTENCE_INDICATOR[status];
+  return (
+    <span
+      className={`persistence-indicator persistence-indicator-${tone}`}
+      role="status"
+      aria-live="polite"
+    >
+      {label}
+    </span>
+  );
+}
+
 function WorkspaceToolbar({
   importInputRef,
   notice,
@@ -492,6 +619,7 @@ function WorkspaceToolbar({
   onImportFileChange,
   onDismissNotice,
   inMemoryImportActive,
+  persistenceStatus,
 }: {
   importInputRef: React.RefObject<HTMLInputElement>;
   notice: SnapshotNotice | null;
@@ -499,6 +627,7 @@ function WorkspaceToolbar({
   onImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDismissNotice: () => void;
   inMemoryImportActive: boolean;
+  persistenceStatus: PersistenceStatus;
 }) {
   return (
     <div className="workspace-toolbar">
@@ -516,18 +645,20 @@ function WorkspaceToolbar({
             className="workspace-import-input"
           />
         </label>
+        <PersistenceIndicator status={persistenceStatus} />
         <span className="workspace-toolbar-note">
-          Portable JSON · replaces current in-memory workspace · no browser storage is used
+          Auto-saves to this browser (IndexedDB) · Export for a portable backup you can share
         </span>
       </div>
       <p className="workspace-toolbar-warning">
-        Importing a snapshot <strong>replaces</strong> the current in-memory workspace after
+        Your workspace auto-saves to this browser (local IndexedDB) and reloads automatically
+        next time. Importing a snapshot <strong>replaces</strong> the current workspace after
         validation and clears any active in-memory import (including undo).
         {inMemoryImportActive
           ? ' An in-memory import is currently active — importing will discard it.'
           : ''}{' '}
-        Export saves a portable JSON file only; nothing is written to a database or browser
-        storage.
+        Export saves a portable JSON backup file you can hand to someone else; nothing is sent
+        off this machine.
       </p>
 
       {notice && notice.kind === 'restored' && (
@@ -535,8 +666,8 @@ function WorkspaceToolbar({
           <strong>Workspace restored from “{notice.fileName}”.</strong>{' '}
           {notice.summary.seasonCount} seasons · {notice.summary.districtCount} districts ·{' '}
           {notice.summary.teamCount} teams · {notice.summary.playerCount} players ·{' '}
-          {notice.summary.gameCount} games. The current in-memory workspace was replaced (no
-          browser/database persistence).
+          {notice.summary.gameCount} games. The current workspace was replaced and saved
+          locally to this browser.
           <button type="button" className="import-link-button" onClick={onDismissNotice}>
             Dismiss
           </button>
