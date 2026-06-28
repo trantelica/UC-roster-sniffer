@@ -1801,9 +1801,11 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
 > **Three distinct workspace builders (do not conflate):**
 > - **Empty** (`loadEmptyWorkspace`) — production fresh start: districts + age divisions, **no
 >   teams**.
-> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — real **baseline**: a registry
->   of the **39 known Ute Conference districts** + age divisions + **empty team shells** (no
->   players/coaches), so roster imports land into existing teams. Built deterministically from
+> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — **optional** baseline: a
+>   registry of the **39 known Ute Conference districts** + age divisions + some **empty team
+>   shells** (no players/coaches). Teams are now CREATED from roster imports, so the shells are
+>   a convenience, not a requirement — what the seed mainly provides is the district registry.
+>   Built deterministically from
 >   the committed seed-source fixture `data-samples/ute-conference-seed.sample.json` (district
 >   names + per-season per-age-division team codes). District ids derive from
 >   `districtIdSlug(name)`; Alta/Brighton keep their seeded-registry branding and the rest get
@@ -1818,9 +1820,14 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
 > - **Sample** (`loadSampleData`) — **demo/testing** content (teams with players); retained for
 >   tests and the explicit "Load sample data" action only.
 >
-> **Roster import** adds player content into existing seeded teams; a district/team absent from
-> the seed shows as "no existing team"/provisional. **Future work:** dynamic create-new
-> district/team-on-import is intentionally **not** part of this pass.
+> **Roster import (corrected model): teams are created from imports.** For each player-team
+> target the import plans **create** (registered district + resolved season/age/team code, no
+> matching team → a new team is created and its players added exactly), **update** (matching
+> team exists → existing review/commit path), or **blocked** (unregistered district →
+> "Add district first"; unreadable team code such as a parenthetical sub-label, never collapsed;
+> missing season/age; needs-review existing team; duplicate). **Districts are infrastructure**
+> (seeded or added provisionally; never auto-invented on import). **Future work:** dynamic
+> create-new district-on-import and parenthetical sub-label disambiguation.
 
 ## Sample data fixtures
 

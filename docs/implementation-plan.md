@@ -49,6 +49,23 @@ A focused three-part correction after Milestones 1–2:
    parser yet (future work) and are not seeded. Expand by adding district names, seasons, or
    per-age-division code lists to the fixture — no runtime change needed.
 
+## Roster ingestion: teams created from imports (correction, landed 2026-06-28)
+
+Corrected product model: a roster file may **create** teams. Districts are infrastructure
+(seeded or added provisionally; never auto-invented on import); teams are season-specific and
+created by the import. `buildWholeFilePlayerImportPlan` now plans **create / update / blocked**
+per target: create a brand-new empty team (registered district + resolved season/age/team code,
+no matching team; players added exactly, no row-level review needed); update an existing team
+(existing review/commit path); or block (unregistered district → "Add district first";
+unreadable team code such as a parenthetical sub-label, never collapsed into a plain code;
+missing season/age; needs-review existing team; duplicate). The primary action **Commit roster
+import** runs `executeWholeFilePlayerImportBatch` (updates) then `commitRosterImportToWorkspace`
+(create + update, all-or-nothing), with **Undo Roster Import** (`undoRosterImportInWorkspace`,
+session-only). The **Ute Conference team-seed path is de-emphasized** (now optional — mainly a
+district registry convenience), and the flat/nested normalizer, empty startup, and District
+Maintenance panel fix are retained. **Future work:** dynamic create-new district-on-import and
+parenthetical sub-label disambiguation.
+
 ## Guiding principles
 
 1. **Spec-first**: the coding agent should treat files in `docs/` as the source of truth.

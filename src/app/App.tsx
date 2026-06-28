@@ -29,8 +29,8 @@ import ScrapedImportPreview, {
 import {
   commitImportedTeamToWorkspace,
   undoImportedTeamCommitInWorkspace,
-  commitImportedTeamsToWorkspace,
-  undoImportedTeamsCommitInWorkspace,
+  commitRosterImportToWorkspace,
+  undoRosterImportInWorkspace,
 } from '../engine/workspaceImportCommit';
 import {
   confirmUnknownScrapedDistrict,
@@ -117,11 +117,11 @@ export default function App() {
   // undo affordance is session-only). A failed batch surfaces a calm notice instead.
   const [wholeFileImportUndo, setWholeFileImportUndo] = useState<{
     previousTeams: Team[];
-    teamsCommitted: number;
-    totalAdded: number;
-    skippedCount: number;
-    beforeCount: number;
-    afterCount: number;
+    createdTeamIds: string[];
+    createdCount: number;
+    updatedCount: number;
+    totalPlayers: number;
+    blockedCount: number;
   } | null>(null);
   const [wholeFileImportError, setWholeFileImportError] = useState<string | null>(null);
   // Bumped on a snapshot restore to force-remount the import workbench, clearing its
@@ -362,58 +362,62 @@ export default function App() {
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
-  // --- Milestone B2: whole-file batch commit of all ready player teams ---
+  // --- Roster import: commit (create new teams + update existing) ---
 
-  // Executes the committable targets all-or-nothing, then writes the resulting teams into the
-  // committed workspace in one update (auto-saved via A1, exported by A2). If execution or the
-  // batch workspace transform fails, NO workspace change is applied and a calm error is shown,
-  // so a failed batch can never partially corrupt the workspace. Clears any transient overlay,
-  // remembers the pre-batch teams for a session undo, and remounts the workbench.
+  // Executes the existing-team updates all-or-nothing, then writes BOTH the new teams (create)
+  // and the updated teams into the committed workspace in one transform (auto-saved via A1,
+  // exported by A2). If anything fails, NO workspace change is applied and a calm error is
+  // shown, so a failed commit can never partially corrupt the workspace. Remembers the
+  // pre-commit team values + created team ids for a session undo, and remounts the workbench.
   function handleCommitWholeFilePlayerImport(payload: WholeFileImportCommitPayload) {
     setWholeFileImportError(null);
+    if (payload.committableTargets.length === 0 && payload.teamsToCreate.length === 0) {
+      setWholeFileImportError('Nothing to import: no teams to create or update.');
+      return;
+    }
     const generatedAt = new Date().toISOString();
     const execution = executeWholeFilePlayerImportBatch({
       committableTargets: payload.committableTargets,
       generatedAt,
     });
-    if (execution.status !== 'executed') {
+    // `nothing-to-commit` is fine when this is a create-only import.
+    if (execution.status === 'rejected') {
       setWholeFileImportError(
-        execution.status === 'nothing-to-commit'
-          ? 'No ready teams to commit.'
-          : `Batch import was not applied: ${execution.message} No teams were changed.`
+        `Roster import was not applied: ${execution.message} No teams were changed.`
       );
       return;
     }
-    const commit = commitImportedTeamsToWorkspace(workspace, execution.committedTeams);
+    const updatedTeams = execution.status === 'executed' ? execution.committedTeams : [];
+
+    const commit = commitRosterImportToWorkspace(workspace, updatedTeams, payload.teamsToCreate);
     if (!commit.committed) {
       setWholeFileImportError(
-        `Batch import was not applied: ${commit.missingTeamIds.length} target team(s) were not found in the workspace. No teams were changed.`
+        `Roster import was not applied (${commit.reason}: ${commit.teamIds.join(', ')}). No teams were changed.`
       );
       return;
     }
     setWorkspace(commit.workspace);
     setInMemoryImport(null);
-    const beforeCount = execution.perTeam.reduce((sum, p) => sum + p.beforeCount, 0);
-    const afterCount = execution.perTeam.reduce((sum, p) => sum + p.afterCount, 0);
     setWholeFileImportUndo({
       previousTeams: commit.previousTeams,
-      teamsCommitted: execution.teamsCommitted,
-      totalAdded: execution.totalAdded,
-      skippedCount: payload.summary.skippedCount,
-      beforeCount,
-      afterCount,
+      createdTeamIds: commit.createdTeamIds,
+      createdCount: payload.summary.createCount,
+      updatedCount: payload.summary.committableCount,
+      totalPlayers: payload.summary.totalPlayersToImport,
+      blockedCount: payload.summary.blockedCount,
     });
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
-  // B2: current-session undo. Restores every affected team to its exact pre-batch state in the
-  // CURRENT workspace (preserving unrelated later changes to other teams), auto-saves via A1,
-  // and clears the undo affordance.
+  // Current-session undo: removes the created teams and restores every updated team to its
+  // exact pre-commit state in the CURRENT workspace (preserving unrelated later changes),
+  // auto-saves via A1, and clears the undo affordance.
   function handleUndoWholeFilePlayerImport() {
     if (!wholeFileImportUndo) return;
-    const result = undoImportedTeamsCommitInWorkspace(
+    const result = undoRosterImportInWorkspace(
       workspace,
-      wholeFileImportUndo.previousTeams
+      wholeFileImportUndo.previousTeams,
+      wholeFileImportUndo.createdTeamIds
     );
     if (result.restored) setWorkspace(result.workspace);
     setWholeFileImportUndo(null);
@@ -847,20 +851,20 @@ export default function App() {
       {wholeFileImportUndo && (
         <div className="committed-import-banner">
           <div>
-            <strong>Whole-file import saved locally.</strong>{' '}
-            {wholeFileImportUndo.teamsCommitted} team
-            {wholeFileImportUndo.teamsCommitted === 1 ? '' : 's'} committed (
-            {wholeFileImportUndo.beforeCount} → {wholeFileImportUndo.afterCount} players across
-            them · {wholeFileImportUndo.totalAdded} added · {wholeFileImportUndo.skippedCount}{' '}
-            skipped). This is now part of your workspace and auto-saves to this browser (it
-            survives reload). Undo is available only for this session.
+            <strong>Roster import saved locally.</strong>{' '}
+            {wholeFileImportUndo.createdCount} team
+            {wholeFileImportUndo.createdCount === 1 ? '' : 's'} created ·{' '}
+            {wholeFileImportUndo.updatedCount} updated · {wholeFileImportUndo.totalPlayers}{' '}
+            players · {wholeFileImportUndo.blockedCount} blocked. This is now part of your
+            workspace and auto-saves to this browser (it survives reload). Undo is available
+            only for this session.
           </div>
           <button
             type="button"
             className="committed-import-undo-button"
             onClick={handleUndoWholeFilePlayerImport}
           >
-            Undo Whole-file Import
+            Undo Roster Import
           </button>
         </div>
       )}

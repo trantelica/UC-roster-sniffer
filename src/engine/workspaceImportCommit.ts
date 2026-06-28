@@ -131,6 +131,97 @@ export function undoImportedTeamsCommitInWorkspace(
   return { restored: true, workspace: { ...workspace, teams } };
 }
 
+// ---------------------------------------------------------------------------
+// Roster ingestion: combined CREATE + UPDATE commit/undo (all-or-nothing)
+// ---------------------------------------------------------------------------
+
+export type WorkspaceRosterImportCommitResult =
+  | {
+      committed: true;
+      workspace: WorkspaceData;
+      /** Pre-commit values of updated existing teams (for undo). */
+      previousTeams: Team[];
+      /** Ids of the brand-new teams that were appended (for undo). */
+      createdTeamIds: string[];
+    }
+  | {
+      committed: false;
+      reason: 'update-team-not-found' | 'created-team-conflict';
+      /** Offending team ids (no change was applied). */
+      teamIds: string[];
+      workspace: WorkspaceData;
+    };
+
+/**
+ * Commits a roster import that may both UPDATE existing teams and CREATE brand-new teams, in
+ * one ALL-OR-NOTHING workspace transform. Updated teams must already exist (else
+ * `update-team-not-found`); created teams must NOT already exist (else `created-team-conflict`)
+ * — so nothing is silently overwritten. On success, updated teams are replaced by id, created
+ * teams are appended (in input order), and every other team/game/coach/district/age division is
+ * preserved exactly. Returns undo info (previous values of updated teams + created team ids).
+ * Pure; never mutates inputs.
+ */
+export function commitRosterImportToWorkspace(
+  workspace: WorkspaceData,
+  updatedTeams: Team[],
+  createdTeams: Team[]
+): WorkspaceRosterImportCommitResult {
+  const byId = new Map(workspace.teams.map((t) => [t.teamId, t] as const));
+
+  const missingUpdates = updatedTeams.map((t) => t.teamId).filter((id) => !byId.has(id));
+  if (missingUpdates.length > 0) {
+    return { committed: false, reason: 'update-team-not-found', teamIds: missingUpdates, workspace };
+  }
+  const conflictingCreates = createdTeams.map((t) => t.teamId).filter((id) => byId.has(id));
+  if (conflictingCreates.length > 0) {
+    return {
+      committed: false,
+      reason: 'created-team-conflict',
+      teamIds: conflictingCreates,
+      workspace,
+    };
+  }
+
+  const replacements = new Map(updatedTeams.map((t) => [t.teamId, t] as const));
+  const previousTeams = updatedTeams.map((t) => byId.get(t.teamId) as Team);
+  const updated = workspace.teams.map((t) => replacements.get(t.teamId) ?? t);
+  const teams = [...updated, ...createdTeams];
+  return {
+    committed: true,
+    workspace: { ...workspace, teams },
+    previousTeams,
+    createdTeamIds: createdTeams.map((t) => t.teamId),
+  };
+}
+
+export type WorkspaceRosterImportUndoResult =
+  | { restored: true; workspace: WorkspaceData }
+  | { restored: false; reason: 'update-team-not-found'; teamIds: string[]; workspace: WorkspaceData };
+
+/**
+ * Reverts a roster-import commit: removes the created teams (by id) and restores the previous
+ * values of the updated teams, in the CURRENT workspace. ALL-OR-NOTHING for the updates (refuses
+ * if an updated team is no longer present); created teams that are already gone are simply not
+ * re-removed. Unrelated later changes to other teams are preserved. Pure; never mutates inputs.
+ */
+export function undoRosterImportInWorkspace(
+  workspace: WorkspaceData,
+  previousTeams: Team[],
+  createdTeamIds: string[]
+): WorkspaceRosterImportUndoResult {
+  const presentIds = new Set(workspace.teams.map((t) => t.teamId));
+  const missingUpdates = previousTeams.map((t) => t.teamId).filter((id) => !presentIds.has(id));
+  if (missingUpdates.length > 0) {
+    return { restored: false, reason: 'update-team-not-found', teamIds: missingUpdates, workspace };
+  }
+  const createdSet = new Set(createdTeamIds);
+  const restorations = new Map(previousTeams.map((t) => [t.teamId, t] as const));
+  const teams = workspace.teams
+    .filter((t) => !createdSet.has(t.teamId))
+    .map((t) => restorations.get(t.teamId) ?? t);
+  return { restored: true, workspace: { ...workspace, teams } };
+}
+
 export type WorkspaceImportUndoResult =
   | { restored: true; workspace: WorkspaceData }
   | { restored: false; reason: 'target-team-not-found'; workspace: WorkspaceData };

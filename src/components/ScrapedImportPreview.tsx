@@ -80,16 +80,18 @@ export type ScrapedImportCommitPayload = {
 };
 
 /**
- * Completion Milestone B2: payload of an explicit WHOLE-FILE batch commit. Carries the
- * committable targets' execution inputs (the app executes them all-or-nothing) plus a small
- * display summary. Only ready player teams are included; skipped teams are reported only.
+ * Payload of an explicit roster-import commit. Carries the new teams to create and the
+ * existing-team update inputs (the app executes updates all-or-nothing, then commits create +
+ * update together), plus a small display summary. Blocked targets are reported only.
  */
 export type WholeFileImportCommitPayload = {
+  teamsToCreate: Team[];
   committableTargets: WholeFileCommittableTarget[];
   summary: {
-    teamCount: number;
-    totalAdditions: number;
-    skippedCount: number;
+    createCount: number;
+    committableCount: number;
+    blockedCount: number;
+    totalPlayersToImport: number;
   };
 };
 
@@ -335,18 +337,20 @@ export default function ScrapedImportPreview({
     [loaded, baselineTeams, districtRegistry]
   );
 
-  // B2: explicit durable batch commit of all ready player teams. Hands the committable
-  // targets up to the app, which executes them all-or-nothing and writes them into the
-  // committed workspace (auto-saved via A1). Locked while an in-memory preview is executed.
+  // Explicit durable roster-import commit. Hands the teams to create + existing-team updates up
+  // to the app, which commits them all-or-nothing into the workspace (auto-saved via A1).
+  // Locked while an in-memory preview is executed.
   function commitWholeFile() {
     if (!wholeFilePlan || executed) return;
-    if (wholeFilePlan.committableTargets.length === 0) return;
+    if (wholeFilePlan.createCount === 0 && wholeFilePlan.committableCount === 0) return;
     onCommitWholeFile({
+      teamsToCreate: wholeFilePlan.teamsToCreate,
       committableTargets: wholeFilePlan.committableTargets,
       summary: {
-        teamCount: wholeFilePlan.committableCount,
-        totalAdditions: wholeFilePlan.totalProjectedAdditions,
-        skippedCount: wholeFilePlan.skippedCount,
+        createCount: wholeFilePlan.createCount,
+        committableCount: wholeFilePlan.committableCount,
+        blockedCount: wholeFilePlan.blockedCount,
+        totalPlayersToImport: wholeFilePlan.totalPlayersToImport,
       },
     });
   }
@@ -675,22 +679,24 @@ export default function ScrapedImportPreview({
 }
 
 const WHOLE_FILE_STATUS_LABELS: Record<string, string> = {
-  committable: 'Ready',
+  create: 'Create team',
+  update: 'Update team',
   'needs-review': 'Needs review',
   blocked: 'Blocked',
   empty: 'Empty',
-  'provisional-district': 'Provisional district',
-  'no-existing-team': 'No workspace team',
+  'provisional-district': 'Add district first',
+  'unparseable-team': 'Unreadable team code',
+  'missing-context': 'Missing season/age',
   'duplicate-target': 'Duplicate target',
   'non-player': 'Coach/non-player',
 };
 
 /**
- * B2: whole-file player import panel. Summarizes every player-team target in the loaded
- * file and offers a single explicit batch commit of all READY teams. Only teams that pass
- * the existing readiness gate (and resolve to a registered district) are committed; every
- * other target is reported and skipped. The action is locked while a single-target
- * in-memory preview is executed, to avoid conflicting/duplicate state.
+ * Roster import plan panel. Summarizes every player-team target as create / update / blocked
+ * and offers one explicit primary action — "Commit roster import" — that creates missing teams
+ * and updates existing ones. Blocked targets (unregistered district, unreadable team code,
+ * needs-review existing team, etc.) are reported, never silently changed. The action is locked
+ * while a single-target in-memory preview is executed.
  */
 function WholeFilePlayerImportPanel({
   plan,
@@ -701,25 +707,27 @@ function WholeFilePlayerImportPanel({
   locked: boolean;
   onCommitWholeFile: () => void;
 }) {
-  const canCommit = !locked && plan.committableCount > 0;
+  const willCommit = plan.createCount + plan.committableCount;
+  const canCommit = !locked && willCommit > 0;
   return (
     <div className="import-section import-whole-file">
       <div className="import-section-head">
-        <h3>Whole-file player import</h3>
+        <h3>Roster import plan</h3>
         <button
           type="button"
           className="import-decision-button import-commit-button"
           onClick={onCommitWholeFile}
           disabled={!canCommit}
         >
-          Commit All Ready Teams to Workspace
+          Commit roster import
         </button>
       </div>
       <p className="import-note">
-        Only teams that pass the existing readiness gate will be committed. Teams needing
-        review, blocked teams, provisional-district teams, and teams with no matching
-        workspace team are skipped (never silently changed). Committing saves to this browser
-        automatically (IndexedDB) and is included in an exported dataset.
+        A roster file may <strong>create</strong> missing teams and <strong>update</strong>
+        existing ones. Teams in a district that is not in the registry are blocked with
+        “Add district first” (districts are infrastructure — seed or add them in the Districts
+        tab); needs-review existing teams and unreadable team codes are blocked too. Committing
+        saves to this browser automatically and is included in an exported dataset.
       </p>
       <div className="import-summary">
         <div className="import-summary-line">
@@ -727,17 +735,16 @@ function WholeFilePlayerImportPanel({
           <strong>{plan.playerTargetCount}</strong>
         </div>
         <div className="import-summary-line">
-          <span>Ready to commit</span>
+          <span>Teams to create</span>
+          <strong>{plan.createCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Teams to update</span>
           <strong>{plan.committableCount}</strong>
         </div>
         <div className="import-summary-line">
-          <span>Skipped</span>
-          <strong>
-            {plan.skippedCount} ({plan.needsReviewCount} needs review · {plan.blockedCount}{' '}
-            blocked · {plan.noExistingTeamCount} no team · {plan.provisionalDistrictCount}{' '}
-            provisional district · {plan.duplicateTargetCount} duplicate · {plan.emptyCount}{' '}
-            empty)
-          </strong>
+          <span>Blocked</span>
+          <strong>{plan.blockedCount}</strong>
         </div>
         {plan.coachTargetCount > 0 && (
           <div className="import-summary-line">
@@ -746,10 +753,8 @@ function WholeFilePlayerImportPanel({
           </div>
         )}
         <div className="import-summary-line">
-          <span>Projected additions (ready teams)</span>
-          <strong>
-            {plan.totalProjectedAdditions} added · {plan.totalLinkNoOps} link no-ops
-          </strong>
+          <span>Total players to import</span>
+          <strong>{plan.totalPlayersToImport}</strong>
         </div>
         <div className="import-summary-line">
           <span>Districts</span>
@@ -759,10 +764,10 @@ function WholeFilePlayerImportPanel({
           </strong>
         </div>
       </div>
-      {plan.committableCount === 0 && (
+      {willCommit === 0 && (
         <p className="import-empty">
-          No teams in this file are ready to commit yet. Resolve review items per team below,
-          or add unknown districts to the registry, then they will become committable.
+          Nothing to import yet. Add the listed districts to the registry (Districts tab), then
+          re-import; or resolve review items for existing teams below.
         </p>
       )}
       <table className="import-table">
@@ -772,8 +777,8 @@ function WholeFilePlayerImportPanel({
             <th>District</th>
             <th>Age</th>
             <th>Code</th>
-            <th>Status</th>
-            <th>Additions</th>
+            <th>Action</th>
+            <th>Players</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -789,7 +794,7 @@ function WholeFilePlayerImportPanel({
                   {WHOLE_FILE_STATUS_LABELS[t.status] ?? t.status}
                 </span>
               </td>
-              <td>{t.committable ? t.projectedAdditions : '—'}</td>
+              <td>{t.committable ? t.playerCount : '—'}</td>
               <td className="import-whole-file-reasons">
                 {t.reasons.length > 0 ? t.reasons.join(' ') : ''}
               </td>
@@ -803,12 +808,10 @@ function WholeFilePlayerImportPanel({
 
 /** Maps a whole-file status to one of the existing readiness badge style buckets. */
 function statusBadge(status: string): string {
-  if (status === 'committable') return 'ready';
+  if (status === 'create' || status === 'update') return 'ready';
   if (status === 'empty') return 'empty';
-  if (status === 'blocked' || status === 'duplicate-target' || status === 'non-player') {
-    return 'blocked';
-  }
-  return 'needs-review';
+  if (status === 'needs-review' || status === 'provisional-district') return 'needs-review';
+  return 'blocked';
 }
 
 function demoIdForLabel(label: string): string {

@@ -89,29 +89,29 @@ provisional:
   Maintenance** screen, which is **Completion Milestone C2** (not yet built). Districts are
   never deleted — inactivation is the only retirement path.
 
-## Whole-file player import panel (Completion Milestone B2)
+## Roster import plan panel (create or update teams)
 
-When a scraped **players** file is loaded, a **Whole-file player import** panel appears above
-the per-target detail. It summarizes every player-team target in the file and lets the user
-commit all ready teams at once — the per-target B1 flow still works for case-by-case review.
+When a scraped **players** file is loaded, a **Roster import plan** panel appears above the
+per-target detail. It plans one action per player-team target and commits them in one step —
+the per-target B1 flow still works for case-by-case review.
 
-- **Summary:** player team targets · ready-to-commit count · skipped count (broken out as
-  needs review / blocked / no workspace team / provisional district / duplicate / empty) ·
-  coach/non-player targets (not imported here) · projected additions and link no-ops across
-  ready teams · districts resolved through the registry vs provisional/unknown.
-- **Table** (one row per target): team · district · age · code · status badge (Ready / Needs
-  review / Blocked / Empty / Provisional district / No workspace team / Duplicate target /
-  Coach) · projected additions · reason notes for skipped teams.
-- **Commit All Ready Teams to Workspace** commits only the ready teams, all-or-nothing, and is
-  **disabled** when there are zero ready teams or while a single-target in-memory preview is
-  executed. Copy: “Only teams that pass the existing readiness gate will be committed. Teams
-  needing review are skipped.” There is **no auto-commit** on file load, selection, staging,
-  district confirmation, or preview.
-- After a successful commit a top banner reads **“Whole-file import saved locally”** with the
-  team count, before→after player totals across the committed teams, additions, and skipped
-  count, plus an **Undo Whole-file Import** button (current session only; the committed data
-  is durable via A1 and survives reload). A failed batch shows a calm error and changes
-  nothing.
+- **Summary:** player team targets · **teams to create** · **teams to update** · **blocked** ·
+  coach/non-player targets (not imported here) · **total players to import** · districts
+  resolved through the registry vs provisional/unknown.
+- **Table** (one row per target): team · district · age · code · **Action** badge — **Create
+  team** / **Update team** / Needs review / **Add district first** / Unreadable team code /
+  Missing season-age / Duplicate target / Empty / Coach — · players · reason notes for blocked
+  targets.
+- **Commit roster import** (primary action) creates the missing teams and updates the existing
+  ones, **all-or-nothing**, and is **disabled** when there is nothing to create or update, or
+  while a single-target in-memory preview is executed. Brand-new empty teams need **no row-level
+  review**; existing teams still follow the review path. Districts not in the registry are
+  blocked (“Add district first”) — never auto-created. There is **no auto-commit** on file load,
+  selection, or preview.
+- After a successful commit a top banner reads **“Roster import saved locally”** with created /
+  updated team counts, total players, and blocked count, plus an **Undo Roster Import** button
+  (current session only; the committed data is durable via A1 and survives reload). A failed
+  commit shows a calm error and changes nothing.
 
 ## District Maintenance screen (Completion Milestone C2)
 
@@ -198,20 +198,20 @@ workspace; export a dataset first for a backup; the change auto-saves and surviv
 
 - **Reset workspace** → **empty** workspace: a production fresh start with **no teams**
   (baseline age divisions + seeded district registry kept).
-- **Load Ute Conference seed** → the **real baseline**: a registry of the **39 known Ute
-  Conference districts** (Alta/Brighton keep their branding; the rest are seeded with
-  **provisional** blank branding, editable later in District Maintenance) + age divisions +
-  **empty team shells** (GI/2026 codes `A1–A4, B1–B4, C1, C2, D2`, no rosters), so real player
-  files import into existing teams.
+- **Load Ute Conference seed** → an **optional baseline**: a registry of the **39 known Ute
+  Conference districts** (Alta/Brighton keep their branding; the rest provisional, editable in
+  District Maintenance) + age divisions + some GI/2026 empty team shells. With teams now created
+  on import, the team shells are **no longer required** — they're a convenience; what matters is
+  that the districts are registered.
 - **Load sample data** → **demo/testing** content only (bundled multi-season sample teams with
   players). Not for production use.
 - **Import Dataset** / **Export Dataset** → portable full-dataset JSON round-trip (unchanged).
 
-These are deliberately **not** collapsed into one concept. After loading the seed, a real
-flat/nested roster import lands its players into the matching seeded team shells via the normal
-import pipeline; a district/team not in the seed shows as “no workspace team” / provisional
-(no team is auto-created in this pass). An existing persisted workspace still restores normally
-on load.
+These are deliberately **not** collapsed into one concept. The primary path is: start empty →
+register districts (Districts tab, in-flow “Add district to registry”, or the optional seed) →
+**roster import creates the season's teams** and adds players. A district not in the registry is
+blocked with “Add district first” (never auto-invented). An existing persisted workspace still
+restores normally on load.
 
 ## Primary navigation
 

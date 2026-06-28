@@ -1,4 +1,4 @@
-import type { Team } from '../domain/types';
+import type { Player, Team } from '../domain/types';
 import {
   createUteScrapedJsonImportSessionFromPayload,
   selectUteScrapedJsonImportSessionTarget,
@@ -27,48 +27,45 @@ import type {
 import { executeUteConferenceScrapedJsonImportTransaction } from './uteConferenceScrapedJsonImportExecution';
 
 /**
- * Completion Milestone B2: PURE, deterministic WHOLE-FILE scraped-JSON PLAYER import
- * planning + batch execution — ENGINE ONLY.
+ * Whole-file scraped-JSON PLAYER import planning + commit — ENGINE ONLY, PURE.
  *
- * It answers: "for one loaded scraped PLAYERS JSON file, which player-team targets are
- * safe to commit right now, and what would committing all of them at once do?" It does
- * NOT invent any readiness, matching, projection, or commit semantics — it COMPOSES the
- * exact same per-target pipeline the single-target B1 flow uses (session selection →
- * roster-aware review → staged projection → future readiness → transaction plan →
- * execution), evaluating every target with EMPTY review decisions so that nothing is
- * auto-resolved: a target is committable only when the existing pipeline already says it
- * is ready without any manual review.
+ * Corrected product model: a roster file may CREATE teams. Teams are season-specific and are
+ * created from roster imports; districts are infrastructure (seeded or added provisionally,
+ * never auto-invented here). For every player-team target this plans one ACTION:
  *
- * Two extra batch-only safety gates layer on top of the existing pipeline (never replacing
- * it):
- *  - a target whose district did not resolve to a registered district at HIGH confidence
- *    (C3) is skipped (`provisional-district`) until it is confirmed/registered; and
- *  - if two committable targets resolve to the SAME existing workspace team, only the first
- *    is committable and the rest are skipped (`duplicate-target`), so a batch can never
- *    double-apply additions to one team.
+ *  - **create** — the district resolves to a registered district at HIGH confidence (C3), the
+ *    season / age division / team classification all resolve, and NO matching team exists yet
+ *    → a brand-new empty team is created and the source players are added exactly as written
+ *    (no row-level identity review is needed for a brand-new empty team).
+ *  - **update** — a matching team already exists → the existing single-target pipeline applies
+ *    (roster-aware review → staged projection → readiness → transaction plan), with EMPTY
+ *    review decisions, so existing rosters stay authoritative and match-bearing rows still
+ *    require review (and are not committed in the batch).
+ *  - **blocked** — anything that cannot be done safely: an unregistered/provisional district
+ *    ("Add district first"), a team label whose classification can't be parsed (e.g. a
+ *    parenthetical sub-label like "GridIron A1 (Bonneville)" — never collapsed into "A1"), a
+ *    missing season/age division, an existing team that needs review, a duplicate target, an
+ *    empty target, or a non-player target.
  *
- * Coach targets are never committed here (B2 is player-only). Targets with no existing
- * workspace team are skipped (`no-existing-team`) — like B1, this commits into EXISTING
- * teams only and never silently creates a team.
- *
- * Guardrails: pure; never mutates the payload, existing teams, or any input. Loaded roster
- * records stay authoritative (existing names preserved exactly and in order; only planned
- * additions are appended; links are no-ops; deferred/unresolved/blocked rows are never
- * added). Batch execution is ALL-OR-NOTHING: if any committable target fails at execution
- * time, the result is `rejected` and no committed teams are produced. Caller-supplied
- * `generatedAt` keeps execution output deterministic.
+ * Guardrails: never mutates the payload, existing teams, or any input. Player names are placed
+ * into new teams EXACTLY as provided (no trim/dedupe/merge/suppress). Commit is ALL-OR-NOTHING.
+ * Caller-supplied `generatedAt` keeps execution output deterministic.
  */
 
 export const UTE_CONFERENCE_SCRAPED_JSON_WHOLE_FILE_IMPORT_LOGIC_VERSION =
-  'milestoneB2-whole-file-player-import-v1';
+  'roster-ingestion-create-or-update-v1';
+
+export type WholeFileTargetAction = 'create' | 'update' | 'blocked';
 
 export type WholeFileTargetStatus =
-  | 'committable'
+  | 'create'
+  | 'update'
   | 'needs-review'
   | 'blocked'
   | 'empty'
   | 'provisional-district'
-  | 'no-existing-team'
+  | 'unparseable-team'
+  | 'missing-context'
   | 'duplicate-target'
   | 'non-player';
 
@@ -76,30 +73,27 @@ export type WholeFileTargetStatus =
 export type WholeFileTargetSummary = {
   sourceTargetId: string;
   teamName: string | null;
-  /** Raw scraped district name, preserved exactly. */
   districtName: string | null;
-  /** Canonical resolved district id (registry id when resolved, else provisional slug). */
   districtId: string | null;
-  /** True when the district resolved against the registry at high confidence (C3). */
   districtResolved: boolean;
   ageDivisionId: string | null;
   ageDivisionLabel: string | null;
   teamClassification: string | null;
+  /** The id of the team this target would create or update, when known. */
+  teamId: string | null;
   existingTeamId: string | null;
+  action: WholeFileTargetAction;
   status: WholeFileTargetStatus;
+  /** True when the target will be committed (create or update). */
   committable: boolean;
-  /** Rows that would be added as NEW roster records. */
-  projectedAdditions: number;
-  /** Rows that would link to an existing record (no new roster slot). */
-  linkNoOps: number;
-  /** Stable, plain-language reason code/messages for a non-committable target. */
+  /** Players to add (create: all source rows; update: projected new additions). */
+  playerCount: number;
   reasons: string[];
 };
 
 /**
- * Execution inputs for one committable target. Carried so the batch can build a real
- * transaction plan + execute it without re-deriving the pipeline. Engine-internal detail;
- * the UI only needs the summary rows + counts.
+ * Execution inputs for one UPDATE target (existing team). Carried so the batch can build a
+ * real transaction plan + execute it without re-deriving the pipeline.
  */
 export type WholeFileCommittableTarget = {
   sourceTargetId: string;
@@ -114,45 +108,46 @@ export type WholeFileCommittableTarget = {
 
 export type WholeFilePlayerImportPlan = {
   recordType: UteScrapedRecordType;
-  /** True only for a supported scraped PLAYERS file. */
   isPlayerFile: boolean;
   totalTargets: number;
   playerTargetCount: number;
   coachTargetCount: number;
+  /** Number of brand-new teams to create. */
+  createCount: number;
+  /** Number of existing teams to update (committable). */
   committableCount: number;
-  /** Player targets that are not committable (everything skipped). */
-  skippedCount: number;
-  emptyCount: number;
+  /** Blocked player targets (everything not create/update). */
   blockedCount: number;
-  needsReviewCount: number;
-  noExistingTeamCount: number;
-  provisionalDistrictCount: number;
-  duplicateTargetCount: number;
-  /** Across committable teams only. */
+  /** Total players across all create + update targets. */
+  totalPlayersToImport: number;
   totalProjectedAdditions: number;
-  totalLinkNoOps: number;
-  /** Player targets whose district resolved against the registry at high confidence. */
   districtsResolvedCount: number;
-  /** Player targets whose district is provisional/unknown (not registered). */
   districtsProvisionalCount: number;
   targets: WholeFileTargetSummary[];
-  /** Engine-internal execution inputs for the committable targets, in source order. */
+  /** Fully-formed new team records (empty teams + their source players), in source order. */
+  teamsToCreate: Team[];
+  /** Execution inputs for the existing-team updates, in source order. */
   committableTargets: WholeFileCommittableTarget[];
 };
 
 export type BuildWholeFilePlayerImportPlanInput = {
   payload: unknown;
-  /** The committed workspace teams to compare/commit against. */
   existingTeams: Team[];
-  /** C3 exact-name district registry lookup (name/source-label -> districtId). */
   districtRegistry?: Record<string, string>;
-  /** Optional source label for the preview artifact (display only). */
   sourceName?: string | null;
 };
 
+/** Players for a brand-new team: every source preview row's name, preserved exactly. */
+function playersFromSession(
+  rows: ReadonlyArray<{ playerName: string | null }>
+): Player[] {
+  return rows.map((row) => ({ name: row.playerName ?? '' }));
+}
+
 /**
- * Builds the whole-file player import plan. Pure; never mutates inputs. Reuses the exact
- * single-target pipeline per target with EMPTY review decisions (no auto-resolution).
+ * Builds the whole-file player import plan (create / update / blocked per target). Pure; never
+ * mutates inputs. Reuses the single-target pipeline for updates; builds empty team shells for
+ * creates.
  */
 export function buildWholeFilePlayerImportPlan(
   input: BuildWholeFilePlayerImportPlanInput
@@ -177,29 +172,29 @@ export function buildWholeFilePlayerImportPlan(
 
   const targets: WholeFileTargetSummary[] = [];
   const committableTargets: WholeFileCommittableTarget[] = [];
+  const teamsToCreate: Team[] = [];
   const claimedExistingTeamIds = new Set<string>();
+  // (season|district|age|code) -> running create order, for deterministic draftOrder.
+  const claimedNewTeamIds = new Set<string>();
 
   for (const reportTarget of reportTargets) {
     const sourceTargetId = reportTarget.sourceTargetId;
 
-    // Coach / non-player targets are never committed by B2.
     if (reportTarget.recordType !== 'players') {
-      targets.push({
-        sourceTargetId,
-        teamName: reportTarget.teamName,
-        districtName: reportTarget.districtName,
-        districtId: reportTarget.canonicalDistrictId,
-        districtResolved: false,
-        ageDivisionId: reportTarget.canonicalAgeDivisionId,
-        ageDivisionLabel: reportTarget.ageDivisionLabel,
-        teamClassification: reportTarget.teamClassification,
-        existingTeamId: null,
-        status: 'non-player',
-        committable: false,
-        projectedAdditions: 0,
-        linkNoOps: 0,
-        reasons: ['Coach/non-player target — not imported by whole-file player import.'],
-      });
+      targets.push(
+        baseSummary(reportTarget, {
+          districtResolved: false,
+          districtId: reportTarget.canonicalDistrictId,
+          ageDivisionId: reportTarget.canonicalAgeDivisionId,
+          teamClassification: reportTarget.teamClassification,
+          teamId: null,
+          existingTeamId: null,
+          action: 'blocked',
+          status: 'non-player',
+          playerCount: 0,
+          reasons: ['Coach/non-player target — not imported by player roster import.'],
+        })
+      );
       continue;
     }
 
@@ -208,6 +203,7 @@ export function buildWholeFilePlayerImportPlan(
     const ctx = mapping?.canonicalContext ?? null;
     const districtConfidence = mapping?.district.confidence ?? 'unknown';
     const districtResolved = districtConfidence === 'high';
+    const readinessStatus = session.selectedTarget?.readinessStatus ?? null;
 
     const review = buildScrapedJsonImportRosterAwareReview(session, input.existingTeams, {});
     const existingTeam = ctx
@@ -218,95 +214,74 @@ export function buildWholeFilePlayerImportPlan(
           teamClassification: ctx.teamClassification,
         })
       : null;
-    const stagedProjection = buildScrapedJsonImportStagedProjection(review, existingTeam);
-    const readiness = buildScrapedJsonImportFutureCommitReadiness(review, stagedProjection);
 
-    const artifactTarget: ScrapedImportPreviewArtifactTarget = {
-      teamName: reportTarget.teamName,
-      existingTeamId: review.available ? review.existingTeamId : null,
-      seasonId: ctx?.seasonId ?? null,
-      districtId: ctx?.districtId ?? null,
-      ageDivisionId: ctx?.ageDivisionId ?? null,
-      teamClassification: ctx?.teamClassification ?? null,
-    };
-
-    // Sentinel id/timestamp keep this preview plan deterministic; a real plan is rebuilt at
-    // execution time. Used only to read the planned/rejected verdict and projected counts.
-    const previewPlan = buildScrapedJsonImportTransactionPlan({
-      transactionId: `whole-file-preview:${sourceTargetId}`,
-      generatedAt: 'whole-file-preview',
-      source: artifactSource,
-      target: artifactTarget,
-      review,
-      stagedProjection,
-      readiness,
-    });
-
-    const additions = review.available
-      ? review.rows.filter((r) => r.outcome === 'projected-create').length
-      : 0;
-    const links = review.available
-      ? review.rows.filter((r) => r.outcome === 'projected-link').length
-      : 0;
-
-    const readinessStatus = session.selectedTarget?.readinessStatus ?? null;
-    const reasons: string[] = [];
-
-    let status: WholeFileTargetStatus;
-    let committable = false;
-
-    if (reportTarget.rowCount === 0) {
-      status = 'empty';
-      reasons.push('No rows to import.');
-    } else if (readinessStatus === 'blocked') {
-      status = 'blocked';
-      pushReasons(reasons, reportTarget.readinessReasons);
-    } else if (!districtResolved) {
-      status = 'provisional-district';
-      reasons.push(
-        `District "${reportTarget.districtName ?? '(unknown)'}" is not a registered district (${districtConfidence}). Confirm/add it to the registry first.`
-      );
-    } else if (existingTeam === null) {
-      status = 'no-existing-team';
-      reasons.push(
-        'No existing workspace team matches this season / district / age division / classification.'
-      );
-    } else if (previewPlan.status === 'planned') {
-      if (claimedExistingTeamIds.has(existingTeam.teamId)) {
-        status = 'duplicate-target';
-        reasons.push(
-          `Another target in this file already commits into team ${existingTeam.teamId}; skipped to avoid double-applying additions.`
-        );
-      } else {
-        status = 'committable';
-        committable = true;
-      }
-    } else {
-      status = 'needs-review';
-      if (previewPlan.status === 'rejected') {
-        pushReasons(reasons, previewPlan.blockingReasons.map((r) => r.message));
-      }
-      pushReasons(reasons, reportTarget.readinessReasons);
-    }
-
-    targets.push({
-      sourceTargetId,
-      teamName: reportTarget.teamName,
-      districtName: reportTarget.districtName,
-      districtId: ctx?.districtId ?? reportTarget.canonicalDistrictId,
+    const common = {
       districtResolved,
+      districtId: ctx?.districtId ?? reportTarget.canonicalDistrictId,
       ageDivisionId: ctx?.ageDivisionId ?? reportTarget.canonicalAgeDivisionId,
-      ageDivisionLabel: reportTarget.ageDivisionLabel,
       teamClassification: ctx?.teamClassification ?? reportTarget.teamClassification,
       existingTeamId: review.available ? review.existingTeamId : null,
-      status,
-      committable,
-      projectedAdditions: additions,
-      linkNoOps: links,
-      reasons,
-    });
+    };
 
-    if (committable && existingTeam) {
+    // --- Blocked-before-action gates ------------------------------------------------
+    if (reportTarget.rowCount === 0) {
+      targets.push(blockedSummary(reportTarget, common, 'empty', ['No rows to import.']));
+      continue;
+    }
+    if (readinessStatus === 'blocked') {
+      targets.push(
+        blockedSummary(reportTarget, common, 'blocked', reportTarget.readinessReasons)
+      );
+      continue;
+    }
+    if (!districtResolved) {
+      targets.push(
+        blockedSummary(reportTarget, common, 'provisional-district', [
+          `District "${reportTarget.districtName ?? '(unknown)'}" is not in the registry. Add the district first (Districts tab, or “Add district to registry” after selecting this target), then re-import.`,
+        ])
+      );
+      continue;
+    }
+
+    // --- Update an existing team -----------------------------------------------------
+    if (existingTeam) {
+      const stagedProjection = buildScrapedJsonImportStagedProjection(review, existingTeam);
+      const readiness = buildScrapedJsonImportFutureCommitReadiness(review, stagedProjection);
+      const artifactTarget = makeArtifactTarget(reportTarget, ctx, existingTeam.teamId);
+      const previewPlan = buildScrapedJsonImportTransactionPlan({
+        transactionId: `whole-file-preview:${sourceTargetId}`,
+        generatedAt: 'whole-file-preview',
+        source: artifactSource,
+        target: artifactTarget,
+        review,
+        stagedProjection,
+        readiness,
+      });
+      const additions = review.available
+        ? review.rows.filter((r) => r.outcome === 'projected-create').length
+        : 0;
+
+      if (previewPlan.status !== 'planned') {
+        const reasons =
+          previewPlan.status === 'rejected'
+            ? previewPlan.blockingReasons.map((r) => r.message)
+            : [];
+        targets.push(
+          blockedSummary(reportTarget, common, 'needs-review', [
+            ...reasons,
+            ...reportTarget.readinessReasons,
+          ])
+        );
+        continue;
+      }
+      if (claimedExistingTeamIds.has(existingTeam.teamId)) {
+        targets.push(
+          blockedSummary(reportTarget, common, 'duplicate-target', [
+            `Another target already updates team ${existingTeam.teamId}; skipped to avoid double-applying.`,
+          ])
+        );
+        continue;
+      }
       claimedExistingTeamIds.add(existingTeam.teamId);
       committableTargets.push({
         sourceTargetId,
@@ -318,50 +293,247 @@ export function buildWholeFilePlayerImportPlan(
         readiness,
         projectedAdditions: additions,
       });
+      targets.push({
+        ...baseSummaryFields(reportTarget, common),
+        teamId: existingTeam.teamId,
+        action: 'update',
+        status: 'update',
+        committable: true,
+        playerCount: additions,
+        reasons: [],
+      });
+      continue;
     }
+
+    // --- Create a brand-new team -----------------------------------------------------
+    if (ctx === null || ctx.seasonId === null || ctx.ageDivisionId === null) {
+      targets.push(
+        blockedSummary(reportTarget, common, 'missing-context', [
+          'Could not resolve a season and/or age division for this target (name the file with a 4-digit year, e.g. “…-2026.json”).',
+        ])
+      );
+      continue;
+    }
+    if (ctx.teamClassification === null || ctx.districtId === null) {
+      targets.push(
+        blockedSummary(reportTarget, common, 'unparseable-team', [
+          `Could not read a team code from "${reportTarget.teamName ?? '(unnamed team)'}". Parenthetical sub-labels (e.g. “… A1 (Bonneville)”) are not supported yet and are never merged into a plain code.`,
+        ])
+      );
+      continue;
+    }
+
+    const teamId = `${ctx.seasonId}-${ctx.districtId}-${ctx.ageDivisionId}-${ctx.teamClassification}`;
+    if (claimedNewTeamIds.has(teamId)) {
+      targets.push(
+        blockedSummary(reportTarget, common, 'duplicate-target', [
+          `Another target already creates team ${teamId}; skipped to avoid duplicate teams.`,
+        ])
+      );
+      continue;
+    }
+    claimedNewTeamIds.add(teamId);
+
+    const players = playersFromSession(session.selectedPlayerPreviewResult?.rows ?? []);
+    teamsToCreate.push({
+      teamId,
+      seasonId: ctx.seasonId,
+      districtId: ctx.districtId,
+      ageDivisionId: ctx.ageDivisionId,
+      teamCode: ctx.teamClassification,
+      // draftOrder / divisionTeamCount are finalized below once all creates are known.
+      draftOrder: 0,
+      divisionTeamCount: 0,
+      headCoach: null,
+      assistantCoaches: [],
+      players,
+    });
+    targets.push({
+      ...baseSummaryFields(reportTarget, common),
+      teamId,
+      action: 'create',
+      status: 'create',
+      committable: true,
+      playerCount: players.length,
+      reasons: [],
+    });
   }
 
+  finalizeCreatedTeamDraftOrders(teamsToCreate, input.existingTeams);
+
   const playerTargets = targets.filter((t) => t.status !== 'non-player');
+  const createCount = teamsToCreate.length;
   const committableCount = committableTargets.length;
-  const countStatus = (s: WholeFileTargetStatus) =>
-    targets.filter((t) => t.status === s).length;
+  const blockedCount = playerTargets.filter((t) => t.action === 'blocked').length;
+  const totalCreatePlayers = teamsToCreate.reduce((sum, t) => sum + t.players.length, 0);
+  const totalProjectedAdditions = committableTargets.reduce(
+    (sum, t) => sum + t.projectedAdditions,
+    0
+  );
 
   return {
     recordType,
     isPlayerFile,
     totalTargets: targets.length,
     playerTargetCount: playerTargets.length,
-    coachTargetCount: countStatus('non-player'),
+    coachTargetCount: targets.filter((t) => t.status === 'non-player').length,
+    createCount,
     committableCount,
-    skippedCount: playerTargets.length - committableCount,
-    emptyCount: countStatus('empty'),
-    blockedCount: countStatus('blocked'),
-    needsReviewCount: countStatus('needs-review'),
-    noExistingTeamCount: countStatus('no-existing-team'),
-    provisionalDistrictCount: countStatus('provisional-district'),
-    duplicateTargetCount: countStatus('duplicate-target'),
-    totalProjectedAdditions: committableTargets.reduce(
-      (sum, t) => sum + t.projectedAdditions,
-      0
-    ),
-    totalLinkNoOps: targets
-      .filter((t) => t.committable)
-      .reduce((sum, t) => sum + t.linkNoOps, 0),
+    blockedCount,
+    totalPlayersToImport: totalCreatePlayers + totalProjectedAdditions,
+    totalProjectedAdditions,
     districtsResolvedCount: playerTargets.filter((t) => t.districtResolved).length,
     districtsProvisionalCount: playerTargets.filter((t) => !t.districtResolved).length,
     targets,
+    teamsToCreate,
     committableTargets,
   };
 }
 
-function pushReasons(reasons: string[], messages: string[]): void {
-  for (const message of messages) {
-    if (message && !reasons.includes(message)) reasons.push(message);
+/**
+ * Assigns deterministic `draftOrder` / `divisionTeamCount` to created teams. For each
+ * (season, district, age) division the count is the existing teams in that division plus the
+ * teams created in this batch; created teams are ordered by team code and slotted after any
+ * existing teams. Existing teams are never mutated.
+ */
+function finalizeCreatedTeamDraftOrders(created: Team[], existing: Team[]): void {
+  const divisionKey = (t: Team) => `${t.seasonId}|${t.districtId}|${t.ageDivisionId}`;
+  const existingByDivision = new Map<string, number>();
+  for (const t of existing) {
+    existingByDivision.set(divisionKey(t), (existingByDivision.get(divisionKey(t)) ?? 0) + 1);
+  }
+  const createdByDivision = new Map<string, Team[]>();
+  for (const t of created) {
+    const key = divisionKey(t);
+    if (!createdByDivision.has(key)) createdByDivision.set(key, []);
+    createdByDivision.get(key)!.push(t);
+  }
+  for (const [key, group] of createdByDivision) {
+    const existingCount = existingByDivision.get(key) ?? 0;
+    const total = existingCount + group.length;
+    const ordered = [...group].sort((a, b) =>
+      a.teamCode < b.teamCode ? -1 : a.teamCode > b.teamCode ? 1 : 0
+    );
+    ordered.forEach((team, index) => {
+      team.divisionTeamCount = total;
+      team.draftOrder = existingCount + index + 1;
+    });
   }
 }
 
+function makeArtifactTarget(
+  reportTarget: { teamName: string | null },
+  ctx: {
+    seasonId: string | null;
+    districtId: string | null;
+    ageDivisionId: string | null;
+    teamClassification: string | null;
+  } | null,
+  existingTeamId: string | null
+): ScrapedImportPreviewArtifactTarget {
+  return {
+    teamName: reportTarget.teamName,
+    existingTeamId,
+    seasonId: ctx?.seasonId ?? null,
+    districtId: ctx?.districtId ?? null,
+    ageDivisionId: ctx?.ageDivisionId ?? null,
+    teamClassification: ctx?.teamClassification ?? null,
+  };
+}
+
+type CommonSummaryFields = {
+  districtResolved: boolean;
+  districtId: string | null;
+  ageDivisionId: string | null;
+  teamClassification: string | null;
+  existingTeamId: string | null;
+};
+
+function baseSummaryFields(
+  reportTarget: {
+    sourceTargetId: string;
+    teamName: string | null;
+    districtName: string | null;
+    ageDivisionLabel: string | null;
+  },
+  common: CommonSummaryFields
+): Omit<WholeFileTargetSummary, 'teamId' | 'action' | 'status' | 'committable' | 'playerCount' | 'reasons'> {
+  return {
+    sourceTargetId: reportTarget.sourceTargetId,
+    teamName: reportTarget.teamName,
+    districtName: reportTarget.districtName,
+    districtId: common.districtId,
+    districtResolved: common.districtResolved,
+    ageDivisionId: common.ageDivisionId,
+    ageDivisionLabel: reportTarget.ageDivisionLabel,
+    teamClassification: common.teamClassification,
+    existingTeamId: common.existingTeamId,
+  };
+}
+
+function baseSummary(
+  reportTarget: {
+    sourceTargetId: string;
+    teamName: string | null;
+    districtName: string | null;
+    ageDivisionLabel: string | null;
+  },
+  rest: Pick<
+    WholeFileTargetSummary,
+    | 'districtResolved'
+    | 'districtId'
+    | 'ageDivisionId'
+    | 'teamClassification'
+    | 'teamId'
+    | 'existingTeamId'
+    | 'action'
+    | 'status'
+    | 'playerCount'
+    | 'reasons'
+  >
+): WholeFileTargetSummary {
+  return {
+    sourceTargetId: reportTarget.sourceTargetId,
+    teamName: reportTarget.teamName,
+    districtName: reportTarget.districtName,
+    ageDivisionLabel: reportTarget.ageDivisionLabel,
+    committable: rest.action !== 'blocked',
+    ...rest,
+  };
+}
+
+function blockedSummary(
+  reportTarget: {
+    sourceTargetId: string;
+    teamName: string | null;
+    districtName: string | null;
+    ageDivisionLabel: string | null;
+  },
+  common: CommonSummaryFields,
+  status: WholeFileTargetStatus,
+  reasons: string[]
+): WholeFileTargetSummary {
+  return {
+    ...baseSummaryFields(reportTarget, common),
+    teamId: null,
+    action: 'blocked',
+    status,
+    committable: false,
+    playerCount: 0,
+    reasons: dedupeReasons(reasons),
+  };
+}
+
+function dedupeReasons(messages: string[]): string[] {
+  const out: string[] = [];
+  for (const message of messages) {
+    if (message && !out.includes(message)) out.push(message);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
-// Batch execution (all-or-nothing)
+// Update-target batch execution (all-or-nothing) — existing teams only
 // ---------------------------------------------------------------------------
 
 export type WholeFileBatchExecutedTeamSummary = {
@@ -375,29 +547,21 @@ export type WholeFileBatchExecutedTeamSummary = {
 export type WholeFileBatchExecutionResult =
   | {
       status: 'executed';
-      /** New team values (existing records preserved + planned additions appended). */
       committedTeams: Team[];
       perTeam: WholeFileBatchExecutedTeamSummary[];
       teamsCommitted: number;
       totalAdded: number;
     }
-  | {
-      status: 'rejected';
-      failedTargetId: string;
-      reason: string;
-      message: string;
-    }
+  | { status: 'rejected'; failedTargetId: string; reason: string; message: string }
   | { status: 'nothing-to-commit' };
 
 /**
- * Executes the committable targets into new in-memory team values, all-or-nothing. Pure;
- * never mutates inputs. On the first execution rejection, returns `rejected` and produces
- * NO committed teams, so the caller applies nothing and the workspace cannot be partially
- * corrupted. Returns `nothing-to-commit` for an empty committable list.
+ * Executes the UPDATE targets into new in-memory team values, all-or-nothing. Pure. On the
+ * first rejection, returns `rejected` and produces NO committed teams. Returns
+ * `nothing-to-commit` for an empty list (e.g. a create-only import).
  */
 export function executeWholeFilePlayerImportBatch(input: {
   committableTargets: WholeFileCommittableTarget[];
-  /** Caller-supplied stable timestamp (keeps output deterministic). */
   generatedAt: string;
 }): WholeFileBatchExecutionResult {
   const { committableTargets, generatedAt } = input;
