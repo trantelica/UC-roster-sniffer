@@ -1165,6 +1165,47 @@ so the loaded source and selected target are preserved) — the district is then
 provisional. Full branding/image/inactivate editing remains the **C2 District Maintenance**
 screen; this slice adds no edit forms, image pickers, or color pickers.
 
+## Whole-file player import (Completion Milestone B2)
+
+B2 lets a user commit **all ready player teams** in one loaded scraped PLAYERS file in a
+single explicit action, while leaving every unready team untouched. It reuses the exact
+single-target pipeline (B1) — it invents no second readiness, matching, projection, or commit
+rule. For every player-team target the engine
+(`buildWholeFilePlayerImportPlan`) composes: session selection → roster-aware review →
+staged projection → future readiness → transaction plan, with **empty review decisions**.
+Because only an unambiguous no-match row defaults to `create-new`, any match-bearing /
+ambiguous row stays unresolved and that team is reported as **needs review**, never
+auto-resolved and never committed.
+
+Per-target status: `committable` · `needs-review` · `blocked` · `empty` ·
+`provisional-district` · `no-existing-team` · `duplicate-target` · `non-player`. A target is
+**committable** only when its transaction plan is `planned` AND its district resolved against
+the registry at **high confidence** (C3) AND a matching existing workspace team was found.
+Two batch-only safety gates layer on top of the pipeline (never replacing it):
+
+- **Provisional/unknown district** → skipped until the district is confirmed/registered, then
+  it becomes committable on re-derive (the plan is rebuilt from the active registry).
+- **Duplicate target** → if two targets resolve to the SAME existing workspace team, only the
+  first is committable; the rest are skipped so a batch can never double-apply additions.
+
+Coach (non-player) targets and targets with **no existing workspace team** are skipped — like
+B1, B2 updates EXISTING teams only and never silently creates a team.
+
+**Commit All Ready Teams to Workspace** runs `executeWholeFilePlayerImportBatch` then
+`commitImportedTeamsToWorkspace`, both **all-or-nothing**: each committable team is executed
+into a new team value (existing records preserved exactly and in order, only planned
+additions appended; links are no-ops; deferred/unresolved/blocked rows never added), and if
+ANY team fails to execute or is missing at commit time, **no workspace change is applied** and
+a calm error is shown — the workspace can never be partially corrupted. A successful commit
+auto-saves via A1 and is included by A2 Export Dataset.
+
+**Undo Whole-file Import** (`undoImportedTeamsCommitInWorkspace`) is current-session only: it
+restores every affected team to its exact pre-batch state in the CURRENT workspace, preserving
+unrelated later changes to other teams. The committed batch itself survives reload (A1); the
+undo affordance does not. B1 single-team commit and the C3 confirm/add district path continue
+to work alongside the batch action; the batch action is disabled while a single-target
+in-memory preview is executed.
+
 ## Portable workspace snapshot export / import (Phase 5 slice 23)
 
 Slice 23 adds **portable workspace snapshots**: the user can explicitly export the current

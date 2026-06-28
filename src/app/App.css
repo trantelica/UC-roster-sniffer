@@ -839,6 +839,21 @@ h1 {
   cursor: not-allowed;
 }
 
+/* B2: whole-file player import panel. */
+.import-whole-file {
+  border: 1px solid var(--color-steel-blue);
+  border-left: 4px solid var(--color-steel-blue);
+  border-radius: 3px;
+  background-color: var(--color-mint-cream);
+  padding: 0.75rem 0.9rem;
+}
+
+.import-whole-file-reasons {
+  font-size: 0.75rem;
+  color: var(--color-carbon-black);
+  max-width: 22rem;
+}
+
 /* Workspace snapshot toolbar (portable JSON export/import) */
 .workspace-toolbar {
   border: 1px solid var(--color-alabaster-grey);
