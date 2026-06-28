@@ -24,12 +24,16 @@ import TeamView from '../components/TeamView';
 import ScrapedImportPreview, {
   type InMemoryImportAppState,
   type ScrapedImportCommitPayload,
+  type WholeFileImportCommitPayload,
 } from '../components/ScrapedImportPreview';
 import {
   commitImportedTeamToWorkspace,
   undoImportedTeamCommitInWorkspace,
+  commitImportedTeamsToWorkspace,
+  undoImportedTeamsCommitInWorkspace,
 } from '../engine/workspaceImportCommit';
 import { confirmUnknownScrapedDistrict } from '../engine/districtRegistry';
+import { executeWholeFilePlayerImportBatch } from '../engine/uteConferenceScrapedJsonWholeFileImport';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
@@ -90,6 +94,18 @@ export default function App() {
     beforeCount: number;
     afterCount: number;
   } | null>(null);
+  // B2: current-session undo for a whole-file batch commit. Holds the pre-batch values of
+  // every affected team. Not persisted (the committed batch itself is durable via A1; this
+  // undo affordance is session-only). A failed batch surfaces a calm notice instead.
+  const [wholeFileImportUndo, setWholeFileImportUndo] = useState<{
+    previousTeams: Team[];
+    teamsCommitted: number;
+    totalAdded: number;
+    skippedCount: number;
+    beforeCount: number;
+    afterCount: number;
+  } | null>(null);
+  const [wholeFileImportError, setWholeFileImportError] = useState<string | null>(null);
   // Bumped on a snapshot restore to force-remount the import workbench, clearing its
   // transient state (loaded source, review decisions, staged preview, execution/undo).
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
@@ -328,6 +344,64 @@ export default function App() {
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
+  // --- Milestone B2: whole-file batch commit of all ready player teams ---
+
+  // Executes the committable targets all-or-nothing, then writes the resulting teams into the
+  // committed workspace in one update (auto-saved via A1, exported by A2). If execution or the
+  // batch workspace transform fails, NO workspace change is applied and a calm error is shown,
+  // so a failed batch can never partially corrupt the workspace. Clears any transient overlay,
+  // remembers the pre-batch teams for a session undo, and remounts the workbench.
+  function handleCommitWholeFilePlayerImport(payload: WholeFileImportCommitPayload) {
+    setWholeFileImportError(null);
+    const generatedAt = new Date().toISOString();
+    const execution = executeWholeFilePlayerImportBatch({
+      committableTargets: payload.committableTargets,
+      generatedAt,
+    });
+    if (execution.status !== 'executed') {
+      setWholeFileImportError(
+        execution.status === 'nothing-to-commit'
+          ? 'No ready teams to commit.'
+          : `Batch import was not applied: ${execution.message} No teams were changed.`
+      );
+      return;
+    }
+    const commit = commitImportedTeamsToWorkspace(workspace, execution.committedTeams);
+    if (!commit.committed) {
+      setWholeFileImportError(
+        `Batch import was not applied: ${commit.missingTeamIds.length} target team(s) were not found in the workspace. No teams were changed.`
+      );
+      return;
+    }
+    setWorkspace(commit.workspace);
+    setInMemoryImport(null);
+    const beforeCount = execution.perTeam.reduce((sum, p) => sum + p.beforeCount, 0);
+    const afterCount = execution.perTeam.reduce((sum, p) => sum + p.afterCount, 0);
+    setWholeFileImportUndo({
+      previousTeams: commit.previousTeams,
+      teamsCommitted: execution.teamsCommitted,
+      totalAdded: execution.totalAdded,
+      skippedCount: payload.summary.skippedCount,
+      beforeCount,
+      afterCount,
+    });
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
+  // B2: current-session undo. Restores every affected team to its exact pre-batch state in the
+  // CURRENT workspace (preserving unrelated later changes to other teams), auto-saves via A1,
+  // and clears the undo affordance.
+  function handleUndoWholeFilePlayerImport() {
+    if (!wholeFileImportUndo) return;
+    const result = undoImportedTeamsCommitInWorkspace(
+      workspace,
+      wholeFileImportUndo.previousTeams
+    );
+    if (result.restored) setWorkspace(result.workspace);
+    setWholeFileImportUndo(null);
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
   // --- Milestone C3: confirm/add an unknown scraped district into the registry ---
 
   // Adds the exact scraped district name into the committed workspace district registry as an
@@ -401,8 +475,11 @@ export default function App() {
         setWorkspace(restored.workspace);
         setWorkspaceFromImport(true);
         setInMemoryImport(null);
-        // The whole workspace was replaced, so a prior committed-import undo is now stale.
+        // The whole workspace was replaced, so any prior committed-import undo (single-team
+        // B1 or whole-file B2) and any whole-file error are now stale and must be cleared.
         setCommittedImportUndo(null);
+        setWholeFileImportUndo(null);
+        setWholeFileImportError(null);
         setSelectedSeason(restored.selection.seasonId);
         setSelectedDistrict(restored.selection.districtId);
         setSelectedAgeDivision(restored.selection.ageDivisionId);
@@ -506,7 +583,7 @@ export default function App() {
           aria-pressed={view === 'import'}
           onClick={() => setView('import')}
         >
-          Import preview (read-only)
+          Roster import
         </button>
         <button
           type="button"
@@ -588,6 +665,40 @@ export default function App() {
         </div>
       )}
 
+      {wholeFileImportUndo && (
+        <div className="committed-import-banner">
+          <div>
+            <strong>Whole-file import saved locally.</strong>{' '}
+            {wholeFileImportUndo.teamsCommitted} team
+            {wholeFileImportUndo.teamsCommitted === 1 ? '' : 's'} committed (
+            {wholeFileImportUndo.beforeCount} → {wholeFileImportUndo.afterCount} players across
+            them · {wholeFileImportUndo.totalAdded} added · {wholeFileImportUndo.skippedCount}{' '}
+            skipped). This is now part of your workspace and auto-saves to this browser (it
+            survives reload). Undo is available only for this session.
+          </div>
+          <button
+            type="button"
+            className="committed-import-undo-button"
+            onClick={handleUndoWholeFilePlayerImport}
+          >
+            Undo Whole-file Import
+          </button>
+        </div>
+      )}
+
+      {wholeFileImportError && (
+        <div className="workspace-notice workspace-notice-error">
+          <strong>{wholeFileImportError}</strong>
+          <button
+            type="button"
+            className="import-link-button"
+            onClick={() => setWholeFileImportError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/*
         Both views stay mounted (visibility toggled) so an in-memory import execution and
         its Undo control are never lost by switching tabs while an execution is active.
@@ -618,6 +729,7 @@ export default function App() {
           onInMemoryImportChange={setInMemoryImport}
           onCommitImport={handleCommitScrapedImport}
           onConfirmDistrict={handleConfirmScrapedDistrict}
+          onCommitWholeFile={handleCommitWholeFilePlayerImport}
         />
       </div>
       <div hidden={view !== 'schedule'}>

@@ -89,6 +89,30 @@ provisional:
   Maintenance** screen, which is **Completion Milestone C2** (not yet built). Districts are
   never deleted — inactivation is the only retirement path.
 
+## Whole-file player import panel (Completion Milestone B2)
+
+When a scraped **players** file is loaded, a **Whole-file player import** panel appears above
+the per-target detail. It summarizes every player-team target in the file and lets the user
+commit all ready teams at once — the per-target B1 flow still works for case-by-case review.
+
+- **Summary:** player team targets · ready-to-commit count · skipped count (broken out as
+  needs review / blocked / no workspace team / provisional district / duplicate / empty) ·
+  coach/non-player targets (not imported here) · projected additions and link no-ops across
+  ready teams · districts resolved through the registry vs provisional/unknown.
+- **Table** (one row per target): team · district · age · code · status badge (Ready / Needs
+  review / Blocked / Empty / Provisional district / No workspace team / Duplicate target /
+  Coach) · projected additions · reason notes for skipped teams.
+- **Commit All Ready Teams to Workspace** commits only the ready teams, all-or-nothing, and is
+  **disabled** when there are zero ready teams or while a single-target in-memory preview is
+  executed. Copy: “Only teams that pass the existing readiness gate will be committed. Teams
+  needing review are skipped.” There is **no auto-commit** on file load, selection, staging,
+  district confirmation, or preview.
+- After a successful commit a top banner reads **“Whole-file import saved locally”** with the
+  team count, before→after player totals across the committed teams, additions, and skipped
+  count, plus an **Undo Whole-file Import** button (current session only; the committed data
+  is durable via A1 and survives reload). A failed batch shows a calm error and changes
+  nothing.
+
 ## Primary navigation
 
 The primary navigation path is:
@@ -456,9 +480,10 @@ separate, later, explicitly approved slice.
 ### Read-only scraped JSON import UI shell (Phase 5 slice 16)
 
 Slice 16 adds the **first visible import UI**: a read-only scraped JSON import preview
-shell (`src/components/ScrapedImportPreview.tsx`), reachable from a top-level
-"Import preview (read-only)" view toggle in `App.tsx` alongside the existing roster
-view. It is a thin renderer over the existing engine: it builds a slice 14 import
+shell (`src/components/ScrapedImportPreview.tsx`), reachable from a top-level import
+view toggle in `App.tsx` alongside the existing roster view (the toggle was originally
+labelled "Import preview (read-only)" and was renamed to "Roster import" once B1/B2
+added explicit commit actions). It is a thin renderer over the existing engine: it builds a slice 14 import
 session from a chosen **demo source** (the existing scraped JSON test fixtures, plus
 two small inline payloads so the blocked and invalid-source states are visible), lets
 the user select one target, and renders the readiness/preview/review state via a pure

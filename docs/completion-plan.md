@@ -1,6 +1,6 @@
 # Completion Plan
 
-Status: **in progress — A1 + A2 + B1 + C1 + C3 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping) landed; B2 / C2 next**
+Status: **in progress — A1 + A2 + B1 + C1 + C3 + B2 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping, whole-file player import) landed; C2 next**
 Date: 2026-06-27 (last updated 2026-06-28)
 Owner: product owner (novice vibe coder)
 
@@ -161,6 +161,22 @@ finishes the roadmap (D) and hardens (E).
   needs-review / blocked rows surfaced for decisions.
   - *Acceptance:* A full scraped season file can be imported in one guided pass; blocked
     rows are clearly explained, not silently dropped.
+  - **Landed (2026-06-28).** A **Whole-file player import** panel evaluates every
+    player-team target in the loaded file by COMPOSING the exact single-target pipeline
+    (session select → roster-aware review → staged projection → future readiness →
+    transaction plan → execution) with EMPTY review decisions, so a team is committable only
+    when the pipeline already calls it ready without manual review. Two batch-only safety
+    gates layer on top (never replacing the pipeline): a non-high-confidence/unregistered
+    district skips the team (`provisional-district`) until confirmed (C3), and two targets
+    resolving to the same workspace team skip the later one (`duplicate-target`). Coach
+    targets and targets with no existing workspace team are skipped. **Commit All Ready Teams
+    to Workspace** executes all committable teams ALL-OR-NOTHING (`executeWholeFilePlayerImportBatch`)
+    and writes them in one workspace transform (`commitImportedTeamsToWorkspace`); a failure
+    applies nothing. Auto-saves via A1, exported by A2. Session-only **Undo Whole-file Import**
+    (`undoImportedTeamsCommitInWorkspace`) restores every affected team, preserving unrelated
+    later changes. Engine: `src/engine/uteConferenceScrapedJsonWholeFileImport.ts`. B1
+    single-team commit and C3 confirm/add still work. No coach commit, no new team creation,
+    no multi-file import.
 
 ### Workstream C — District registry + maintenance utility
 
@@ -258,11 +274,11 @@ up exactly where the last one stopped.
 - [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: #65 · landed 2026-06-27
 - [x] **A2** — One-click portable export/import + save indicator (round-trip test) · branch: `milestoneA2-portable-dataset-export-import` · PR: #66 · landed 2026-06-27
 - [x] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · branch: `milestoneB1-scraped-json-team-commit` · PR: #67 · landed 2026-06-28
-- [x] **C1** — District registry model + persistence (seed Ute Conference districts) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: _pending_ · landed 2026-06-28
-- [x] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: _pending_ · landed 2026-06-28
+- [x] **C1** — District registry model + persistence (seed Ute Conference districts) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: #68 · landed 2026-06-28
+- [x] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: #68 · landed 2026-06-28
 
 **Milestone 2 — "Full data in, fully managed"**
-- [ ] **B2** — Whole-file import flow (multiple teams from readiness report) · PR: _ · _
+- [x] **B2** — Whole-file import flow (multiple teams from readiness report) · branch: `milestoneB2-whole-file-player-import` · PR: _pending_ · landed 2026-06-28
 - [ ] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · PR: _ · _
 - [ ] **E1** — First-run + empty states · PR: _ · _
 - [ ] **E2** — File-error handling (malformed/wrong-shape JSON) · PR: _ · _
@@ -277,9 +293,10 @@ up exactly where the last one stopped.
 
 ## Next slice
 
-**Milestone 1 is complete** (A1, A2, B1, C1, C3): scraped data loads, commits, persists
-across restarts, and districts resolve against a real registry. The next slices are in
-**Milestone 2 — "Full data in, fully managed":** **B2** (whole-file import of all ready
-teams in one guided pass) and **C2** (the full District Maintenance screen to add/edit/
-inactivate districts and point them at helmet/logo files in `public/districts/`). Either is
-ready to start; C2 builds directly on the C1 registry model.
+**Milestone 1 is complete** (A1, A2, B1, C1, C3) and **B2 (whole-file player import) has
+landed**: scraped data loads, commits per-team or whole-file, persists across restarts, and
+districts resolve against a real registry. The next slice is **C2 — the full District
+Maintenance screen** (list/add/edit/inactivate districts; set name/mascot/colors; point each
+at helmet/logo files in `public/districts/`). It builds directly on the C1 registry model and
+the C3 confirm/add path. After C2, the remaining Milestone-2 polish is **E1** (first-run /
+empty states) and **E2** (file-error handling).

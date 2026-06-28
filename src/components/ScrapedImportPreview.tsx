@@ -29,6 +29,11 @@ import {
 } from '../engine/uteConferenceScrapedJsonImportExecution';
 import type { District, Team } from '../domain/types';
 import { buildDistrictNameRegistryLookup } from '../engine/districtRegistry';
+import {
+  buildWholeFilePlayerImportPlan,
+  type WholeFilePlayerImportPlan,
+  type WholeFileCommittableTarget,
+} from '../engine/uteConferenceScrapedJsonWholeFileImport';
 
 import playersPw from '../test/fixtures/ute-scraped-json/players-2023-pw-small.json';
 import coachesPw from '../test/fixtures/ute-scraped-json/coaches-2022-pw-small.json';
@@ -62,6 +67,20 @@ export type ScrapedImportCommitPayload = {
     addedCount: number;
     beforeCount: number;
     afterCount: number;
+  };
+};
+
+/**
+ * Completion Milestone B2: payload of an explicit WHOLE-FILE batch commit. Carries the
+ * committable targets' execution inputs (the app executes them all-or-nothing) plus a small
+ * display summary. Only ready player teams are included; skipped teams are reported only.
+ */
+export type WholeFileImportCommitPayload = {
+  committableTargets: WholeFileCommittableTarget[];
+  summary: {
+    teamCount: number;
+    totalAdditions: number;
+    skippedCount: number;
   };
 };
 
@@ -147,6 +166,7 @@ export default function ScrapedImportPreview({
   onInMemoryImportChange,
   onCommitImport,
   onConfirmDistrict,
+  onCommitWholeFile,
 }: {
   baselineTeams: Team[];
   // C3: the committed workspace district registry; scraped district labels resolve against it.
@@ -156,6 +176,8 @@ export default function ScrapedImportPreview({
   onCommitImport: (payload: ScrapedImportCommitPayload) => void;
   // C3: confirm/add an unknown scraped district into the registry (durable via A1).
   onConfirmDistrict: (rawName: string) => void;
+  // B2: commit ALL ready player teams in the loaded file at once (durable via A1).
+  onCommitWholeFile: (payload: WholeFileImportCommitPayload) => void;
 }) {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
@@ -209,6 +231,38 @@ export default function ScrapedImportPreview({
         : null,
     [session, reviewDecisions, baselineTeams]
   );
+
+  // B2: whole-file player import plan. Derived against the immutable baseline roster and
+  // active registry (same inputs the single-target view model uses), with NO review
+  // decisions, so only teams the existing pipeline already calls ready are committable.
+  const wholeFilePlan = useMemo<WholeFilePlayerImportPlan | null>(
+    () =>
+      loaded
+        ? buildWholeFilePlayerImportPlan({
+            payload: loaded.payload,
+            existingTeams: baselineTeams,
+            districtRegistry,
+            sourceName: loaded.name,
+          })
+        : null,
+    [loaded, baselineTeams, districtRegistry]
+  );
+
+  // B2: explicit durable batch commit of all ready player teams. Hands the committable
+  // targets up to the app, which executes them all-or-nothing and writes them into the
+  // committed workspace (auto-saved via A1). Locked while an in-memory preview is executed.
+  function commitWholeFile() {
+    if (!wholeFilePlan || executed) return;
+    if (wholeFilePlan.committableTargets.length === 0) return;
+    onCommitWholeFile({
+      committableTargets: wholeFilePlan.committableTargets,
+      summary: {
+        teamCount: wholeFilePlan.committableCount,
+        totalAdditions: wholeFilePlan.totalProjectedAdditions,
+        skippedCount: wholeFilePlan.skippedCount,
+      },
+    });
+  }
 
   // Selecting / switching a target isolates identity decisions to that target and
   // invalidates any staged projection. Locked while an in-memory import is executed.
@@ -454,6 +508,14 @@ export default function ScrapedImportPreview({
         <p className="import-empty">No source loaded. Choose a local JSON file to begin.</p>
       )}
 
+      {loaded && wholeFilePlan && wholeFilePlan.isPlayerFile && (
+        <WholeFilePlayerImportPanel
+          plan={wholeFilePlan}
+          locked={executed}
+          onCommitWholeFile={commitWholeFile}
+        />
+      )}
+
       {loaded && vm && (
         <Workbench
           vm={vm}
@@ -475,6 +537,143 @@ export default function ScrapedImportPreview({
       )}
     </div>
   );
+}
+
+const WHOLE_FILE_STATUS_LABELS: Record<string, string> = {
+  committable: 'Ready',
+  'needs-review': 'Needs review',
+  blocked: 'Blocked',
+  empty: 'Empty',
+  'provisional-district': 'Provisional district',
+  'no-existing-team': 'No workspace team',
+  'duplicate-target': 'Duplicate target',
+  'non-player': 'Coach/non-player',
+};
+
+/**
+ * B2: whole-file player import panel. Summarizes every player-team target in the loaded
+ * file and offers a single explicit batch commit of all READY teams. Only teams that pass
+ * the existing readiness gate (and resolve to a registered district) are committed; every
+ * other target is reported and skipped. The action is locked while a single-target
+ * in-memory preview is executed, to avoid conflicting/duplicate state.
+ */
+function WholeFilePlayerImportPanel({
+  plan,
+  locked,
+  onCommitWholeFile,
+}: {
+  plan: WholeFilePlayerImportPlan;
+  locked: boolean;
+  onCommitWholeFile: () => void;
+}) {
+  const canCommit = !locked && plan.committableCount > 0;
+  return (
+    <div className="import-section import-whole-file">
+      <div className="import-section-head">
+        <h3>Whole-file player import</h3>
+        <button
+          type="button"
+          className="import-decision-button import-commit-button"
+          onClick={onCommitWholeFile}
+          disabled={!canCommit}
+        >
+          Commit All Ready Teams to Workspace
+        </button>
+      </div>
+      <p className="import-note">
+        Only teams that pass the existing readiness gate will be committed. Teams needing
+        review, blocked teams, provisional-district teams, and teams with no matching
+        workspace team are skipped (never silently changed). Committing saves to this browser
+        automatically (IndexedDB) and is included in an exported dataset.
+      </p>
+      <div className="import-summary">
+        <div className="import-summary-line">
+          <span>Player team targets</span>
+          <strong>{plan.playerTargetCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Ready to commit</span>
+          <strong>{plan.committableCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Skipped</span>
+          <strong>
+            {plan.skippedCount} ({plan.needsReviewCount} needs review · {plan.blockedCount}{' '}
+            blocked · {plan.noExistingTeamCount} no team · {plan.provisionalDistrictCount}{' '}
+            provisional district · {plan.duplicateTargetCount} duplicate · {plan.emptyCount}{' '}
+            empty)
+          </strong>
+        </div>
+        {plan.coachTargetCount > 0 && (
+          <div className="import-summary-line">
+            <span>Coach/non-player targets</span>
+            <strong>{plan.coachTargetCount} (not imported here)</strong>
+          </div>
+        )}
+        <div className="import-summary-line">
+          <span>Projected additions (ready teams)</span>
+          <strong>
+            {plan.totalProjectedAdditions} added · {plan.totalLinkNoOps} link no-ops
+          </strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Districts</span>
+          <strong>
+            {plan.districtsResolvedCount} registry-resolved ·{' '}
+            {plan.districtsProvisionalCount} provisional/unknown
+          </strong>
+        </div>
+      </div>
+      {plan.committableCount === 0 && (
+        <p className="import-empty">
+          No teams in this file are ready to commit yet. Resolve review items per team below,
+          or add unknown districts to the registry, then they will become committable.
+        </p>
+      )}
+      <table className="import-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>District</th>
+            <th>Age</th>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Additions</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plan.targets.map((t) => (
+            <tr key={t.sourceTargetId}>
+              <td>{t.teamName ?? '(unnamed team)'}</td>
+              <td>{t.districtName ?? '—'}</td>
+              <td>{t.ageDivisionId ?? t.ageDivisionLabel ?? '—'}</td>
+              <td>{t.teamClassification ?? '—'}</td>
+              <td>
+                <span className={`import-badge import-badge-${statusBadge(t.status)}`}>
+                  {WHOLE_FILE_STATUS_LABELS[t.status] ?? t.status}
+                </span>
+              </td>
+              <td>{t.committable ? t.projectedAdditions : '—'}</td>
+              <td className="import-whole-file-reasons">
+                {t.reasons.length > 0 ? t.reasons.join(' ') : ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Maps a whole-file status to one of the existing readiness badge style buckets. */
+function statusBadge(status: string): string {
+  if (status === 'committable') return 'ready';
+  if (status === 'empty') return 'empty';
+  if (status === 'blocked' || status === 'duplicate-target' || status === 'non-player') {
+    return 'blocked';
+  }
+  return 'needs-review';
 }
 
 function demoIdForLabel(label: string): string {
