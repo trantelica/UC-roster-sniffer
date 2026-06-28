@@ -35,7 +35,7 @@ phase, it references the canonical docs.
 |-------|----------|
 | Scope | **Full roadmap.** Complete everything, including the deferred polish (district artwork, coach Scout-to-Scout exception, favorites, opponent links). |
 | Primary import path | **Scraped Ute Conference JSON**, taken end-to-end (load → review → commit → persist → view). Paste/CSV stays available but secondary. |
-| Districts | **Build a District Maintenance utility.** A small in-app screen to add/edit/remove districts over time, set name/mascot/colors, and point each at helmet `.jpg`/`.png` files stored in a project folder. |
+| Districts | **Build a District Maintenance utility.** A small in-app screen to add/edit/inactivate districts over time, set name/mascot/colors, and point each at helmet `.jpg`/`.png` files stored in a project folder. **Districts are never destructively deleted** — they may be edited or marked inactive only. |
 | Persistence | **IndexedDB (confirmed)** for automatic session-to-session storage — data stays in the tool across terminal/browser/Mac restarts with no manual load. **Plus a hard requirement:** a one-click full-dataset JSON export that is completely portable and round-trips back into another person's browser (give the file to another coach/assistant → they import → identical workspace). No backend for now; a local-file backend stays a possible later upgrade only. |
 
 ## Persistence: what "data stays in the tool" actually requires
@@ -152,8 +152,9 @@ finishes the roadmap (D) and hardens (E).
     confidence instead of `provisional`.
 
 - **C2 — District Maintenance screen.**
-  An in-app utility to list, add, edit, and remove districts; set name/mascot/colors;
-  and point a district at helmet/logo files in `public/districts/`.
+  An in-app utility to list, add, edit, and inactivate districts; set name/mascot/colors;
+  and point a district at helmet/logo files in `public/districts/`. Districts are never
+  destructively deleted — inactivate (not remove) is the only way to retire one.
   - *Acceptance:* Owner can add a brand-new district with a helmet image and see it used
     in the app, with no code changes.
 
@@ -202,6 +203,9 @@ finishes the roadmap (D) and hardens (E).
 - Loaded roster records stay authoritative; derived metadata never mutates source rows.
 - Prior seasons stay locked.
 - No reshaping of existing sample-data contracts.
+- **Districts must never be destructively deleted.** District Maintenance (Workstream C)
+  may add, edit, or mark a district inactive only — never remove/hard-delete a district
+  record. This is a locked rule for all current and future slices.
 
 ## Progress tracker
 
@@ -210,7 +214,7 @@ lands, change `[ ]` to `[x]` and fill in the PR/branch + date so a new session c
 up exactly where the last one stopped.
 
 **Milestone 1 — "It's a real tool"**
-- [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: _pending_ · landed 2026-06-27
+- [x] **A1** — IndexedDB persistence (auto-save / auto-load) · branch: `milestoneA1-indexeddb-workspace-persistence` · PR: #65 · landed 2026-06-27
 - [ ] **A2** — One-click portable export/import + save indicator (round-trip test) · PR: _ · _
 - [ ] **B1** — Commit a previewed scraped-JSON team into the workspace (with undo) · PR: _ · _
 - [ ] **C1** — District registry model + persistence (seed Ute Conference districts) · PR: _ · _
@@ -218,7 +222,7 @@ up exactly where the last one stopped.
 
 **Milestone 2 — "Full data in, fully managed"**
 - [ ] **B2** — Whole-file import flow (multiple teams from readiness report) · PR: _ · _
-- [ ] **C2** — District Maintenance screen (add/edit/remove, point at helmet/logo files) · PR: _ · _
+- [ ] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · PR: _ · _
 - [ ] **E1** — First-run + empty states · PR: _ · _
 - [ ] **E2** — File-error handling (malformed/wrong-shape JSON) · PR: _ · _
 
