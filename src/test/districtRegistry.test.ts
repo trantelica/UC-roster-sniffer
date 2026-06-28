@@ -174,7 +174,8 @@ describe('confirmUnknownScrapedDistrict', () => {
     const before = freeze([district({ districtId: 'alta', name: 'Alta' })]);
     const r1 = confirmUnknownScrapedDistrict(before, 'Granger');
     const r2 = confirmUnknownScrapedDistrict(before, 'Granger');
-    expect(r1.added).toBe(true);
+    expect(r1.outcome).toBe('added');
+    expect(r1.changed).toBe(true);
     expect(r1.district).toEqual(r2.district); // deterministic
     expect(r1.district.districtId).toBe('granger');
     expect(r1.district.name).toBe('Granger');
@@ -186,18 +187,54 @@ describe('confirmUnknownScrapedDistrict', () => {
     expect(r1.districts).toHaveLength(2);
   });
 
-  it('is idempotent for an exact existing match (reuses, adds nothing)', () => {
-    const before = [district({ districtId: 'alta', name: 'Alta' })];
+  it('is idempotent for an exact ACTIVE match (reuses, changes nothing)', () => {
+    const before = [district({ districtId: 'alta', name: 'Alta', status: 'active' })];
     const r = confirmUnknownScrapedDistrict(before, 'Alta');
-    expect(r.added).toBe(false);
+    expect(r.outcome).toBe('reused');
+    expect(r.changed).toBe(false);
     expect(r.districts).toHaveLength(1);
     expect(r.district.districtId).toBe('alta');
+  });
+
+  it('reactivates an inactive-only exact match instead of a dead no-op (never deletes/duplicates)', () => {
+    const before = freeze([district({ districtId: 'alta', name: 'Alta', status: 'inactive' })]);
+    const r = confirmUnknownScrapedDistrict(before, 'Alta');
+    expect(r.outcome).toBe('reactivated');
+    expect(r.changed).toBe(true);
+    expect(r.districts).toHaveLength(1); // reactivated in place — no duplicate appended
+    expect(r.district.districtId).toBe('alta'); // same record, not a new id
+    expect(r.district.status).toBe('active');
+    // After reactivation the lookup resolves the scraped label at high confidence.
+    expect(buildDistrictNameRegistryLookup(r.districts).Alta).toBe('alta');
+    // input not mutated
+    expect(before[0].status).toBe('inactive');
+  });
+
+  it('reactivates via an exact inactive SOURCE LABEL match (not just name)', () => {
+    const before = [
+      district({ districtId: 'alta', name: 'Alta', status: 'inactive', sourceLabels: ['Alta District'] }),
+    ];
+    const r = confirmUnknownScrapedDistrict(before, 'Alta District');
+    expect(r.outcome).toBe('reactivated');
+    expect(r.district.districtId).toBe('alta');
+    expect(buildDistrictNameRegistryLookup(r.districts)['Alta District']).toBe('alta');
+  });
+
+  it('prefers reusing an ACTIVE match over reactivating an inactive same-name record', () => {
+    const before = [
+      district({ districtId: 'a-old', name: 'Acme', status: 'inactive' }),
+      district({ districtId: 'a-new', name: 'Acme', status: 'active' }),
+    ];
+    const r = confirmUnknownScrapedDistrict(before, 'Acme');
+    expect(r.outcome).toBe('reused');
+    expect(r.changed).toBe(false);
+    expect(r.district.districtId).toBe('a-new');
   });
 
   it('disambiguates a colliding id without overwriting a different district', () => {
     const before = [district({ districtId: 'bingham', name: 'Bingham' })];
     const r = confirmUnknownScrapedDistrict(before, 'Bingham!'); // slug collides with "bingham"
-    expect(r.added).toBe(true);
+    expect(r.outcome).toBe('added');
     expect(r.district.districtId).toBe('bingham-2');
     expect(r.district.name).toBe('Bingham!');
   });

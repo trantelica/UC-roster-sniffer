@@ -339,7 +339,9 @@ export default function App() {
   function handleConfirmScrapedDistrict(rawName: string) {
     setWorkspace((current) => {
       const result = confirmUnknownScrapedDistrict(current.districts, rawName);
-      if (!result.added) return current;
+      // `changed` covers both appending a new district and reactivating an inactive-only
+      // exact match, so confirming an inactive district is never a dead no-op.
+      if (!result.changed) return current;
       return { ...current, districts: result.districts };
     });
   }

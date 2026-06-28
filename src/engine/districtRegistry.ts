@@ -189,21 +189,42 @@ export function buildDistrictNameRegistryLookup(
 // Confirm an unknown scraped district
 // ---------------------------------------------------------------------------
 
+/**
+ * What confirming did:
+ * - `reused`     — an EXACT ACTIVE match already existed; nothing changed (idempotent).
+ * - `reactivated`— the only EXACT match(es) were inactive; the existing record was flipped
+ *                  back to active (preserved, never duplicated or deleted).
+ * - `added`      — no exact match existed; a new active/provisional record was appended.
+ */
+export type ConfirmScrapedDistrictOutcome = 'reused' | 'reactivated' | 'added';
+
 export type ConfirmScrapedDistrictResult = {
   /** The registry after the confirm (new array; input never mutated). */
   districts: District[];
-  /** The matched-or-created district record. */
+  /** The matched-or-created district record (always active after a confirm). */
   district: District;
-  /** True when a new record was appended; false when an existing exact match was reused. */
-  added: boolean;
+  /** What confirming did. */
+  outcome: ConfirmScrapedDistrictOutcome;
+  /** True when `districts` differs from the input (i.e. `reactivated` or `added`). */
+  changed: boolean;
 };
 
 /**
- * Confirms an unknown scraped district name into the registry. If an EXACT name/source-label
- * match already exists it is reused (idempotent, nothing added). Otherwise a new ACTIVE
- * record is appended with a deterministic id (the name slug, disambiguated on collision),
- * the exact scraped name preserved, the scraped name recorded as a source label, and
- * placeholder/provisional branding (`brandingProvisional: true`). Pure; never mutates input.
+ * Confirms an unknown scraped district name into the registry, always yielding an ACTIVE
+ * registry outcome so the import workbench can re-derive a high-confidence mapping:
+ *
+ * - An EXACT ACTIVE match is reused as-is (idempotent, nothing changes).
+ * - When the ONLY exact match(es) are INACTIVE, the existing inactive record is REACTIVATED
+ *   (status flipped to active). We reactivate rather than append a competing duplicate so a
+ *   previously-retired district is not fragmented into two records for the same label, and
+ *   the record (and any branding) is preserved — districts are never deleted. The scraped
+ *   label already matches that record's `name`/`sourceLabels`, so the lookup resolves it.
+ * - When there is NO exact match, a new ACTIVE record is appended with a deterministic id
+ *   (the name slug, disambiguated on collision), the exact scraped name preserved, the
+ *   scraped name recorded as a source label, and placeholder branding
+ *   (`brandingProvisional: true`).
+ *
+ * Matching is EXACT only (no fuzzy matching); pure (never mutates the input).
  */
 export function confirmUnknownScrapedDistrict(
   districts: District[],
@@ -219,12 +240,20 @@ export function confirmUnknownScrapedDistrict(
       status: 'active',
       brandingProvisional: true,
     };
-    return { districts: [...districts], district: placeholder, added: false };
+    return { districts: [...districts], district: placeholder, outcome: 'reused', changed: false };
   }
 
   const existing = findDistrictByExactName(districts, name);
+  if (existing && isDistrictActive(existing)) {
+    return { districts: [...districts], district: existing, outcome: 'reused', changed: false };
+  }
   if (existing) {
-    return { districts: [...districts], district: existing, added: false };
+    // Only an inactive exact match exists: reactivate it (never a silent no-op).
+    const district: District = { ...existing, status: 'active' };
+    const next = districts.map((d) =>
+      d.districtId === existing.districtId ? district : d
+    );
+    return { districts: next, district, outcome: 'reactivated', changed: true };
   }
 
   const districtId = nextAvailableDistrictId(districts, name);
@@ -236,7 +265,7 @@ export function confirmUnknownScrapedDistrict(
     sourceLabels: [name],
     brandingProvisional: true,
   };
-  return { districts: [...districts, district], district, added: true };
+  return { districts: [...districts, district], district, outcome: 'added', changed: true };
 }
 
 /** Deterministic id derived from the name slug, suffixed only on a collision. */

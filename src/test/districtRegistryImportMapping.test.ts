@@ -94,6 +94,27 @@ describe('registry-backed scraped district mapping', () => {
     expect(after.district.canonicalValue).toBe('granger');
   });
 
+  it('an inactive-only district is provisional, then resolves high after confirm reactivates it', () => {
+    let registry = [district({ districtId: 'alta', name: 'Alta', status: 'inactive' })];
+    // Inactive districts are excluded from the lookup, so the scraped label is provisional.
+    const before = mapUteScrapedTeamTargetToCanonicalContext(payload('Alta'), target, {
+      districtRegistry: buildDistrictNameRegistryLookup(registry),
+    });
+    expect(before.district.confidence).toBe('provisional');
+
+    // Confirming reactivates the existing inactive record (not a dead no-op, no duplicate).
+    const confirmed = confirmUnknownScrapedDistrict(registry, 'Alta');
+    expect(confirmed.outcome).toBe('reactivated');
+    expect(confirmed.districts).toHaveLength(1);
+    registry = confirmed.districts;
+
+    const after = mapUteScrapedTeamTargetToCanonicalContext(payload('Alta'), target, {
+      districtRegistry: buildDistrictNameRegistryLookup(registry),
+    });
+    expect(after.district.confidence).toBe('high');
+    expect(after.district.canonicalValue).toBe('alta');
+  });
+
   it('prefers an active registered district over an inactive same-name district', () => {
     const registry = [
       district({ districtId: 'a-old', name: 'Acme', status: 'inactive' }),

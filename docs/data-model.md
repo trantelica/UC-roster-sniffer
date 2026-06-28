@@ -66,7 +66,10 @@ workspace or snapshot — only the reference.
 Pure registry helpers live in `src/engine/districtRegistry.ts` (validate/coerce, seed,
 ensure-seeds-without-duplicates, find active/inactive/by-id/by-exact-name, build the
 name→id lookup, confirm an unknown scraped district, inactivate). There is deliberately
-**no hard-delete helper**. The deterministic seed list (known Ute Conference districts)
+**no hard-delete helper**. `confirmUnknownScrapedDistrict` always produces an **active**
+outcome: it reuses an exact active match, **reactivates** an exact match that was only
+inactive (preserving the record — never duplicating or deleting it), or appends a new
+active/provisional record when there is no exact match. The deterministic seed list (known Ute Conference districts)
 lives in `src/data/districtRegistrySeed.ts`. The registry persists with the workspace
 (IndexedDB auto-save A1) and round-trips through the portable dataset export/import (A2).
 
