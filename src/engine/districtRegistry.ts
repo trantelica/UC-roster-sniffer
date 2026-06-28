@@ -1,4 +1,4 @@
-import type { District, DistrictStatus } from '../domain/types';
+import type { District, DistrictStatus, Team } from '../domain/types';
 import { UTE_CONFERENCE_DISTRICT_SEED } from '../data/districtRegistrySeed';
 
 /**
@@ -303,4 +303,194 @@ export function inactivateDistrict(
   const district: District = { ...target, status: 'inactive' };
   const next = districts.map((d) => (d.districtId === districtId ? district : d));
   return { changed: true, districts: next, district };
+}
+
+// ---------------------------------------------------------------------------
+// Reactivate (mirror of inactivate; never deletes, never changes the id)
+// ---------------------------------------------------------------------------
+
+export type ReactivateDistrictResult =
+  | { changed: true; districts: District[]; district: District }
+  | { changed: false; reason: 'not-found' | 'already-active'; districts: District[] };
+
+/**
+ * Marks an inactive district active again, preserving the SAME districtId and every other
+ * field. Returns `changed: false` when the id is unknown or already active. Pure; never
+ * mutates the input.
+ */
+export function reactivateDistrict(
+  districts: District[],
+  districtId: string
+): ReactivateDistrictResult {
+  const target = findDistrictById(districts, districtId);
+  if (!target) return { changed: false, reason: 'not-found', districts: [...districts] };
+  if (isDistrictActive(target)) {
+    return { changed: false, reason: 'already-active', districts: [...districts] };
+  }
+  const district: District = { ...target, status: 'active' };
+  const next = districts.map((d) => (d.districtId === districtId ? district : d));
+  return { changed: true, districts: next, district };
+}
+
+// ---------------------------------------------------------------------------
+// District Maintenance (C2): create / edit + supporting helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalizes a free-text (user-entered) source-label list for District Maintenance: trims
+ * each entry, drops blanks, and dedupes exactly (after trimming). Distinct from the snapshot
+ * `coerceSourceLabels`, which preserves stored values verbatim for round-trip fidelity.
+ */
+export function normalizeSourceLabels(labels: readonly unknown[] | undefined): string[] {
+  if (!Array.isArray(labels)) return [];
+  const out: string[] = [];
+  for (const entry of labels) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (trimmed !== '' && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
+/** True when a district's branding (colors) is incomplete/placeholder-like. */
+function brandingIsIncomplete(input: {
+  primaryColor?: string;
+  secondaryColor?: string;
+}): boolean {
+  return (
+    presentString(input.primaryColor) === null ||
+    presentString(input.secondaryColor) === null
+  );
+}
+
+export type DistrictMaintenanceInput = {
+  name: string;
+  mascot?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  logoAssetPath?: string;
+  helmetAssetPath?: string;
+  /** Exact import aliases. When omitted/empty, defaults to `[name]` on create. */
+  sourceLabels?: string[];
+  /** When omitted, defaults to true unless both brand colors are present. */
+  brandingProvisional?: boolean;
+};
+
+export type DistrictInputValidationError = 'missing-name' | 'missing-mascot';
+
+/**
+ * Validates the required District Maintenance fields (name + mascot). Colors and image
+ * references are optional (image refs are plain strings only; never bytes). Pure.
+ */
+export function validateDistrictInput(
+  input: DistrictMaintenanceInput
+): DistrictInputValidationError[] {
+  const errors: DistrictInputValidationError[] = [];
+  if (presentString(input.name) === null) errors.push('missing-name');
+  if (presentString(input.mascot) === null) errors.push('missing-mascot');
+  return errors;
+}
+
+export type CreateDistrictResult = {
+  districts: District[];
+  district: District;
+};
+
+/**
+ * Creates a new ACTIVE district from user input and appends it to the registry. The
+ * districtId is generated deterministically from the name slug, disambiguated on collision
+ * (the same scheme `confirmUnknownScrapedDistrict` uses) — the caller never types an id.
+ * `sourceLabels` default to `[name]` when none are supplied; `brandingProvisional` defaults
+ * to true unless both brand colors are present. Image references are stored as plain strings.
+ * Pure; never mutates the input. Assumes the input already passed `validateDistrictInput`.
+ */
+export function createDistrictFromInput(
+  districts: District[],
+  input: DistrictMaintenanceInput
+): CreateDistrictResult {
+  const name = (presentString(input.name) ?? '').trim();
+  const districtId = nextAvailableDistrictId(districts, name);
+  const labels = normalizeSourceLabels(input.sourceLabels);
+  const sourceLabels = labels.length > 0 ? labels : [name];
+  const brandingProvisional =
+    input.brandingProvisional ?? brandingIsIncomplete(input);
+
+  const district: District = {
+    districtId,
+    name,
+    mascot: (input.mascot ?? '').trim(),
+    logoAssetPath: (input.logoAssetPath ?? '').trim(),
+    helmetAssetPath: (input.helmetAssetPath ?? '').trim(),
+    primaryColor: (input.primaryColor ?? '').trim(),
+    secondaryColor: (input.secondaryColor ?? '').trim(),
+    status: 'active',
+    sourceLabels,
+    brandingProvisional,
+  };
+  return { districts: [...districts, district], district };
+}
+
+/** Editable fields for an existing district (districtId and status are NOT editable here). */
+export type DistrictUpdatePatch = {
+  name?: string;
+  mascot?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  logoAssetPath?: string;
+  helmetAssetPath?: string;
+  sourceLabels?: string[];
+  brandingProvisional?: boolean;
+};
+
+export type UpdateDistrictResult =
+  | { changed: true; districts: District[]; district: District }
+  | { changed: false; reason: 'not-found'; districts: District[] };
+
+/**
+ * Updates the mutable fields of an existing district IN PLACE (same districtId, same status —
+ * use {@link inactivateDistrict} / {@link reactivateDistrict} for status). Only provided
+ * fields are changed; `sourceLabels`, when provided, are trimmed/de-duped (blank entries
+ * removed) and matched EXACTLY (no fuzzy aliases). Pure; never mutates the input and never
+ * deletes a district or rewrites any team's districtId reference.
+ */
+export function updateDistrict(
+  districts: District[],
+  districtId: string,
+  patch: DistrictUpdatePatch
+): UpdateDistrictResult {
+  const target = findDistrictById(districts, districtId);
+  if (!target) return { changed: false, reason: 'not-found', districts: [...districts] };
+
+  const district: District = { ...target };
+  if (patch.name !== undefined) district.name = patch.name.trim();
+  if (patch.mascot !== undefined) district.mascot = patch.mascot.trim();
+  if (patch.primaryColor !== undefined) district.primaryColor = patch.primaryColor.trim();
+  if (patch.secondaryColor !== undefined) {
+    district.secondaryColor = patch.secondaryColor.trim();
+  }
+  if (patch.logoAssetPath !== undefined) district.logoAssetPath = patch.logoAssetPath.trim();
+  if (patch.helmetAssetPath !== undefined) {
+    district.helmetAssetPath = patch.helmetAssetPath.trim();
+  }
+  if (patch.sourceLabels !== undefined) {
+    district.sourceLabels = normalizeSourceLabels(patch.sourceLabels);
+  }
+  if (patch.brandingProvisional !== undefined) {
+    district.brandingProvisional = patch.brandingProvisional;
+  }
+  const next = districts.map((d) => (d.districtId === districtId ? district : d));
+  return { changed: true, districts: next, district };
+}
+
+/** True when any team references this districtId (used to warn before inactivation). */
+export function isDistrictReferencedByTeams(
+  teams: Team[],
+  districtId: string
+): boolean {
+  return teams.some((t) => t.districtId === districtId);
+}
+
+/** Number of teams that reference this districtId. */
+export function countTeamsForDistrict(teams: Team[], districtId: string): number {
+  return teams.reduce((n, t) => (t.districtId === districtId ? n + 1 : n), 0);
 }

@@ -1,6 +1,6 @@
 # Completion Plan
 
-Status: **in progress — A1 + A2 + B1 + C1 + C3 + B2 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping, whole-file player import) landed; C2 next**
+Status: **in progress — A1 + A2 + B1 + C1 + C3 + B2 + C2 (persistence, portable dataset, scraped-JSON team commit, district registry + registry-backed import mapping, whole-file player import, District Maintenance screen) landed; E1 / E2 next**
 Date: 2026-06-27 (last updated 2026-06-28)
 Owner: product owner (novice vibe coder)
 
@@ -203,6 +203,20 @@ finishes the roadmap (D) and hardens (E).
   destructively deleted — inactivate (not remove) is the only way to retire one.
   - *Acceptance:* Owner can add a brand-new district with a helmet image and see it used
     in the app, with no code changes.
+  - **Landed (2026-06-28).** A **Districts** tab (`src/components/DistrictMaintenanceView.tsx`)
+    lists every district (active AND inactive — inactive never hidden) with name, id, mascot,
+    status, color chips, logo/helmet path refs, `brandingProvisional` flag, and source-label
+    aliases. The user can **add** a district (deterministic id from the name slug, collision-
+    disambiguated; never typed by hand; `sourceLabels` default to `[name]`; status active),
+    **edit** mutable fields (id and status never change on edit), **inactivate**, and
+    **reactivate** (same id preserved) — there is **no delete**. New pure helpers in
+    `districtRegistry.ts`: `createDistrictFromInput`, `updateDistrict`, `reactivateDistrict`,
+    `validateDistrictInput`, `normalizeSourceLabels`, `isDistrictReferencedByTeams`,
+    `countTeamsForDistrict` (no delete/remove/destroy export). All changes write committed
+    `workspace.districts`, so A1 auto-saves, A2 export/imports, and C3/B2 import mapping uses
+    active edits/creates/reactivations immediately. Image handling is string references only
+    (no upload/file picker). Inactivating a referenced district is allowed with a warning;
+    existing rosters keep their districtId and stay valid.
 
 - **C3 — Wire registry into import mapping + confirm-on-import.**
   Feed the registry into the scraped-JSON canonical mapping so registered districts stop
@@ -278,8 +292,8 @@ up exactly where the last one stopped.
 - [x] **C3** — Wire registry into import mapping + confirm-on-import (clears provisional warning) · branch: `milestoneC1C3-district-registry-import-mapping` · PR: #68 · landed 2026-06-28
 
 **Milestone 2 — "Full data in, fully managed"**
-- [x] **B2** — Whole-file import flow (multiple teams from readiness report) · branch: `milestoneB2-whole-file-player-import` · PR: _pending_ · landed 2026-06-28
-- [ ] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · PR: _ · _
+- [x] **B2** — Whole-file import flow (multiple teams from readiness report) · branch: `milestoneB2-whole-file-player-import` · PR: #69 · landed 2026-06-28
+- [x] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · branch: `milestoneC2-district-maintenance-screen` · PR: _pending_ · landed 2026-06-28
 - [ ] **E1** — First-run + empty states · PR: _ · _
 - [ ] **E2** — File-error handling (malformed/wrong-shape JSON) · PR: _ · _
 
@@ -293,10 +307,10 @@ up exactly where the last one stopped.
 
 ## Next slice
 
-**Milestone 1 is complete** (A1, A2, B1, C1, C3) and **B2 (whole-file player import) has
-landed**: scraped data loads, commits per-team or whole-file, persists across restarts, and
-districts resolve against a real registry. The next slice is **C2 — the full District
-Maintenance screen** (list/add/edit/inactivate districts; set name/mascot/colors; point each
-at helmet/logo files in `public/districts/`). It builds directly on the C1 registry model and
-the C3 confirm/add path. After C2, the remaining Milestone-2 polish is **E1** (first-run /
-empty states) and **E2** (file-error handling).
+**Milestone 1 is complete** (A1, A2, B1, C1, C3) and **B2 (whole-file player import) + C2
+(District Maintenance screen) have landed**: scraped data loads, commits per-team or
+whole-file, persists across restarts, and districts can be fully managed in-app (add / edit /
+inactivate / reactivate, never deleted) with edits feeding import mapping immediately. The
+remaining Milestone-2 polish is **E1** (first-run / empty states) and **E2** (file-error
+handling); then Milestone 3 is the D-series roadmap polish (D1 district branding artwork in
+views builds directly on C2) and the E3/E4 hardening.
