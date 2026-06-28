@@ -21,6 +21,31 @@ persistence. It is informational only (no controls) and uses design-system token
 The existing portable workspace snapshot Export/Import remains the way to move data between
 machines or hand it to another person; it is unchanged.
 
+## Portable dataset Export / Import (Completion Milestone A2)
+
+The workspace toolbar offers two clearly labelled controls, distinct from the browser
+auto-save above:
+
+- **Export Dataset (.json)** — downloads a portable `.json` file containing the whole
+  **committed** workspace dataset (districts, age divisions, teams, players, games, coaches,
+  coach assignments, and the snapshot's selection). Filename
+  `uc-roster-sniffer-dataset-YYYY-MM-DD.json`. This is the file you hand to another coach.
+- **Import Dataset (.json)** — validates a chosen file and, if valid, **replaces** the
+  current committed workspace (never merges), clears any active in-memory import overlay
+  (including undo), and the result auto-saves to this browser via A1. Invalid JSON or a
+  wrong-shape file shows a calm error and leaves the current workspace unchanged.
+
+Copy in the toolbar explains the two distinct ideas: **auto-save (IndexedDB)** keeps work in
+*this browser/session*; **Export Dataset** is the portable *backup/share* file.
+
+**Active in-memory import overlay:** the transient import preview/undo overlay is **not**
+part of an exported dataset — Export always writes the committed workspace only. When an
+overlay is active the toolbar copy states this explicitly. (Export does not implement import
+commit; committing previewed imports is a later slice.)
+
+After a successful import, a summary line reports seasons, districts, teams, players, games,
+and coaches.
+
 ## Primary navigation
 
 The primary navigation path is:

@@ -1665,9 +1665,12 @@ summary: { schemaVersion, generatedAt, seasonCount, districtCount,
 ```
 
 - The snapshot reuses the existing `District` / `AgeDivision` / `Team` / `Player` / `Coach`
-  / `Game` domain shapes (no competing model). `workspace.teams` is the CURRENT in-memory
-  roster, including any slice-22 executed additions; `workspace.games` is the schedule
-  (Phase 6 slice 24).
+  / `Game` domain shapes (no competing model). `workspace.teams` is the roster passed by the
+  caller; `workspace.games` is the schedule (Phase 6 slice 24).
+  - **Completion Milestone A2 clarification:** the toolbar **Export Dataset** now passes the
+    **committed** `workspace` only — it does NOT include a transient in-memory import overlay
+    (the slice-22 executed additions). `buildWorkspaceSnapshot` itself is unchanged (it
+    serializes whatever workspace it is given); the change is which teams the export hands it.
 - `workspace.games` is OPTIONAL on input: slice-23 snapshots that predate games still import
   and restore with an empty schedule (schemaVersion stays 1 — optional extension, no
   migration). Exported snapshots always include `games` and `summary.gameCount`.
