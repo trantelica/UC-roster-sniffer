@@ -9,7 +9,7 @@ persistence. It is informational only (no controls) and uses design-system token
 
 - **Loading saved workspace…** — reading any saved workspace on startup.
 - **Auto-save on (this browser)** — startup finished; nothing saved yet this session
-  (e.g. a fresh/empty store using the default sample data).
+  (e.g. a fresh/empty store using the default empty workspace — 39 seeded districts, no teams).
 - **Saving…** — a debounced auto-save is in flight after a workspace change.
 - **Saved locally** — the current workspace is saved in this browser.
 - **Save failed** — the most recent auto-save failed (data remains in memory; the manual

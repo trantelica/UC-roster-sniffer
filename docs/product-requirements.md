@@ -76,6 +76,12 @@ Districts are standardized and should support:
 
 District branding should be configurable through helper workflows or config files.
 
+Districts are **infrastructure**, not roster content: the known historical Ute Conference
+districts may be **seeded** and ship in a fresh workspace (see "Workspace data lifecycle &
+roster import"). A district without confirmed branding is still valid (provisional blank
+branding). Districts are never destructively deleted — inactivation is the only retirement
+path.
+
 ## Age division behavior
 
 Age divisions are fixed and do not split, merge, or consolidate.
@@ -104,6 +110,62 @@ Teams have:
 - players
 - schedule/results
 - playoff/championship flags through game records
+
+## Workspace data lifecycle & roster import
+
+This is the final corrected product model for how data enters the workspace.
+
+**Fresh workspace.** A fresh (no persisted data) workspace contains:
+
+- the **39 known historical Ute Conference districts** (seeded; Alta/Brighton with confirmed
+  branding, the rest provisional)
+- the **fixed age divisions** (SC, GR, PW, MM, GI, BA)
+- **zero** teams, players, coaches, and games/schedules/results
+
+Default startup is this empty workspace — **not** demo/sample data. Bundled **sample data is
+demo-only** (an explicit "Load sample data" action, and tests). District-registry seeding is
+allowed precisely because districts are infrastructure.
+
+**Teams are season-specific content created by committed imports.** A team is never required
+to exist before import, and is **never created on file load** — only on an **explicit commit**.
+A player roster JSON is authoritative evidence that the listed teams exist for that season.
+
+**Roster import** (see `docs/import-workflow.md`) accepts a **flat row-list** player JSON and a
+**nested scraped** JSON, supports the **empty-workspace first import**, and plans one action
+per team target:
+
+- **create** — a registered district + resolved season/age/team code with no matching team →
+  create the team and add its players (no row-level review needed for a brand-new team)
+- **update** — a matching team already exists → update it through the existing review path
+- **blocked** — with a clear reason (unregistered district → "Add district first"; unreadable
+  team code; missing season/age; needs-review existing team; duplicate)
+
+**Loaded rostered player names are authoritative and preserved exactly** (no trim, dedupe,
+merge, suppress, or rewrite).
+
+**Materialized teams.** A team is **materialized** when committed source data populated it —
+players, an assigned coach, schedule/results, or an explicit committed source marker. The
+normal **Team selector shows materialized teams only**, never theoretical/empty team shells.
+Prior-season comparison operates after current-season teams/players are materialized, not
+against empty shells.
+
+**Acceptance reference (Corner Canyon, 2025 GI roster).** Importing the 2025 GI roster must
+create/show Corner Canyon **GridIron A3 (17 players)**, **C1 (18 players)**, and **C2 (20
+players)** — and must **not** show Corner Canyon A1/A2/A4 unless those teams exist in committed
+data.
+
+**Known limitations.**
+
+- A district outside the seeded registry is **blocked** ("Add district first") or requires a
+  provisional add; it is never silently invented on import.
+- **Parenthetical / sub-label** team names (e.g. `GridIron A1 (Bonneville)`) must not collapse
+  into a plain code; until disambiguation is supported they are **blocked** (future work).
+- **Coach commit** is a separate path from roster import (not yet committed via this flow).
+- **Schedule/results** import is separate from roster import.
+
+**Optional seed.** An optional "Load Ute Conference seed" action can pre-create empty team
+shells over the same district registry, but it is **non-primary and not required** for normal
+roster import (which creates teams). A roster import simply updates any matching shell.
 
 ## Player behavior
 

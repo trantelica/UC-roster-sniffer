@@ -161,7 +161,11 @@ finishes the roadmap (D) and hardens (E).
   needs-review / blocked rows surfaced for decisions.
   - *Acceptance:* A full scraped season file can be imported in one guided pass; blocked
     rows are clearly explained, not silently dropped.
-  - **Landed (2026-06-28).** A **Whole-file player import** panel evaluates every
+  - **Landed (2026-06-28). Superseded by the PR #72 corrections** (see "Corrections (PR #72)"
+    below): roster import now plans **create / update / blocked** per target and **creates**
+    missing teams — it no longer skips no-existing-team targets, and "Commit All Ready Teams"
+    became **Commit roster import**. The note below describes B2's original update-only batch.
+    A **Whole-file player import** panel evaluates every
     player-team target in the loaded file by COMPOSING the exact single-target pipeline
     (session select → roster-aware review → staged projection → future readiness →
     transaction plan → execution) with EMPTY review decisions, so a team is committable only
@@ -311,8 +315,8 @@ up exactly where the last one stopped.
 **Milestone 2 — "Full data in, fully managed"**
 - [x] **B2** — Whole-file import flow (multiple teams from readiness report) · branch: `milestoneB2-whole-file-player-import` · PR: #69 · landed 2026-06-28
 - [x] **C2** — District Maintenance screen (add/edit/inactivate, point at helmet/logo files) · branch: `milestoneC2-district-maintenance-screen` · PR: #70 · landed 2026-06-28
-- [x] **E1** — First-run + empty states · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: _pending_ · landed 2026-06-28
-- [x] **E2** — File-error handling (malformed/wrong-shape JSON) · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: _pending_ · landed 2026-06-28
+- [x] **E1** — First-run + empty states · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: #71 · landed 2026-06-28
+- [x] **E2** — File-error handling (malformed/wrong-shape JSON) · branch: `milestoneE1E2-first-run-empty-file-errors` · PR: #71 · landed 2026-06-28
 
 **Milestone 3 — "Roadmap complete"**
 - [ ] **D1** — District branding artwork in views · PR: _ · _
@@ -321,6 +325,19 @@ up exactly where the last one stopped.
 - [ ] **D4** — Surface transient import-workbench review rows in Review Center · PR: _ · _
 - [ ] **E3** — Launcher wait-for-server polish · PR: _ · _
 - [ ] **E4** — Full regression pass (`npm test`, `npm run build`) + smoke test · PR: _ · _
+
+**Corrections (PR #72 — post-Milestone-2, before merge)**
+- [x] **Robust scraped-source normalization** — accept a flat player/coach row-list in addition
+  to nested scraped JSON (normalize to the nested shape; names preserved exactly).
+- [x] **District Maintenance panel** — add/edit form opens on demand (not always-open).
+- [x] **Empty default startup** — fresh workspace is empty (no teams), with the **39 known Ute
+  Conference districts** + fixed age divisions seeded by default; **Reset workspace** /
+  **Load sample data** / optional **Load Ute Conference seed** actions.
+- [x] **Roster import creates teams** — corrected model: import plans **create / update /
+  blocked** per target and commits on explicit action (`commitRosterImportToWorkspace`); the
+  Ute Conference team-seed path is **optional / non-primary**.
+- [x] **Materialized-team selector** — the Team selector shows only teams populated by committed
+  data, not empty/seed shells (fixes the Corner Canyon "0 players / 17 prior" symptom).
 
 ## Next slice
 

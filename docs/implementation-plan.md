@@ -14,9 +14,11 @@ The workspace now persists automatically between sessions. A small isolated stor
 (`src/storage/workspaceIndexedDbStore.ts`, kept out of `src/engine`) saves the existing
 workspace snapshot (`buildWorkspaceSnapshot`) to IndexedDB after workspace-data changes and
 restores it on startup via `restoreWorkspaceFromSnapshot`. An empty store keeps the default
-sample data; a corrupt/unrestorable record falls back calmly (visible warning, no crash,
-never auto-deleted). No `localStorage`, backend, or sync. The portable JSON export/import
-path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and follow-on A2.
+startup workspace (now the **empty** workspace — 39 seeded districts, no teams; see the
+corrections below — not sample data); a corrupt/unrestorable record falls back calmly (visible
+warning, no crash, never auto-deleted). No `localStorage`, backend, or sync. The portable JSON
+export/import path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and
+follow-on A2.
 
 ## Production-blocker correction pass (landed 2026-06-28)
 
@@ -36,18 +38,14 @@ A focused three-part correction after Milestones 1–2:
    state. New **Reset workspace** / **Load sample data** toolbar actions (confirmed). The
    persistence restore accepts an empty workspace (`allowEmptyWorkspace`); user Dataset Import
    still rejects an empty file. Sample data files are retained for tests + the explicit action.
-4. **Ute Conference baseline seed (correction direction).** `loadUteConferenceSeedWorkspace`
-   builds the real baseline — district registry + age divisions + **empty team shells** (no
-   rosters) — from the committed fixture `data-samples/ute-conference-seed.sample.json`, with a
-   **Load Ute Conference seed** toolbar action (confirmed). Real roster files then import into
-   the existing shells via the unchanged pipeline; **no dynamic team creation on import**.
-   Empty / seed / sample stay three distinct concepts. Coverage: the **39 known Ute Conference
-   districts** (deterministic `districtIdSlug` ids; Alta/Brighton keep their real registry
-   branding, the rest get provisional blank branding `brandingProvisional: true`) and **GI/2026
-   empty team shells** for codes `A1–A4, B1–B4, C1, C2, D2` (429 shells). Parenthetical
-   sub-labels like `GridIron A1 (Bonneville)` are not distinguished by the classification
-   parser yet (future work) and are not seeded. Expand by adding district names, seasons, or
-   per-age-division code lists to the fixture — no runtime change needed.
+4. **Ute Conference baseline seed (initial direction — SUPERSEDED).** This step originally made
+   `loadUteConferenceSeedWorkspace` create **empty team shells** that roster files imported
+   into ("no dynamic team creation on import"). That direction was **superseded** by the next
+   note ("Roster ingestion: teams created from imports"): roster import now **creates** teams,
+   the seed is **optional and non-primary**, and the 39 known districts live in the default
+   registry. The seed action remains as an optional convenience only; its team shells are not
+   required for normal roster import. Parenthetical sub-labels like `GridIron A1 (Bonneville)`
+   are still not distinguished by the classification parser (future work).
 
 ## Roster ingestion: teams created from imports (correction, landed 2026-06-28)
 

@@ -116,6 +116,13 @@ there is no fuzzy matching or import-collision resolution in Phase 2.
 
 ### Prior-season roster comparison contract (Phase 3 slice 1)
 
+> **Materialized teams only (final model).** Prior-season comparison is meaningful only
+> between teams that committed source data actually **materialized** (≥1 player, an assigned
+> coach, or schedule/results). The Team selector surfaces materialized teams only, so the
+> comparison runs after current-season teams/players exist — never against an empty theoretical
+> team shell (which would otherwise misreport, e.g., "0 current / 17 prior"). See
+> `docs/product-requirements.md` ("Workspace data lifecycle & roster import").
+
 The first Phase 3 slice establishes a stable result shape for a current-vs-prior
 roster comparison, without adding any new movement taxonomy. Built on the
 existing exact-identity overlap pipeline, it organizes records into four buckets:
