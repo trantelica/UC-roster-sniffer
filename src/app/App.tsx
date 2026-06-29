@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { loadSampleData, loadEmptyWorkspace } from '../data/loadSampleData';
 import { loadUteConferenceSeedWorkspace } from '../data/loadUteConferenceSeedWorkspace';
-import { getDistinctSeasons } from '../engine/filters';
+import { getDistinctSeasons, getMaterializedTeams } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import {
   buildWorkspaceSnapshot,
@@ -43,7 +43,6 @@ import {
 } from '../engine/districtRegistry';
 import DistrictMaintenanceView from '../components/DistrictMaintenanceView';
 import EmptyState from '../components/EmptyState';
-import { assessWorkspaceEmptiness } from '../engine/workspaceEmptyState';
 import {
   buildDatasetImportErrorGuidance,
   type UserFacingFileError,
@@ -158,6 +157,9 @@ export default function App() {
   };
 
   const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
+  // The roster Team selector lists only MATERIALIZED teams — teams that loaded data actually
+  // populated — so empty/theoretical seed shells never appear as selectable "0 player" teams.
+  const materializedTeams = getMaterializedTeams(liveTeams);
 
   // Startup: restore the saved workspace from IndexedDB if one exists. An empty store keeps
   // the default sample data; a corrupt/unrestorable record falls back calmly with a warning
@@ -221,10 +223,10 @@ export default function App() {
     };
   }, [workspace]);
 
-  // Auto-select the most recent available season on load, so a season that can
-  // show prior-season roster comparison is the default view.
+  // Auto-select the most recent season that has MATERIALIZED teams, so the default view shows
+  // real roster data rather than an empty seeded season (e.g. a future-season shell set).
   useEffect(() => {
-    const seasons = getDistinctSeasons(workspace.teams);
+    const seasons = getDistinctSeasons(getMaterializedTeams(workspace.teams));
     if (seasons.length > 0 && selectedSeason === null) {
       setSelectedSeason(seasons[seasons.length - 1]);
     }
@@ -636,8 +638,6 @@ export default function App() {
     ? findPriorSeasonTeam(liveTeams, selectedTeam)
     : null;
 
-  // E1: workspace emptiness drives the first-run / empty states.
-  const emptiness = assessWorkspaceEmptiness(workspace);
   function triggerDatasetImport() {
     importInputRef.current?.click();
   }
@@ -688,12 +688,12 @@ export default function App() {
           tab to restore the baseline roster.
         </div>
       )}
-      {!emptiness.hasTeams ? (
+      {materializedTeams.length === 0 ? (
         firstRunState
       ) : (
         <>
           <FilterBar
-            teams={liveTeams}
+            teams={materializedTeams}
             districts={workspace.districts}
             ageDivisions={workspace.ageDivisions}
             selectedSeason={selectedSeason}
@@ -889,7 +889,7 @@ export default function App() {
       <div hidden={view !== 'roster'}>{rosterContent}</div>
       <div hidden={view !== 'my-team'}>
         <MyTeamView
-          teams={liveTeams}
+          teams={materializedTeams}
           districts={workspace.districts}
           ageDivisions={workspace.ageDivisions}
           games={workspace.games}

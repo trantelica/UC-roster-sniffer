@@ -224,9 +224,23 @@ Season -> District -> Age Division -> Team
 
 Each selection narrows the analytical scope.
 
+## Materialized teams only in the Team selector (correction)
+
+The roster **Team selector** (season → district → age division → team cascade in the FilterBar)
+and the **My Team** picker list only **materialized** teams — teams that loaded data actually
+populated (≥1 rostered player, or an assigned coach). Empty/theoretical **seed shells** (e.g.
+provisional team shells created by the optional seed) are **not** shown as selectable
+"0 player" teams. The helper `getMaterializedTeams` / `isMaterializedTeam`
+(`src/engine/filters.ts`) is the single rule. Consequence: after committing a roster file, the
+selector shows exactly the teams the import created/updated (with their real player counts);
+if a workspace contains only empty shells, the roster tab shows the first-run state rather than
+empty dropdowns.
+
 ## Default season selection
 
-When loaded data includes multiple seasons, the app should default to the most recent season.
+When loaded data includes multiple seasons, the app should default to the most recent season
+**that has materialized teams** (so an empty future-season shell set never becomes the default
+landing view).
 
 - This matches the normal expectation that the current/latest season is the first view.
 - Prior-season data remains available for derived comparison, but a prior season should not become the default landing state unless the user explicitly selects it.
