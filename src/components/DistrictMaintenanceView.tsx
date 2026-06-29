@@ -94,7 +94,9 @@ export default function DistrictMaintenanceView({
   onReactivate: (districtId: string) => void;
 }) {
   const [filter, setFilter] = useState<DistrictFilter>('all');
-  // null = create mode; a districtId = editing that district.
+  // The add/edit form is hidden by default (Part 2): the list is the resting state. It opens
+  // only on "Add district" or "Edit". editingId === null while open means create mode.
+  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<string[]>([]);
@@ -110,15 +112,25 @@ export default function DistrictMaintenanceView({
   const activeCount = districts.filter(isDistrictActive).length;
   const inactiveCount = districts.length - activeCount;
 
-  function startCreate() {
+  function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setErrors([]);
+    setFormOpen(true);
   }
 
   function startEdit(d: District) {
     setEditingId(d.districtId);
     setForm(formForDistrict(d));
+    setErrors([]);
+    setFormOpen(true);
+  }
+
+  // Closes the form and returns to the list (used by Cancel and after a successful save).
+  function closeForm() {
+    setFormOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
     setErrors([]);
   }
 
@@ -162,7 +174,7 @@ export default function DistrictMaintenanceView({
     } else {
       onCreate(input);
     }
-    startCreate();
+    closeForm();
   }
 
   const idPreview = form.name.trim() ? districtIdSlug(form.name) : '';
@@ -184,19 +196,29 @@ export default function DistrictMaintenanceView({
 
       <div className="district-maintenance-body">
         <div className="district-list-pane">
-          <div className="district-filter">
-            <span>Show:</span>
-            {(['all', 'active', 'inactive'] as DistrictFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                className={`app-nav-button ${filter === f ? 'app-nav-button-active' : ''}`}
-                aria-pressed={filter === f}
-                onClick={() => setFilter(f)}
-              >
-                {f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Inactive'}
-              </button>
-            ))}
+          <div className="district-list-toolbar">
+            <div className="district-filter">
+              <span>Show:</span>
+              {(['all', 'active', 'inactive'] as DistrictFilter[]).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={`app-nav-button ${filter === f ? 'app-nav-button-active' : ''}`}
+                  aria-pressed={filter === f}
+                  onClick={() => setFilter(f)}
+                >
+                  {f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Inactive'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="import-decision-button import-commit-button"
+              onClick={openCreate}
+              aria-expanded={formOpen && editingId === null}
+            >
+              + Add district
+            </button>
           </div>
 
           {visible.length === 0 ? (
@@ -273,14 +295,13 @@ export default function DistrictMaintenanceView({
           )}
         </div>
 
+        {formOpen && (
         <form className="district-form" onSubmit={handleSubmit}>
           <div className="import-section-head">
             <h3>{editingId ? `Edit district: ${editingId}` : 'Add a district'}</h3>
-            {editingId && (
-              <button type="button" className="import-link-button" onClick={startCreate}>
-                Cancel edit
-              </button>
-            )}
+            <button type="button" className="import-link-button" onClick={closeForm}>
+              Cancel
+            </button>
           </div>
 
           {editingId && referencedWarning(teams, editingId)}
@@ -386,10 +407,16 @@ export default function DistrictMaintenanceView({
             </ul>
           )}
 
-          <button type="submit" className="import-decision-button import-commit-button">
-            {editingId ? 'Save changes' : 'Add district'}
-          </button>
+          <div className="district-form-actions">
+            <button type="submit" className="import-decision-button import-commit-button">
+              {editingId ? 'Save changes' : 'Add district'}
+            </button>
+            <button type="button" className="import-link-button" onClick={closeForm}>
+              Cancel
+            </button>
+          </div>
         </form>
+        )}
       </div>
     </div>
   );

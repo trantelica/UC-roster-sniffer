@@ -4,6 +4,8 @@ import {
   getDistinctDistricts,
   getDistinctAgeDivisions,
   filterTeams,
+  isMaterializedTeam,
+  getMaterializedTeams,
 } from '../engine/filters';
 import type { Team } from '../domain/types';
 
@@ -112,5 +114,47 @@ describe('filterTeams', () => {
 
   it('returns empty array for empty teams', () => {
     expect(filterTeams([], '2026', null, null)).toHaveLength(0);
+  });
+});
+
+describe('materialized teams', () => {
+  function shell(overrides: Partial<Team>): Team {
+    return {
+      teamId: 't',
+      seasonId: '2026',
+      districtId: 'corner-canyon',
+      ageDivisionId: 'GI',
+      teamCode: 'A3',
+      draftOrder: 1,
+      divisionTeamCount: 11,
+      headCoach: null,
+      assistantCoaches: [],
+      players: [],
+      ...overrides,
+    };
+  }
+
+  it('treats an empty seed shell (no players/coaches) as NOT materialized', () => {
+    expect(isMaterializedTeam(shell({}))).toBe(false);
+  });
+
+  it('treats a team with players as materialized', () => {
+    expect(isMaterializedTeam(shell({ players: [{ name: 'Cary, Hudson' }] }))).toBe(true);
+  });
+
+  it('treats a team with a head or assistant coach as materialized', () => {
+    expect(isMaterializedTeam(shell({ headCoach: { name: 'Coach' } }))).toBe(true);
+    expect(isMaterializedTeam(shell({ assistantCoaches: [{ name: 'Asst' }] }))).toBe(true);
+  });
+
+  it('keeps only materialized teams and preserves order (hides empty shells)', () => {
+    const emptyA3 = shell({ teamId: '2026-corner-canyon-GI-A3' }); // seeded shell
+    const realA3 = shell({ teamId: '2025-corner-canyon-GI-A3', seasonId: '2025', players: [{ name: 'P1' }, { name: 'P2' }] });
+    const realC1 = shell({ teamId: '2025-corner-canyon-GI-C1', seasonId: '2025', teamCode: 'C1', players: [{ name: 'P3' }] });
+    const result = getMaterializedTeams([emptyA3, realA3, realC1]);
+    expect(result.map((t) => t.teamId)).toEqual([
+      '2025-corner-canyon-GI-A3',
+      '2025-corner-canyon-GI-C1',
+    ]);
   });
 });

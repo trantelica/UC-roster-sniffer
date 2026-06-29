@@ -14,9 +14,62 @@ The workspace now persists automatically between sessions. A small isolated stor
 (`src/storage/workspaceIndexedDbStore.ts`, kept out of `src/engine`) saves the existing
 workspace snapshot (`buildWorkspaceSnapshot`) to IndexedDB after workspace-data changes and
 restores it on startup via `restoreWorkspaceFromSnapshot`. An empty store keeps the default
-sample data; a corrupt/unrestorable record falls back calmly (visible warning, no crash,
-never auto-deleted). No `localStorage`, backend, or sync. The portable JSON export/import
-path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and follow-on A2.
+startup workspace (now the **empty** workspace — 39 seeded districts, no teams; see the
+corrections below — not sample data); a corrupt/unrestorable record falls back calmly (visible
+warning, no crash, never auto-deleted). No `localStorage`, backend, or sync. The portable JSON
+export/import path is unchanged. See `docs/completion-plan.md` (Workstream A) for scope and
+follow-on A2.
+
+## Production-blocker correction pass (landed 2026-06-28)
+
+A focused three-part correction after Milestones 1–2:
+
+1. **Robust scraped-source normalization.** Two pure engine helpers
+   (`uteConferenceImportSourceShape.ts` classify, `uteConferenceImportSourceNormalization.ts`
+   normalize) accept a **flat player/coach row-list** in addition to the nested scraped
+   payload, converting it to the nested shape before the existing import session/readiness/
+   whole-file path. Names preserved exactly; deterministic grouping by district + age group +
+   team; metadata inferred only when missing (organization, age-division alias, filename year)
+   and reported. See `docs/import-workflow.md` (“Robust scraped-source normalization”).
+2. **District Maintenance form-on-demand.** The add/edit form is hidden by default; it opens on
+   **+ Add district** / **Edit**, has **Cancel**, and closes back to the list after save.
+3. **Empty default startup + reset.** Startup is now an **empty** workspace (baseline
+   age divisions + seeded district registry kept), so a fresh browser reaches the first-run
+   state. New **Reset workspace** / **Load sample data** toolbar actions (confirmed). The
+   persistence restore accepts an empty workspace (`allowEmptyWorkspace`); user Dataset Import
+   still rejects an empty file. Sample data files are retained for tests + the explicit action.
+4. **Ute Conference baseline seed (initial direction — SUPERSEDED).** This step originally made
+   `loadUteConferenceSeedWorkspace` create **empty team shells** that roster files imported
+   into ("no dynamic team creation on import"). That direction was **superseded** by the next
+   note ("Roster ingestion: teams created from imports"): roster import now **creates** teams,
+   the seed is **optional and non-primary**, and the 39 known districts live in the default
+   registry. The seed action remains as an optional convenience only; its team shells are not
+   required for normal roster import. Parenthetical sub-labels like `GridIron A1 (Bonneville)`
+   are still not distinguished by the classification parser (future work).
+
+## Roster ingestion: teams created from imports (correction, landed 2026-06-28)
+
+Corrected product model: a roster file may **create** teams. Districts are infrastructure
+(seeded or added provisionally; never auto-invented on import); teams are season-specific and
+created by the import. `buildWholeFilePlayerImportPlan` now plans **create / update / blocked**
+per target: create a brand-new empty team (registered district + resolved season/age/team code,
+no matching team; players added exactly, no row-level review needed); update an existing team
+(existing review/commit path); or block (unregistered district → "Add district first";
+unreadable team code such as a parenthetical sub-label, never collapsed into a plain code;
+missing season/age; needs-review existing team; duplicate). The primary action **Commit roster
+import** runs `executeWholeFilePlayerImportBatch` (updates) then `commitRosterImportToWorkspace`
+(create + update, all-or-nothing), with **Undo Roster Import** (`undoRosterImportInWorkspace`,
+session-only). The **Ute Conference team-seed path is de-emphasized** (now optional — mainly a
+district registry convenience), and the flat/nested normalizer, empty startup, and District
+Maintenance panel fix are retained. **Future work:** dynamic create-new district-on-import and
+parenthetical sub-label disambiguation.
+
+Follow-up: the **default seeded district registry** (`src/data/districtRegistrySeed.ts`) now
+contains all **39 known Ute Conference districts** (districts are core infrastructure), so a
+fresh `loadEmptyWorkspace` can create teams from a real roster file with no seed step. Alta and
+Brighton keep confirmed branding; the rest are active with provisional blank branding. The
+optional seed workspace builds its team shells over this same registry; an unknown district is
+still blocked ("Add district first").
 
 ## Guiding principles
 

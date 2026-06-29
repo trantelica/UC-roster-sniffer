@@ -112,7 +112,12 @@ export function buildDatasetImportErrorGuidance(
 
 export type ScrapedImportErrorInput =
   | { kind: 'parse'; reason: 'empty-file' | 'invalid-json'; message: string }
-  | { kind: 'invalid-source'; payload: unknown };
+  | { kind: 'invalid-source'; payload: unknown }
+  | {
+      kind: 'normalize';
+      reason: 'unsupported-flat-rows' | 'empty-source';
+      message: string;
+    };
 
 /**
  * Builds plain-language guidance for a FAILED scraped Roster import — either a file-level
@@ -135,6 +140,22 @@ export function buildScrapedImportErrorGuidance(
       what: "It isn't valid JSON, so it can't be opened.",
       tryThis: 'Choose a scraped Ute Conference JSON file exported by the scraper.',
       detail: input.message,
+    };
+  }
+
+  if (input.kind === 'normalize') {
+    if (input.reason === 'empty-source') {
+      return {
+        title: 'This file has no rows.',
+        what: 'The file is an empty list, so there is nothing to import.',
+        tryThis: 'Choose a scraped file (nested or flat row-list) that contains rows.',
+      };
+    }
+    return {
+      title: 'We could not use this flat file.',
+      what: input.message,
+      tryThis:
+        'Make sure each row has a district, an age group (age_group / league / ageDivision), a team (team / team_name), and a player name (player_name / name).',
     };
   }
 

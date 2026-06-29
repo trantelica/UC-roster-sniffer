@@ -116,6 +116,13 @@ there is no fuzzy matching or import-collision resolution in Phase 2.
 
 ### Prior-season roster comparison contract (Phase 3 slice 1)
 
+> **Materialized teams only (final model).** Prior-season comparison is meaningful only
+> between teams that committed source data actually **materialized** (≥1 player, an assigned
+> coach, or schedule/results). The Team selector surfaces materialized teams only, so the
+> comparison runs after current-season teams/players exist — never against an empty theoretical
+> team shell (which would otherwise misreport, e.g., "0 current / 17 prior"). See
+> `docs/product-requirements.md` ("Workspace data lifecycle & roster import").
+
 The first Phase 3 slice establishes a stable result shape for a current-vs-prior
 roster comparison, without adding any new movement taxonomy. Built on the
 existing exact-identity overlap pipeline, it organizes records into four buckets:
@@ -1172,6 +1179,16 @@ Loaded roster records are authoritative.
 - Duplicate or ambiguous player names must remain visible and preserved in the roster.
 - Ambiguity affects derived metadata only — such as identity confidence and roster status — never the source roster record.
 - Derived logic must not alter, remove, suppress, merge, nullify, rewrite, or ignore a rostered player record because of duplication or ambiguity.
+
+### Source-shape normalization preserves authority (production-blocker correction)
+
+`normalizeUteConferenceImportSource` (which converts a flat scraped row-list into the nested
+scraped payload before import) is bound by the same rule. It only **regroups** rows (by
+district + age group + team) and **infers absent metadata** (organization, age-division alias,
+filename year) — it never trims, deduplicates, merges, suppresses, reorders within a team, or
+rewrites player/coach names or titles. Player names are placed into `players[].name` exactly
+as provided (commas, spacing, and trailing source flags preserved), so identity confidence and
+collision review still see the raw source values. The original payload is never mutated.
 
 ## Identity confidence
 

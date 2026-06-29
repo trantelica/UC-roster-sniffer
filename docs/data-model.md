@@ -69,8 +69,12 @@ name→id lookup, confirm an unknown scraped district, inactivate). There is del
 **no hard-delete helper**. `confirmUnknownScrapedDistrict` always produces an **active**
 outcome: it reuses an exact active match, **reactivates** an exact match that was only
 inactive (preserving the record — never duplicating or deleting it), or appends a new
-active/provisional record when there is no exact match. The deterministic seed list (known Ute Conference districts)
-lives in `src/data/districtRegistrySeed.ts`. The registry persists with the workspace
+active/provisional record when there is no exact match. The deterministic seed list lives in
+`src/data/districtRegistrySeed.ts` and contains the **39 known Ute Conference districts** —
+this full registry is the **default** for a fresh empty workspace (districts are core
+infrastructure), so a real roster file can create teams immediately. Alta and Brighton carry
+confirmed branding; the rest are seeded active with provisional blank branding
+(`brandingProvisional: true`, `sourceLabels: [name]`). The registry persists with the workspace
 (IndexedDB auto-save A1) and round-trips through the portable dataset export/import (A2).
 
 ### District Maintenance (Completion Milestone C2)
@@ -1276,6 +1280,15 @@ It is **not** an internal record and is never persisted; the adapter converts a
 selected team into the existing `Roster Import Preview` input (players) or a separate
 coach preview shape (coaches).
 
+> **Two accepted source modes (production-blocker correction).** The import workbench
+> accepts BOTH the nested payload below AND a **flat row-list** (one object per player/coach
+> row; see “Real-world flat roster source shape” in `docs/import-workflow.md`).
+> `normalizeUteConferenceImportSource` converts a flat row-list into this nested shape before
+> the adapter runs, grouping rows by district + age group + team and inferring missing
+> metadata (organization, age-division alias when rows agree, year/event from the filename).
+> Names are preserved exactly; the original payload is never mutated. The nested shape remains
+> the single internal source contract the rest of the pipeline reads.
+
 ```json
 {
   "metadata": {
@@ -1780,9 +1793,53 @@ snapshot:           WorkspaceSnapshot  (the portable snapshot above)
   database, or sync. See `docs/completion-plan.md` (Workstream A) and `docs/ui-workflow.md`
   ("Automatic save-state indicator").
 
+> **Empty default startup + reset (production-blocker correction).** The default startup
+> workspace is now **empty** (`loadEmptyWorkspace` — no teams/games/coaches; the fixed age
+> divisions and the **full 39-district seeded registry** are kept, so a real roster file can
+> create teams immediately without loading any seed), so a fresh browser opens to the first-run
+> state rather than sample data. A user can **Reset
+> workspace** (confirmed) to return to empty, or **Load sample data** explicitly. Because a
+> reset-to-empty workspace is a legitimate persisted state, the persistence restore validates
+> with `allowEmptyWorkspace: true`; user-facing **Dataset Import** keeps the default (an empty
+> dataset file is still rejected with `empty-workspace`).
+>
+> **Three distinct workspace builders (do not conflate):**
+> - **Empty** (`loadEmptyWorkspace`) — production fresh start: the **full 39-district registry**
+>   + age divisions, **no teams**. Real roster imports create teams against these districts.
+> - **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) — **optional** baseline: the same
+>   39-district registry + age divisions + some **empty team shells** (no players/coaches). Since
+>   the districts are already in the default empty workspace and teams are CREATED from roster
+>   imports, the shells are a convenience (a roster import UPDATES them instead of creating),
+>   not a requirement. Built deterministically from
+>   the committed seed-source fixture `data-samples/ute-conference-seed.sample.json` (district
+>   names + per-season per-age-division team codes). District ids derive from
+>   `districtIdSlug(name)`; Alta/Brighton keep their seeded-registry branding and the rest get
+>   **provisional blank branding** (`brandingProvisional: true`, `status: 'active'`,
+>   `sourceLabels: [name]`) — incomplete branding never blocks seeding. Currently seeds **GI /
+>   season 2026** codes `A1–A4, B1–B4, C1, C2, D2` (429 shells); `divisionTeamCount`/`draftOrder`
+>   are internally consistent and every reference is valid. It is a clean workspace builder,
+>   **not** a runtime scrape parser, and is expandable (add district names / seasons /
+>   age-division code lists in the fixture). Parenthetical team sub-labels (e.g.
+>   `GridIron A1 (Bonneville)`) are not distinguished by the classification parser yet and are
+>   not seeded (future work).
+> - **Sample** (`loadSampleData`) — **demo/testing** content (teams with players); retained for
+>   tests and the explicit "Load sample data" action only.
+>
+> **Roster import (corrected model): teams are created from imports.** For each player-team
+> target the import plans **create** (registered district + resolved season/age/team code, no
+> matching team → a new team is created and its players added exactly), **update** (matching
+> team exists → existing review/commit path), or **blocked** (unregistered district →
+> "Add district first"; unreadable team code such as a parenthetical sub-label, never collapsed;
+> missing season/age; needs-review existing team; duplicate). **Districts are infrastructure**
+> (seeded or added provisionally; never auto-invented on import). **Future work:** dynamic
+> create-new district-on-import and parenthetical sub-label disambiguation.
+
 ## Sample data fixtures
 
-Local sample data under `data-samples/` exists to prove the data contract and to exercise derived behavior during development.
+Local sample data under `data-samples/` exists to prove the data contract and to exercise
+derived behavior during development. It is **no longer loaded into production startup** (see
+the empty-default-startup note above); it remains available to tests and to the explicit
+"Load sample data" action via `loadSampleData`.
 
 ### Notes
 

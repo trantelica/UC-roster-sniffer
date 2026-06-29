@@ -9,7 +9,7 @@ persistence. It is informational only (no controls) and uses design-system token
 
 - **Loading saved workspace…** — reading any saved workspace on startup.
 - **Auto-save on (this browser)** — startup finished; nothing saved yet this session
-  (e.g. a fresh/empty store using the default sample data).
+  (e.g. a fresh/empty store using the default empty workspace — 39 seeded districts, no teams).
 - **Saving…** — a debounced auto-save is in flight after a workspace change.
 - **Saved locally** — the current workspace is saved in this browser.
 - **Save failed** — the most recent auto-save failed (data remains in memory; the manual
@@ -89,29 +89,29 @@ provisional:
   Maintenance** screen, which is **Completion Milestone C2** (not yet built). Districts are
   never deleted — inactivation is the only retirement path.
 
-## Whole-file player import panel (Completion Milestone B2)
+## Roster import plan panel (create or update teams)
 
-When a scraped **players** file is loaded, a **Whole-file player import** panel appears above
-the per-target detail. It summarizes every player-team target in the file and lets the user
-commit all ready teams at once — the per-target B1 flow still works for case-by-case review.
+When a scraped **players** file is loaded, a **Roster import plan** panel appears above the
+per-target detail. It plans one action per player-team target and commits them in one step —
+the per-target B1 flow still works for case-by-case review.
 
-- **Summary:** player team targets · ready-to-commit count · skipped count (broken out as
-  needs review / blocked / no workspace team / provisional district / duplicate / empty) ·
-  coach/non-player targets (not imported here) · projected additions and link no-ops across
-  ready teams · districts resolved through the registry vs provisional/unknown.
-- **Table** (one row per target): team · district · age · code · status badge (Ready / Needs
-  review / Blocked / Empty / Provisional district / No workspace team / Duplicate target /
-  Coach) · projected additions · reason notes for skipped teams.
-- **Commit All Ready Teams to Workspace** commits only the ready teams, all-or-nothing, and is
-  **disabled** when there are zero ready teams or while a single-target in-memory preview is
-  executed. Copy: “Only teams that pass the existing readiness gate will be committed. Teams
-  needing review are skipped.” There is **no auto-commit** on file load, selection, staging,
-  district confirmation, or preview.
-- After a successful commit a top banner reads **“Whole-file import saved locally”** with the
-  team count, before→after player totals across the committed teams, additions, and skipped
-  count, plus an **Undo Whole-file Import** button (current session only; the committed data
-  is durable via A1 and survives reload). A failed batch shows a calm error and changes
-  nothing.
+- **Summary:** player team targets · **teams to create** · **teams to update** · **blocked** ·
+  coach/non-player targets (not imported here) · **total players to import** · districts
+  resolved through the registry vs provisional/unknown.
+- **Table** (one row per target): team · district · age · code · **Action** badge — **Create
+  team** / **Update team** / Needs review / **Add district first** / Unreadable team code /
+  Missing season-age / Duplicate target / Empty / Coach — · players · reason notes for blocked
+  targets.
+- **Commit roster import** (primary action) creates the missing teams and updates the existing
+  ones, **all-or-nothing**, and is **disabled** when there is nothing to create or update, or
+  while a single-target in-memory preview is executed. Brand-new empty teams need **no row-level
+  review**; existing teams still follow the review path. Districts not in the registry are
+  blocked (“Add district first”) — never auto-created. There is **no auto-commit** on file load,
+  selection, or preview.
+- After a successful commit a top banner reads **“Roster import saved locally”** with created /
+  updated team counts, total players, and blocked count, plus an **Undo Roster Import** button
+  (current session only; the committed data is durable via A1 and survives reload). A failed
+  commit shows a calm error and changes nothing.
 
 ## District Maintenance screen (Completion Milestone C2)
 
@@ -119,12 +119,16 @@ A top-level **Districts** tab opens the District Maintenance screen
 (`src/components/DistrictMaintenanceView.tsx`) — an in-app manager for the canonical district
 registry (`workspace.districts`).
 
-- **List (left/top):** every district, **active and inactive** (inactive are never hidden
-  here). Columns: name (with a “provisional” flag when branding is placeholder), `districtId`,
-  mascot, status badge (Active/Inactive), primary/secondary color chips, logo & helmet path
-  references, and exact import aliases (`sourceLabels`). An **All / Active / Inactive** filter
-  toggles the list.
-- **Add / Edit form (right/below):**
+- **List (the resting state):** every district, **active and inactive** (inactive are never
+  hidden here). Columns: name (with a “provisional” flag when branding is placeholder),
+  `districtId`, mascot, status badge (Active/Inactive), primary/secondary color chips, logo &
+  helmet path references, and exact import aliases (`sourceLabels`). An **All / Active /
+  Inactive** filter and a **+ Add district** button sit above the list.
+- **Add / Edit form (opens on demand — production-blocker correction):** the form is
+  **hidden by default** so it never crowds or obscures the list. It opens as a side panel only
+  after **+ Add district** or a row’s **Edit**, and has a **Cancel** action; after a successful
+  create or update it closes and returns to the list. At common desktop widths the list stays
+  visible beside the form (no overlay/modal).
   - **Add** — name and mascot are required; primary/secondary color, logo path, helmet path,
     exact aliases (comma/newline separated), and a “branding is placeholder/provisional”
     checkbox are optional. The `districtId` is **generated automatically** from the name (a
@@ -175,6 +179,41 @@ loosened to accept bad files).
   use **Import Dataset**; an unsupported scraped `record_type` and unrecognized files are
   explained. A loaded **coaches** file notes that whole-file import is player-only.
 
+## Flat-source normalization note (production-blocker correction)
+
+When a loaded Roster-import file is a **flat row-list** (the Claude-scrape drift shape), the
+workbench normalizes it into the standard nested shape on load and shows a small note:
+“Normalized a flat row-list … grouped by district + age group + team. Player names were
+preserved exactly,” plus which metadata was **inferred** (organization, age division,
+season year from filename) and any **warnings** (mixed age groups, no filename year). A flat
+file whose rows are missing required fields gets a plain-language error instead. There is no
+inline metadata editor in this pass.
+
+## Empty startup, Reset, Seed, and Sample data (production-blocker correction)
+
+A fresh browser (no persisted workspace) opens to an **empty** workspace and the first-run
+state — bundled sample data is no longer forced into startup. The top toolbar offers four
+**distinct, separately-confirmed** workspace actions (each replaces this browser’s local
+workspace; export a dataset first for a backup; the change auto-saves and survives reload):
+
+- **Reset workspace** → **empty** workspace: a production fresh start with **no teams** but the
+  **full 39-district Ute Conference registry** + age divisions, so a real roster file can create
+  teams immediately (Alta/Brighton keep confirmed branding; the rest are provisional, editable
+  in District Maintenance).
+- **Load Ute Conference seed** → an **optional** convenience: the same 39-district registry plus
+  some GI/2026 empty team shells. Since the districts already exist in a fresh workspace and
+  teams are created on import, the shells are **not required** — a roster import simply updates
+  them instead of creating teams.
+- **Load sample data** → **demo/testing** content only (bundled multi-season sample teams with
+  players). Not for production use.
+- **Import Dataset** / **Export Dataset** → portable full-dataset JSON round-trip (unchanged).
+
+These are deliberately **not** collapsed into one concept. The primary path is: start empty →
+register districts (Districts tab, in-flow “Add district to registry”, or the optional seed) →
+**roster import creates the season's teams** and adds players. A district not in the registry is
+blocked with “Add district first” (never auto-invented). An existing persisted workspace still
+restores normally on load.
+
 ## Primary navigation
 
 The primary navigation path is:
@@ -185,9 +224,23 @@ Season -> District -> Age Division -> Team
 
 Each selection narrows the analytical scope.
 
+## Materialized teams only in the Team selector (correction)
+
+The roster **Team selector** (season → district → age division → team cascade in the FilterBar)
+and the **My Team** picker list only **materialized** teams — teams that loaded data actually
+populated (≥1 rostered player, or an assigned coach). Empty/theoretical **seed shells** (e.g.
+provisional team shells created by the optional seed) are **not** shown as selectable
+"0 player" teams. The helper `getMaterializedTeams` / `isMaterializedTeam`
+(`src/engine/filters.ts`) is the single rule. Consequence: after committing a roster file, the
+selector shows exactly the teams the import created/updated (with their real player counts);
+if a workspace contains only empty shells, the roster tab shows the first-run state rather than
+empty dropdowns.
+
 ## Default season selection
 
-When loaded data includes multiple seasons, the app should default to the most recent season.
+When loaded data includes multiple seasons, the app should default to the most recent season
+**that has materialized teams** (so an empty future-season shell set never becomes the default
+landing view).
 
 - This matches the normal expectation that the current/latest season is the first view.
 - Prior-season data remains available for derived comparison, but a prior season should not become the default landing state unless the user explicitly selects it.

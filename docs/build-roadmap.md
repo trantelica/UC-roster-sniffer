@@ -119,6 +119,17 @@ Next (optional, requires explicit approval): the actual import **apply / commit*
 that performs a projection's planned links / additions, plus real persistence, CSV /
 file parsing, and the review UI — each a separate later slice.
 
+> **Update (completion plan + PR #72 corrections):** durable import **commit** has since
+> been implemented. Roster import now **creates or updates** teams on explicit commit
+> (`buildWholeFilePlayerImportPlan` → `commitRosterImportToWorkspace`): teams are
+> season-specific content created from a committed roster file (never on file load); a fresh
+> workspace ships the 39 known districts + fixed age divisions and **zero** teams. The Team
+> selector shows **materialized** teams only (not empty/seed shells). See
+> `docs/import-workflow.md` ("Roster import: create OR update teams"),
+> `docs/product-requirements.md` ("Workspace data lifecycle & roster import"), and
+> `docs/completion-plan.md`. The pre-commit statements above describe the historical Phase 5
+> status.
+
 ## Phase 0: Specification baseline
 
 Goal: establish governing docs before coding.

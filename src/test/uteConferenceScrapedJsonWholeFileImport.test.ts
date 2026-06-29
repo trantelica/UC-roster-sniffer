@@ -122,8 +122,8 @@ describe('whole-file player import planning', () => {
     const b3 = plan.targets.find((t) => t.teamClassification === 'B3');
     expect(b3?.committable).toBe(false);
     expect(b3?.status).toBe('needs-review');
-    expect(plan.skippedCount).toBe(1);
-    expect(plan.needsReviewCount).toBe(1);
+    expect(b3?.action).toBe('blocked');
+    expect(plan.blockedCount).toBe(1);
     // The match-bearing team is NOT in the committable execution list.
     expect(plan.committableTargets.some((t) => t.existingTeam.teamId === 'wt-b3')).toBe(false);
   });
@@ -142,9 +142,10 @@ describe('whole-file player import planning', () => {
     expect(t.status).toBe('provisional-district');
     expect(t.committable).toBe(false);
     expect(before.committableCount).toBe(0);
-    expect(before.provisionalDistrictCount).toBe(1);
+    expect(before.createCount).toBe(0);
+    expect(before.blockedCount).toBe(1);
 
-    // After confirming/registering Granger, the same team becomes committable on re-plan.
+    // After confirming/registering Granger, the existing team becomes an update on re-plan.
     const registry = buildDistrictNameRegistryLookup([
       district({ districtId: 'granger', name: 'Granger', status: 'active' }),
     ]);
@@ -153,7 +154,7 @@ describe('whole-file player import planning', () => {
       existingTeams: existing,
       districtRegistry: registry,
     });
-    expect(after.targets[0].status).toBe('committable');
+    expect(after.targets[0].status).toBe('update');
     expect(after.committableCount).toBe(1);
   });
 
@@ -172,16 +173,22 @@ describe('whole-file player import planning', () => {
     expect(plan.committableCount).toBe(0);
   });
 
-  it('skips a scraped team with no matching workspace team', () => {
+  it('CREATES a team when the district is registered and no matching team exists', () => {
     const file = playersFile('Alta', [scrapedTeam('Gremlin B1', ['New One'])]);
     const plan = buildWholeFilePlayerImportPlan({
       payload: file,
-      existingTeams: [], // no workspace team for the context
+      existingTeams: [], // no workspace team for the context -> create
       districtRegistry: altaRegistry,
     });
-    expect(plan.targets[0].status).toBe('no-existing-team');
+    expect(plan.targets[0].status).toBe('create');
+    expect(plan.targets[0].committable).toBe(true);
+    expect(plan.createCount).toBe(1);
     expect(plan.committableCount).toBe(0);
-    expect(plan.noExistingTeamCount).toBe(1);
+    expect(plan.teamsToCreate).toHaveLength(1);
+    const created = plan.teamsToCreate[0];
+    expect(created.teamId).toBe('2026-alta-GR-B1');
+    expect(created.players.map((p) => p.name)).toEqual(['New One']);
+    expect(created.headCoach).toBeNull();
   });
 
   it('does not commit a coach (non-player) file', () => {
@@ -217,6 +224,7 @@ describe('whole-file player import planning', () => {
     });
     expect(plan.isPlayerFile).toBe(false);
     expect(plan.committableCount).toBe(0);
+    expect(plan.createCount).toBe(0);
   });
 
   it('does not mutate its inputs', () => {

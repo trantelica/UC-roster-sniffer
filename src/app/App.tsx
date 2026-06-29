@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { loadSampleData } from '../data/loadSampleData';
-import { getDistinctSeasons } from '../engine/filters';
+import { loadSampleData, loadEmptyWorkspace } from '../data/loadSampleData';
+import { loadUteConferenceSeedWorkspace } from '../data/loadUteConferenceSeedWorkspace';
+import { getDistinctSeasons, getMaterializedTeams } from '../engine/filters';
 import { findPriorSeasonTeam } from '../engine/teamRosterStatusSummary';
 import {
   buildWorkspaceSnapshot,
@@ -28,8 +29,8 @@ import ScrapedImportPreview, {
 import {
   commitImportedTeamToWorkspace,
   undoImportedTeamCommitInWorkspace,
-  commitImportedTeamsToWorkspace,
-  undoImportedTeamsCommitInWorkspace,
+  commitRosterImportToWorkspace,
+  undoRosterImportInWorkspace,
 } from '../engine/workspaceImportCommit';
 import {
   confirmUnknownScrapedDistrict,
@@ -42,7 +43,6 @@ import {
 } from '../engine/districtRegistry';
 import DistrictMaintenanceView from '../components/DistrictMaintenanceView';
 import EmptyState from '../components/EmptyState';
-import { assessWorkspaceEmptiness } from '../engine/workspaceEmptyState';
 import {
   buildDatasetImportErrorGuidance,
   type UserFacingFileError,
@@ -56,7 +56,9 @@ import MyTeamView from '../components/MyTeamView';
 import AnalyticsView from '../components/AnalyticsView';
 import ReviewCenterView from '../components/ReviewCenterView';
 
-const initialAppData = loadSampleData();
+// Production startup is an EMPTY workspace (Part 3): a fresh browser opens to the first-run
+// state, not bundled sample data. Sample data is available via an explicit action.
+const initialAppData = loadEmptyWorkspace();
 
 type AppView =
   | 'roster'
@@ -114,11 +116,11 @@ export default function App() {
   // undo affordance is session-only). A failed batch surfaces a calm notice instead.
   const [wholeFileImportUndo, setWholeFileImportUndo] = useState<{
     previousTeams: Team[];
-    teamsCommitted: number;
-    totalAdded: number;
-    skippedCount: number;
-    beforeCount: number;
-    afterCount: number;
+    createdTeamIds: string[];
+    createdCount: number;
+    updatedCount: number;
+    totalPlayers: number;
+    blockedCount: number;
   } | null>(null);
   const [wholeFileImportError, setWholeFileImportError] = useState<string | null>(null);
   // Bumped on a snapshot restore to force-remount the import workbench, clearing its
@@ -155,6 +157,9 @@ export default function App() {
   };
 
   const liveTeams = inMemoryImport ? inMemoryImport.teams : workspace.teams;
+  // The roster Team selector lists only MATERIALIZED teams — teams that loaded data actually
+  // populated — so empty/theoretical seed shells never appear as selectable "0 player" teams.
+  const materializedTeams = getMaterializedTeams(liveTeams);
 
   // Startup: restore the saved workspace from IndexedDB if one exists. An empty store keeps
   // the default sample data; a corrupt/unrestorable record falls back calmly with a warning
@@ -218,10 +223,10 @@ export default function App() {
     };
   }, [workspace]);
 
-  // Auto-select the most recent available season on load, so a season that can
-  // show prior-season roster comparison is the default view.
+  // Auto-select the most recent season that has MATERIALIZED teams, so the default view shows
+  // real roster data rather than an empty seeded season (e.g. a future-season shell set).
   useEffect(() => {
-    const seasons = getDistinctSeasons(workspace.teams);
+    const seasons = getDistinctSeasons(getMaterializedTeams(workspace.teams));
     if (seasons.length > 0 && selectedSeason === null) {
       setSelectedSeason(seasons[seasons.length - 1]);
     }
@@ -359,58 +364,62 @@ export default function App() {
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
-  // --- Milestone B2: whole-file batch commit of all ready player teams ---
+  // --- Roster import: commit (create new teams + update existing) ---
 
-  // Executes the committable targets all-or-nothing, then writes the resulting teams into the
-  // committed workspace in one update (auto-saved via A1, exported by A2). If execution or the
-  // batch workspace transform fails, NO workspace change is applied and a calm error is shown,
-  // so a failed batch can never partially corrupt the workspace. Clears any transient overlay,
-  // remembers the pre-batch teams for a session undo, and remounts the workbench.
+  // Executes the existing-team updates all-or-nothing, then writes BOTH the new teams (create)
+  // and the updated teams into the committed workspace in one transform (auto-saved via A1,
+  // exported by A2). If anything fails, NO workspace change is applied and a calm error is
+  // shown, so a failed commit can never partially corrupt the workspace. Remembers the
+  // pre-commit team values + created team ids for a session undo, and remounts the workbench.
   function handleCommitWholeFilePlayerImport(payload: WholeFileImportCommitPayload) {
     setWholeFileImportError(null);
+    if (payload.committableTargets.length === 0 && payload.teamsToCreate.length === 0) {
+      setWholeFileImportError('Nothing to import: no teams to create or update.');
+      return;
+    }
     const generatedAt = new Date().toISOString();
     const execution = executeWholeFilePlayerImportBatch({
       committableTargets: payload.committableTargets,
       generatedAt,
     });
-    if (execution.status !== 'executed') {
+    // `nothing-to-commit` is fine when this is a create-only import.
+    if (execution.status === 'rejected') {
       setWholeFileImportError(
-        execution.status === 'nothing-to-commit'
-          ? 'No ready teams to commit.'
-          : `Batch import was not applied: ${execution.message} No teams were changed.`
+        `Roster import was not applied: ${execution.message} No teams were changed.`
       );
       return;
     }
-    const commit = commitImportedTeamsToWorkspace(workspace, execution.committedTeams);
+    const updatedTeams = execution.status === 'executed' ? execution.committedTeams : [];
+
+    const commit = commitRosterImportToWorkspace(workspace, updatedTeams, payload.teamsToCreate);
     if (!commit.committed) {
       setWholeFileImportError(
-        `Batch import was not applied: ${commit.missingTeamIds.length} target team(s) were not found in the workspace. No teams were changed.`
+        `Roster import was not applied (${commit.reason}: ${commit.teamIds.join(', ')}). No teams were changed.`
       );
       return;
     }
     setWorkspace(commit.workspace);
     setInMemoryImport(null);
-    const beforeCount = execution.perTeam.reduce((sum, p) => sum + p.beforeCount, 0);
-    const afterCount = execution.perTeam.reduce((sum, p) => sum + p.afterCount, 0);
     setWholeFileImportUndo({
       previousTeams: commit.previousTeams,
-      teamsCommitted: execution.teamsCommitted,
-      totalAdded: execution.totalAdded,
-      skippedCount: payload.summary.skippedCount,
-      beforeCount,
-      afterCount,
+      createdTeamIds: commit.createdTeamIds,
+      createdCount: payload.summary.createCount,
+      updatedCount: payload.summary.committableCount,
+      totalPlayers: payload.summary.totalPlayersToImport,
+      blockedCount: payload.summary.blockedCount,
     });
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
-  // B2: current-session undo. Restores every affected team to its exact pre-batch state in the
-  // CURRENT workspace (preserving unrelated later changes to other teams), auto-saves via A1,
-  // and clears the undo affordance.
+  // Current-session undo: removes the created teams and restores every updated team to its
+  // exact pre-commit state in the CURRENT workspace (preserving unrelated later changes),
+  // auto-saves via A1, and clears the undo affordance.
   function handleUndoWholeFilePlayerImport() {
     if (!wholeFileImportUndo) return;
-    const result = undoImportedTeamsCommitInWorkspace(
+    const result = undoRosterImportInWorkspace(
       workspace,
-      wholeFileImportUndo.previousTeams
+      wholeFileImportUndo.previousTeams,
+      wholeFileImportUndo.createdTeamIds
     );
     if (result.restored) setWorkspace(result.workspace);
     setWholeFileImportUndo(null);
@@ -468,6 +477,64 @@ export default function App() {
       if (!result.changed) return current;
       return { ...current, districts: result.districts };
     });
+  }
+
+  // --- Part 3: reset to an empty workspace / load bundled sample data ----------
+
+  // Clears all transient session state and selection after a wholesale workspace replacement.
+  function resetTransientStateForWorkspaceReplace() {
+    setInMemoryImport(null);
+    setCommittedImportUndo(null);
+    setWholeFileImportUndo(null);
+    setWholeFileImportError(null);
+    setSnapshotNotice(null);
+    setWorkspaceFromImport(false);
+    setSelectedSeason(null);
+    setSelectedDistrict(null);
+    setSelectedAgeDivision(null);
+    setSelectedTeamId(null);
+    setSelectedCoachId(null);
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
+  // Replaces THIS browser's workspace with an empty one (baseline registries kept). The change
+  // auto-saves via A1, so the empty state survives reload. Confirmed because it is destructive
+  // to local data. Export a dataset first to keep a backup.
+  function handleResetWorkspace() {
+    const confirmed = window.confirm(
+      'Reset this browser’s workspace to empty?\n\nThis replaces all roster, team, game, and ' +
+        'coach data saved in THIS browser. The district registry and age divisions are kept. ' +
+        'Export a dataset first if you want a backup. This cannot be undone.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadEmptyWorkspace());
+    resetTransientStateForWorkspaceReplace();
+  }
+
+  // Loads the bundled sample/demo data into this browser's workspace (replaces current data).
+  function handleLoadSampleData() {
+    const confirmed = window.confirm(
+      'Load bundled sample/demo data into this browser’s workspace?\n\nThis replaces the ' +
+        'current local workspace data. Export a dataset first if you want a backup.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadSampleData());
+    resetTransientStateForWorkspaceReplace();
+  }
+
+  // Loads the real Ute Conference BASELINE seed: district registry + age divisions + EMPTY team
+  // shells (no rosters), so real player files import into existing teams. Distinct from sample
+  // (demo) and empty (no teams). Replaces this browser's workspace; auto-saves via A1.
+  function handleLoadUteConferenceSeed() {
+    const confirmed = window.confirm(
+      'Load the Ute Conference baseline seed into this browser’s workspace?\n\nThis replaces ' +
+        'the current local workspace data with district + team shells that have EMPTY rosters, ' +
+        'ready for you to import real player files into. Export a dataset first if you want a ' +
+        'backup.'
+    );
+    if (!confirmed) return;
+    setWorkspace(loadUteConferenceSeedWorkspace());
+    resetTransientStateForWorkspaceReplace();
   }
 
   // --- Slice 23 + A2: portable dataset export / import --------------------
@@ -571,8 +638,6 @@ export default function App() {
     ? findPriorSeasonTeam(liveTeams, selectedTeam)
     : null;
 
-  // E1: workspace emptiness drives the first-run / empty states.
-  const emptiness = assessWorkspaceEmptiness(workspace);
   function triggerDatasetImport() {
     importInputRef.current?.click();
   }
@@ -623,12 +688,12 @@ export default function App() {
           tab to restore the baseline roster.
         </div>
       )}
-      {!emptiness.hasTeams ? (
+      {materializedTeams.length === 0 ? (
         firstRunState
       ) : (
         <>
           <FilterBar
-            teams={liveTeams}
+            teams={materializedTeams}
             districts={workspace.districts}
             ageDivisions={workspace.ageDivisions}
             selectedSeason={selectedSeason}
@@ -756,6 +821,9 @@ export default function App() {
         onExport={handleExportSnapshot}
         onImportFileChange={handleImportFileChange}
         onDismissNotice={() => setSnapshotNotice(null)}
+        onResetWorkspace={handleResetWorkspace}
+        onLoadSampleData={handleLoadSampleData}
+        onLoadUteConferenceSeed={handleLoadUteConferenceSeed}
         inMemoryImportActive={inMemoryImport !== null}
         persistenceStatus={persistenceStatus}
       />
@@ -783,20 +851,20 @@ export default function App() {
       {wholeFileImportUndo && (
         <div className="committed-import-banner">
           <div>
-            <strong>Whole-file import saved locally.</strong>{' '}
-            {wholeFileImportUndo.teamsCommitted} team
-            {wholeFileImportUndo.teamsCommitted === 1 ? '' : 's'} committed (
-            {wholeFileImportUndo.beforeCount} → {wholeFileImportUndo.afterCount} players across
-            them · {wholeFileImportUndo.totalAdded} added · {wholeFileImportUndo.skippedCount}{' '}
-            skipped). This is now part of your workspace and auto-saves to this browser (it
-            survives reload). Undo is available only for this session.
+            <strong>Roster import saved locally.</strong>{' '}
+            {wholeFileImportUndo.createdCount} team
+            {wholeFileImportUndo.createdCount === 1 ? '' : 's'} created ·{' '}
+            {wholeFileImportUndo.updatedCount} updated · {wholeFileImportUndo.totalPlayers}{' '}
+            players · {wholeFileImportUndo.blockedCount} blocked. This is now part of your
+            workspace and auto-saves to this browser (it survives reload). Undo is available
+            only for this session.
           </div>
           <button
             type="button"
             className="committed-import-undo-button"
             onClick={handleUndoWholeFilePlayerImport}
           >
-            Undo Whole-file Import
+            Undo Roster Import
           </button>
         </div>
       )}
@@ -821,7 +889,7 @@ export default function App() {
       <div hidden={view !== 'roster'}>{rosterContent}</div>
       <div hidden={view !== 'my-team'}>
         <MyTeamView
-          teams={liveTeams}
+          teams={materializedTeams}
           districts={workspace.districts}
           ageDivisions={workspace.ageDivisions}
           games={workspace.games}
@@ -966,6 +1034,9 @@ function WorkspaceToolbar({
   onExport,
   onImportFileChange,
   onDismissNotice,
+  onResetWorkspace,
+  onLoadSampleData,
+  onLoadUteConferenceSeed,
   inMemoryImportActive,
   persistenceStatus,
 }: {
@@ -974,6 +1045,9 @@ function WorkspaceToolbar({
   onExport: () => void;
   onImportFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDismissNotice: () => void;
+  onResetWorkspace: () => void;
+  onLoadSampleData: () => void;
+  onLoadUteConferenceSeed: () => void;
   inMemoryImportActive: boolean;
   persistenceStatus: PersistenceStatus;
 }) {
@@ -993,6 +1067,19 @@ function WorkspaceToolbar({
             className="workspace-import-input"
           />
         </label>
+        <button type="button" className="workspace-button" onClick={onLoadUteConferenceSeed}>
+          Load Ute Conference seed
+        </button>
+        <button type="button" className="workspace-button" onClick={onLoadSampleData}>
+          Load sample data
+        </button>
+        <button
+          type="button"
+          className="workspace-button workspace-button-danger"
+          onClick={onResetWorkspace}
+        >
+          Reset workspace
+        </button>
         <PersistenceIndicator status={persistenceStatus} />
         <span className="workspace-toolbar-note">
           Auto-save (IndexedDB) keeps your work in this browser · Export Dataset makes a

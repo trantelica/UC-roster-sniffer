@@ -1,5 +1,6 @@
 import { detectUteConferenceScrapedJsonRecordType } from './uteConferenceScrapedJsonAdapter';
 import { WORKSPACE_SNAPSHOT_APP, WORKSPACE_SNAPSHOT_KIND } from './workspaceSnapshot';
+import { classifyUteConferenceImportSource } from './uteConferenceImportSourceShape';
 
 /**
  * Completion Milestone E2: PURE, deterministic coarse classification of an already-parsed
@@ -29,6 +30,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
  * `metadata`/`districts`. Pure; never mutates the input.
  */
 export function classifyImportFileShape(payload: unknown): ImportFileShape {
+  // A recognizable flat row-list (Claude scrape drift) is a scraped source, not a dataset —
+  // map it so the dataset-import path can still say "this belongs in Roster import". An array
+  // that is not a valid flat player/coach list stays 'unknown' (it is not a scraped file).
+  if (Array.isArray(payload)) {
+    const flat = classifyUteConferenceImportSource(payload);
+    if (flat === 'flat-players') return 'scraped-players';
+    if (flat === 'flat-coaches') return 'scraped-coaches';
+    return 'unknown';
+  }
+
   if (!isObject(payload)) return 'unknown';
 
   if (

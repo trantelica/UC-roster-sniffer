@@ -4,7 +4,11 @@ import rosterImport2025 from '../../data-samples/roster-import-2025.sample.json'
 import gamesSample from '../../data-samples/games.sample.json';
 import type { AppData, District, Game, Team, Coach } from '../domain/types';
 import { deriveCoachesAndAssignmentsFromTeams } from '../engine/coachModel';
-import { coerceDistrictRecord, ensureSeedDistricts } from '../engine/districtRegistry';
+import {
+  coerceDistrictRecord,
+  ensureSeedDistricts,
+  buildSeededDistrictRegistry,
+} from '../engine/districtRegistry';
 
 function toCoach(raw: { name: string }): Coach {
   return { name: raw.name };
@@ -46,6 +50,25 @@ function teamsFromImport(rosterImport: RosterImportFile): Team[] {
       notes: p.notes ?? undefined,
     })),
   }));
+}
+
+/**
+ * Production-blocker correction (Part 3): the DEFAULT startup workspace is EMPTY — no sample
+ * teams/games/coaches — so a fresh browser opens to the first-run state. The baseline
+ * registries needed for import to function are preserved: the fixed age divisions and the
+ * seeded district registry (so scraped district mapping still resolves the known districts).
+ * The bundled sample data remains available via `loadSampleData` (tests + an explicit "Load
+ * sample data" action).
+ */
+export function loadEmptyWorkspace(): AppData {
+  return {
+    districts: buildSeededDistrictRegistry(),
+    ageDivisions: districtConfig.ageDivisions,
+    teams: [],
+    games: [],
+    coaches: [],
+    coachAssignments: [],
+  };
 }
 
 export function loadSampleData(): AppData {

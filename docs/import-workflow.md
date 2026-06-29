@@ -92,6 +92,71 @@ Known implications:
 
 This source shape is an import input contract, not the preferred internal storage shape.
 
+### Robust scraped-source normalization (production-blocker correction)
+
+Claude-generated scrape output can drift between the nested scraped payload and this flat
+row-list. Two pure engine helpers run BEFORE the existing import session so both shapes feed
+the same pipeline (no parallel import system):
+
+- `classifyUteConferenceImportSource(payload)` (`src/engine/uteConferenceImportSourceShape.ts`)
+  → `nested-players` | `nested-coaches` | `flat-players` | `flat-coaches` | `flat-unsupported`
+  | `empty-source` | `dataset` | `unknown`.
+- `normalizeUteConferenceImportSource(payload, { fileName })`
+  (`src/engine/uteConferenceImportSourceNormalization.ts`) → converts a flat row-list into the
+  nested `{ metadata, districts[].teams[] }` payload; nested and unrecognized object payloads
+  **pass through unchanged**; flat rows missing required keys (or an empty array) return a
+  clear, non-throwing failure for plain-language UI guidance.
+
+Accepted flat-row key aliases (exact, never fuzzy):
+
+```text
+district     : district, district_name
+age group    : age_group, ageDivision, age_division, league
+team         : team, team_name
+player name  : player_name, player, name
+coach name   : coach_name, coach, name
+coach title  : coach_title, title
+```
+
+Normalization rules (carry the roster-authority rule, see `docs/derived-logic.md`):
+
+- The original payload is never mutated; player/coach names and titles are placed into the
+  nested payload **exactly** as provided (no trim, dedupe, merge, suppress, or rewrite).
+- Flat rows are grouped deterministically by **district + age group + team**, preserving
+  source row order inside each team and first-seen order of districts/teams.
+- `record_type` is derived (`players` for flat player rows; `coaches` when explicit coach
+  signals are present and no player-name key).
+- Metadata is **inferred only when missing** and the inference is reported (never silent):
+  organization (`Ute Conference`); `age_division` + `age_division_alias` when all rows agree on
+  one age group (e.g. `GI League 12` → `GI` via the fixed age-division map); `year` + `event`
+  from a clear 4-digit filename year (e.g. `2025` → “2025 Season”).
+- Disagreements do not reject the file: mixed age groups or a missing year surface a
+  **warning** and still import what can be grouped (teams whose names start with an age word —
+  e.g. `GridIron`, `Gremlin` — still resolve their division from the team name).
+- Required-key gaps return `unsupported-flat-rows`; an empty array returns `empty-source`.
+
+The Roster import workbench runs this normalizer on every loaded file/demo and shows a note
+when a flat list was normalized and/or metadata was inferred. Coaches still preview per team;
+whole-file commit remains player-only.
+
+### Districts are infrastructure; teams come from the import
+
+The primary workflow does **not** require pre-seeded team shells. Roster imports **create**
+teams (see "Roster import: create OR update teams"). What an import needs in place first is the
+**districts** (infrastructure) — and a fresh empty workspace already contains the **full
+39-district Ute Conference registry** by default, so a real roster file (Riverton, Bingham,
+Herriman, …) can create teams immediately with no seed step. A district not in that registry
+(or a custom one) can be added via the Districts tab or the in-flow "Add district to registry"
+action; once registered, importing a player file for it creates the season's teams and players.
+
+The **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) is now **optional**: it loads the
+39 known districts plus a set of GI/2026 empty team shells. With teams created on import the
+shells are no longer required — importing into a seeded workspace simply **updates** the matching
+shells instead of creating new teams. A district not in the registry blocks its targets with
+"Add district first" (never silently invented). **Parenthetical sub-labels** like
+`GridIron A1 (Bonneville)` still don't resolve a team code and are blocked (`unparseable-team`),
+never merged into a plain code — future work.
+
 ## Roster import preview (Phase 5 slice 1)
 
 Phase 5 begins with a pure, deterministic **import preview state/contract**
@@ -1173,46 +1238,45 @@ high-confidence on the next mapping — for both the single-target preview and t
 plan. Inactivated districts drop out of the lookup, so new imports stop matching them (existing
 rosters that reference them remain valid).
 
-## Whole-file player import (Completion Milestone B2)
+## Roster import: create OR update teams (corrected product model)
 
-B2 lets a user commit **all ready player teams** in one loaded scraped PLAYERS file in a
-single explicit action, while leaving every unready team untouched. It reuses the exact
-single-target pipeline (B1) — it invents no second readiness, matching, projection, or commit
-rule. For every player-team target the engine
-(`buildWholeFilePlayerImportPlan`) composes: session selection → roster-aware review →
-staged projection → future readiness → transaction plan, with **empty review decisions**.
-Because only an unambiguous no-match row defaults to `create-new`, any match-bearing /
-ambiguous row stays unresolved and that team is reported as **needs review**, never
-auto-resolved and never committed.
+**Teams are created from roster imports.** A roster file must not require pre-existing team
+shells: for one loaded scraped PLAYERS file (nested or flat, normalized on load),
+`buildWholeFilePlayerImportPlan` plans ONE action per player-team target —
 
-Per-target status: `committable` · `needs-review` · `blocked` · `empty` ·
-`provisional-district` · `no-existing-team` · `duplicate-target` · `non-player`. A target is
-**committable** only when its transaction plan is `planned` AND its district resolved against
-the registry at **high confidence** (C3) AND a matching existing workspace team was found.
-Two batch-only safety gates layer on top of the pipeline (never replacing it):
+- **create** — the district resolves to a **registered** district at high confidence (C3), the
+  season / age division / team classification all resolve, and **no matching team exists** →
+  a brand-new empty team is created and the source players are added **exactly as written**.
+  A brand-new empty team needs **no row-level identity review** (there is no existing roster to
+  collide with). Deterministic id: `${seasonId}-${districtId}-${ageDivisionId}-${teamCode}`;
+  `draftOrder`/`divisionTeamCount` are made consistent across the resulting division.
+- **update** — a matching team already exists → the existing single-target pipeline applies
+  (roster-aware review → staged projection → readiness → transaction plan, with **empty review
+  decisions**), so existing rosters stay authoritative and match-bearing rows still require
+  review (and are not committed in the batch).
+- **blocked** — anything not safe: `provisional-district` (district not in the registry →
+  "Add district first"), `unparseable-team` (no parseable team code — e.g. a parenthetical
+  sub-label like "GridIron A1 (Bonneville)", which is **never collapsed into plain A1**),
+  `missing-context` (no season/age — name the file with a 4-digit year), `needs-review` (an
+  existing team with match-bearing rows), `duplicate-target`, `empty`, `non-player`.
 
-- **Provisional/unknown district** → skipped until the district is confirmed/registered, then
-  it becomes committable on re-derive (the plan is rebuilt from the active registry).
-- **Duplicate target** → if two targets resolve to the SAME existing workspace team, only the
-  first is committable; the rest are skipped so a batch can never double-apply additions.
+Districts are **infrastructure** (seeded or added provisionally via the Districts tab / the C3
+"Add district to registry" action); imports never silently invent a district. Teams are
+**season-specific** and are created by the import.
 
-Coach (non-player) targets and targets with **no existing workspace team** are skipped — like
-B1, B2 updates EXISTING teams only and never silently creates a team.
+The plan exposes **teams to create**, **teams to update**, **blocked targets**, and **total
+players to import**. The primary action **Commit roster import** runs
+`executeWholeFilePlayerImportBatch` (updates, all-or-nothing) then
+`commitRosterImportToWorkspace`, which in ONE all-or-nothing transform appends the new teams
+(must not already exist) and replaces the updated teams (must exist) — if anything fails, **no
+workspace change is applied**. A successful commit auto-saves via A1 and exports via A2.
+**Undo Roster Import** (`undoRosterImportInWorkspace`, current session only) removes the created
+teams and restores the updated teams to their exact pre-commit state, preserving unrelated
+later changes. B1 single-team commit and the C3 confirm/add path still work alongside it; the
+action is disabled while a single-target in-memory preview is executed.
 
-**Commit All Ready Teams to Workspace** runs `executeWholeFilePlayerImportBatch` then
-`commitImportedTeamsToWorkspace`, both **all-or-nothing**: each committable team is executed
-into a new team value (existing records preserved exactly and in order, only planned
-additions appended; links are no-ops; deferred/unresolved/blocked rows never added), and if
-ANY team fails to execute or is missing at commit time, **no workspace change is applied** and
-a calm error is shown — the workspace can never be partially corrupted. A successful commit
-auto-saves via A1 and is included by A2 Export Dataset.
-
-**Undo Whole-file Import** (`undoImportedTeamsCommitInWorkspace`) is current-session only: it
-restores every affected team to its exact pre-batch state in the CURRENT workspace, preserving
-unrelated later changes to other teams. The committed batch itself survives reload (A1); the
-undo affordance does not. B1 single-team commit and the C3 confirm/add district path continue
-to work alongside the batch action; the batch action is disabled while a single-target
-in-memory preview is executed.
+**Future work:** distinguishing parenthetical sub-labels (same code, different sub-team) and
+auto-creating unknown districts on import are intentionally out of scope here.
 
 ## Two import paths & wrong-file guidance (Completion Milestone E2)
 
@@ -1220,14 +1284,16 @@ There are deliberately **two distinct import paths**, and a file belongs in exac
 
 - **Import Dataset** (top toolbar) — opens a portable **UC Roster Sniffer dataset export**
   (`.json` from Export Dataset) and **replaces** the whole workspace.
-- **Roster import** (tab) — loads a **scraped Ute Conference** players/coaches JSON and
-  previews/commits per-team or whole-file.
+- **Roster import** (tab) — loads a **scraped Ute Conference** players/coaches JSON (either the
+  nested shape or a **flat row-list**, normalized on load) and previews/commits per-team or
+  whole-file.
 
 A small pure classifier (`classifyImportFileShape`) lets each path recognise when it was handed
-the OTHER kind of file and say so in plain language (no auto-routing — guidance only):
+the OTHER kind of file and say so in plain language (no auto-routing — guidance only). It
+recognises a flat player/coach row-list as a scraped source too:
 
-- A **scraped** file dropped into Import Dataset → “This looks like a scraped Ute Conference
-  file… use Roster import instead.”
+- A **scraped** file (nested or flat row-list) dropped into Import Dataset → “This looks like a
+  scraped Ute Conference file… use Roster import instead.”
 - A **dataset export** dropped into Roster import → “This looks like a UC Roster Sniffer
   dataset export… use Import Dataset instead.”
 - A **coaches** scrape in the Roster workbench is previewable per target, but the whole-file
