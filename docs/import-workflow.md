@@ -153,9 +153,38 @@ The **Ute Conference seed** (`loadUteConferenceSeedWorkspace`) is now **optional
 39 known districts plus a set of GI/2026 empty team shells. With teams created on import the
 shells are no longer required — importing into a seeded workspace simply **updates** the matching
 shells instead of creating new teams. A district not in the registry blocks its targets with
-"Add district first" (never silently invented). **Parenthetical sub-labels** like
-`GridIron A1 (Bonneville)` still don't resolve a team code and are blocked (`unparseable-team`),
-never merged into a plain code — future work.
+"Add district first" (never silently invented).
+
+### Parenthetical district references in scraped team labels
+
+Some scraped sources label a team like `GridIron A1 (Layton)`. The trailing parenthetical is
+treated as a **represented district reference**, not a team sub-label, and is parsed
+deterministically (pure helper `parseParentheticalDistrictReference`, wired into the canonical
+mapping — never fuzzy):
+
+- **base team label / classification** come from the text before the parenthesis
+  (`GridIron A1` → code `A1`); the parenthetical is **never merged into the team code**.
+- **represented district** is the parenthetical candidate (`Layton`), resolved against the
+  district registry using the existing **exact** name/source-label matching only.
+- **source/admin district** (the scraped row's parent district) and the **original source team
+  label** (`GridIron A1 (Layton)`) are retained as **source evidence** in the import/source
+  metadata (canonical mapping `parentheticalRouting`; whole-file plan `sourceDistrictName` /
+  `representedDistrictName` / `routedFromParenthetical`, plus a "Routed to …" note).
+
+Resolution outcomes:
+
+- **Resolved** — the candidate matches a known active district: the team is **created/updated
+  under the represented district** (e.g. `2026-layton-GI-A1`), never as a literal
+  `GridIron A1 (Layton)` team and never under the scraped/admin district.
+- **Unresolved** — the candidate is not in the registry: the target is **blocked**
+  (`unresolved-parenthetical-district`) with a clear "Add … first" reason. It is never silently
+  ignored, never slugged into a provisional district, and no team is invented. Adding the
+  district to the registry and re-importing routes it normally.
+
+A label with **no** parenthetical keeps the existing behavior unchanged (it maps against the
+scraped/admin district as before). A parenthetical whose base label still has no readable code
+(e.g. `Scout White (Layton)`) resolves the district but is blocked `unparseable-team` for the
+code.
 
 ## Roster import preview (Phase 5 slice 1)
 
