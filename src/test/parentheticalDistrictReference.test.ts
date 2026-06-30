@@ -32,6 +32,25 @@ describe('parseParentheticalDistrictReference', () => {
     expect(parseParentheticalDistrictReference('GridIron A1 (Layton (North))')).toBeNull();
   });
 
+  it('returns null when the base still contains a parenthesis (multiple groups, ambiguous)', () => {
+    expect(parseParentheticalDistrictReference('GridIron A1 (North) (Layton)')).toBeNull();
+  });
+
+  it('parses a single group whose candidate is "North" as base "GridIron A1"', () => {
+    const ref = parseParentheticalDistrictReference('GridIron A1 (North)');
+    expect(ref?.baseLabel).toBe('GridIron A1');
+    expect(ref?.districtCandidate).toBe('North');
+  });
+
+  it('keeps the original single-group "GridIron A1 (Layton)" behavior unchanged', () => {
+    const ref = parseParentheticalDistrictReference('GridIron A1 (Layton)');
+    expect(ref).toEqual({
+      originalLabel: 'GridIron A1 (Layton)',
+      baseLabel: 'GridIron A1',
+      districtCandidate: 'Layton',
+    });
+  });
+
   it('returns null for non-string input', () => {
     expect(parseParentheticalDistrictReference(null)).toBeNull();
     expect(parseParentheticalDistrictReference(undefined)).toBeNull();

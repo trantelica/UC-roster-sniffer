@@ -28,10 +28,12 @@ export type ParentheticalDistrictReference = {
   districtCandidate: string;
 };
 
-// A single trailing parenthetical group with no nested parentheses, e.g. "Base (Candidate)".
-// The base capture is non-greedy with required leading content; the candidate has at least one
-// non-paren character. Surrounding/leading whitespace is captured loosely so it can be trimmed.
-const TRAILING_PARENTHETICAL = /^(.*\S)\s*\(([^()]+)\)\s*$/;
+// A single trailing parenthetical group, e.g. "Base (Candidate)". BOTH the base and the
+// candidate must contain NO parentheses (`[^()]+`), so a label with more than one group or a
+// nested group — e.g. "GridIron A1 (North) (Layton)" — matches nothing and is rejected as
+// ambiguous rather than picking the last group. Surrounding whitespace is captured loosely so
+// it can be trimmed.
+const TRAILING_PARENTHETICAL = /^([^()]+)\(([^()]+)\)\s*$/;
 
 /**
  * Parses a trailing parenthetical district reference out of a team label. Returns the original
