@@ -430,7 +430,7 @@ export function buildWholeFilePlayerImportPlan(
  * teams created in this batch; created teams are ordered by team code and slotted after any
  * existing teams. Existing teams are never mutated.
  */
-function finalizeCreatedTeamDraftOrders(created: Team[], existing: Team[]): void {
+export function finalizeCreatedTeamDraftOrders(created: Team[], existing: Team[]): void {
   const divisionKey = (t: Team) => `${t.seasonId}|${t.districtId}|${t.ageDivisionId}`;
   const existingByDivision = new Map<string, number>();
   for (const t of existing) {

@@ -347,6 +347,16 @@ up exactly where the last one stopped.
   with a clear "Add … first" reason, never collapsed into a plain code or invented. Pure helper
   `parseParentheticalDistrictReference`; exact district matching only (no fuzzy). Also: clearer
   spacing between the District Maintenance **Edit** and **Inactivate/Reactivate** action links.
+- [x] **Whole-file coach import (create / update / undo)** — a committed scraped **coach** source
+  (nested or normalized-flat) may **create** a season-specific **coach-only team** (zero players,
+  materialized) or **update** an existing team's `headCoach`/`assistantCoaches` only, preserving
+  players and every unrelated field. Reuses the player pipeline (targets, canonical mapping,
+  PR #73 parenthetical routing, registry resolution, shared roster-import commit/undo). Roles use
+  a deterministic `interpretScrapedCoachTitle` (Head / Asst only); coach names preserved exactly;
+  ambiguous roles / multiple head coaches / no-name rows **block** (never discard). Commit is
+  explicit + **all-or-nothing** (refuses while any target is blocked) and session-undoable. Engine
+  `uteConferenceScrapedJsonWholeFileCoachImport.ts` + `scrapedCoachTitleRole.ts`; UI: a **Coach
+  import plan** panel in the import workbench. Coach **analytics** remain out of scope.
 
 ## Next slice
 

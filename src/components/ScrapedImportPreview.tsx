@@ -35,6 +35,10 @@ import {
   type WholeFileCommittableTarget,
 } from '../engine/uteConferenceScrapedJsonWholeFileImport';
 import {
+  buildWholeFileCoachImportPlan,
+  type WholeFileCoachImportPlan,
+} from '../engine/uteConferenceScrapedJsonWholeFileCoachImport';
+import {
   buildScrapedImportErrorGuidance,
   type UserFacingFileError,
 } from '../app/fileImportGuidance';
@@ -93,6 +97,14 @@ export type WholeFileImportCommitPayload = {
     blockedCount: number;
     totalPlayersToImport: number;
   };
+};
+
+/**
+ * Payload of an explicit whole-file COACH-import commit. Carries the full deterministic plan;
+ * the app runs the all-or-nothing coach commit transaction against the current workspace.
+ */
+export type WholeFileCoachImportCommitPayload = {
+  plan: WholeFileCoachImportPlan;
 };
 
 /**
@@ -256,6 +268,7 @@ export default function ScrapedImportPreview({
   onCommitImport,
   onConfirmDistrict,
   onCommitWholeFile,
+  onCommitWholeFileCoach,
 }: {
   baselineTeams: Team[];
   // C3: the committed workspace district registry; scraped district labels resolve against it.
@@ -267,6 +280,8 @@ export default function ScrapedImportPreview({
   onConfirmDistrict: (rawName: string) => void;
   // B2: commit ALL ready player teams in the loaded file at once (durable via A1).
   onCommitWholeFile: (payload: WholeFileImportCommitPayload) => void;
+  // Coach import: commit ALL coach targets in the loaded coach file at once (durable via A1).
+  onCommitWholeFileCoach: (payload: WholeFileCoachImportCommitPayload) => void;
 }) {
   const [loaded, setLoaded] = useState<LoadedSource | null>(null);
   const [fileError, setFileError] = useState<FileError | null>(null);
@@ -337,6 +352,21 @@ export default function ScrapedImportPreview({
     [loaded, baselineTeams, districtRegistry]
   );
 
+  // Whole-file COACH import plan. Same inputs as the player plan; derived against the immutable
+  // baseline roster + active registry so preview never mutates the workspace.
+  const wholeFileCoachPlan = useMemo<WholeFileCoachImportPlan | null>(
+    () =>
+      loaded
+        ? buildWholeFileCoachImportPlan({
+            payload: loaded.payload,
+            existingTeams: baselineTeams,
+            districtRegistry,
+            sourceName: loaded.name,
+          })
+        : null,
+    [loaded, baselineTeams, districtRegistry]
+  );
+
   // Explicit durable roster-import commit. Hands the teams to create + existing-team updates up
   // to the app, which commits them all-or-nothing into the workspace (auto-saved via A1).
   // Locked while an in-memory preview is executed.
@@ -353,6 +383,14 @@ export default function ScrapedImportPreview({
         totalPlayersToImport: wholeFilePlan.totalPlayersToImport,
       },
     });
+  }
+
+  // Explicit durable coach-import commit (all-or-nothing). Hands the full plan up; the app runs
+  // the coach commit transaction. Refused unless the plan is committable (no blocked targets).
+  function commitWholeFileCoach() {
+    if (!wholeFileCoachPlan || executed) return;
+    if (!wholeFileCoachPlan.canCommit) return;
+    onCommitWholeFileCoach({ plan: wholeFileCoachPlan });
   }
 
   // Selecting / switching a target isolates identity decisions to that target and
@@ -654,6 +692,14 @@ export default function ScrapedImportPreview({
         />
       )}
 
+      {loaded && wholeFileCoachPlan && wholeFileCoachPlan.isCoachFile && (
+        <WholeFileCoachImportPanel
+          plan={wholeFileCoachPlan}
+          locked={executed}
+          onCommitWholeFileCoach={commitWholeFileCoach}
+        />
+      )}
+
       {loaded && vm && (
         <Workbench
           vm={vm}
@@ -820,6 +866,133 @@ function statusBadge(status: string): string {
   return 'blocked';
 }
 
+const WHOLE_FILE_COACH_STATUS_LABELS: Record<string, string> = {
+  create: 'Create team',
+  update: 'Update coaches',
+  blocked: 'Blocked',
+  empty: 'Empty',
+  'provisional-district': 'Add district first',
+  'unresolved-parenthetical-district': 'Add parenthetical district first',
+  'unparseable-team': 'Unreadable team code',
+  'missing-context': 'Missing season/age',
+  'duplicate-target': 'Duplicate target',
+};
+
+/**
+ * Whole-file COACH import plan panel. Summarizes every coach team target as create / update /
+ * blocked, shows the recognized head coach + assistants (and represented district when a label
+ * routed via a parenthetical), and offers one explicit primary action — "Commit coach import".
+ * The commit is ALL-OR-NOTHING: it is disabled whenever any target is blocked. Loading is preview
+ * only — no team or coaching staff changes before commit. Created coach-only teams (zero players)
+ * become materialized and appear in normal team selection after commit.
+ */
+function WholeFileCoachImportPanel({
+  plan,
+  locked,
+  onCommitWholeFileCoach,
+}: {
+  plan: WholeFileCoachImportPlan;
+  locked: boolean;
+  onCommitWholeFileCoach: () => void;
+}) {
+  const willCommit = plan.createCount + plan.updateCount;
+  const canCommit = !locked && plan.canCommit;
+  return (
+    <div className="import-section import-whole-file">
+      <div className="import-section-head">
+        <h3>Coach import plan</h3>
+        <button
+          type="button"
+          className="import-decision-button import-commit-button"
+          onClick={onCommitWholeFileCoach}
+          disabled={!canCommit}
+        >
+          Commit coach import
+        </button>
+      </div>
+      <p className="import-note">
+        A committed coach file may <strong>create</strong> a season-specific team (with zero
+        players) and <strong>update</strong> an existing team's coaching staff. Coach import is
+        authoritative for coaching staff only — players and all other team data are preserved.
+        Loading is <strong>preview only</strong>; nothing changes until you commit. The coach
+        commit is <strong>all-or-nothing</strong>: resolve every blocked target first. Created
+        coach-only teams become available in normal team selection after commit.
+      </p>
+      <div className="import-summary">
+        <div className="import-summary-line">
+          <span>Coach team targets</span>
+          <strong>{plan.coachTargetCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Teams to create</span>
+          <strong>{plan.createCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Teams to update</span>
+          <strong>{plan.updateCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Blocked</span>
+          <strong>{plan.blockedCount}</strong>
+        </div>
+        <div className="import-summary-line">
+          <span>Coaching staff to import</span>
+          <strong>{plan.totalCoachingStaff}</strong>
+        </div>
+      </div>
+      {plan.blockedCount > 0 && (
+        <p className="import-warn">
+          {plan.blockedCount} target{plan.blockedCount === 1 ? ' is' : 's are'} blocked. The coach
+          commit is all-or-nothing, so resolve every blocked target before committing.
+        </p>
+      )}
+      {willCommit === 0 && plan.blockedCount === 0 && (
+        <p className="import-empty">Nothing to import yet from this coach file.</p>
+      )}
+      <table className="import-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>District</th>
+            <th>Age</th>
+            <th>Code</th>
+            <th>Action</th>
+            <th>Head coach</th>
+            <th>Assistants</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plan.targets.map((t) => (
+            <tr key={t.sourceTargetId}>
+              <td>{t.teamName ?? '(unnamed team)'}</td>
+              <td>
+                {t.routedFromParenthetical && t.representedDistrictName
+                  ? `${t.representedDistrictName} (from ${t.sourceDistrictName ?? '—'})`
+                  : t.districtName ?? '—'}
+              </td>
+              <td>{t.ageDivisionId ?? t.ageDivisionLabel ?? '—'}</td>
+              <td>{t.teamClassification ?? '—'}</td>
+              <td>
+                <span className={`import-badge import-badge-${statusBadge(t.status)}`}>
+                  {WHOLE_FILE_COACH_STATUS_LABELS[t.status] ?? t.status}
+                </span>
+              </td>
+              <td>{t.headCoachName ?? '—'}</td>
+              <td>
+                {t.assistantCoachNames.length > 0 ? t.assistantCoachNames.join(', ') : '—'}
+              </td>
+              <td className="import-whole-file-reasons">
+                {t.reasons.length > 0 ? t.reasons.join(' ') : ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function demoIdForLabel(label: string): string {
   return DEMO_SOURCES.find((s) => s.label === label)?.id ?? '';
 }
@@ -906,9 +1079,9 @@ function Workbench({
         <>
           {vm.recordType === 'coaches' && (
             <p className="import-note">
-              This is a <strong>coaches</strong> file. You can preview each team's coaches
-              below, but committing coaches into the workspace isn't available yet — the
-              one-click <strong>whole-file import</strong> commits player teams only.
+              This is a <strong>coaches</strong> file. Preview each team's coaches below; use the
+              one-click <strong>Coach import plan</strong> above to commit coaching staff (and
+              create coach-only teams) into the workspace.
             </p>
           )}
           <TargetSection

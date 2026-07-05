@@ -25,6 +25,7 @@ import ScrapedImportPreview, {
   type InMemoryImportAppState,
   type ScrapedImportCommitPayload,
   type WholeFileImportCommitPayload,
+  type WholeFileCoachImportCommitPayload,
 } from '../components/ScrapedImportPreview';
 import {
   commitImportedTeamToWorkspace,
@@ -48,6 +49,10 @@ import {
   type UserFacingFileError,
 } from './fileImportGuidance';
 import { executeWholeFilePlayerImportBatch } from '../engine/uteConferenceScrapedJsonWholeFileImport';
+import {
+  commitWholeFileCoachImport,
+  undoWholeFileCoachImport,
+} from '../engine/uteConferenceScrapedJsonWholeFileCoachImport';
 import ScheduleImportWorkbench from '../components/ScheduleImportWorkbench';
 import StandingsView from '../components/StandingsView';
 import CoachImportWorkbench from '../components/CoachImportWorkbench';
@@ -123,6 +128,16 @@ export default function App() {
     blockedCount: number;
   } | null>(null);
   const [wholeFileImportError, setWholeFileImportError] = useState<string | null>(null);
+  // Coach whole-file import: current-session undo, mirroring the player affordance. Holds the
+  // pre-commit values of updated teams + the created coach-only team ids.
+  const [wholeFileCoachImportUndo, setWholeFileCoachImportUndo] = useState<{
+    previousTeams: Team[];
+    createdTeamIds: string[];
+    createdCount: number;
+    updatedCount: number;
+    coachingStaff: number;
+  } | null>(null);
+  const [wholeFileCoachImportError, setWholeFileCoachImportError] = useState<string | null>(null);
   // Bumped on a snapshot restore to force-remount the import workbench, clearing its
   // transient state (loaded source, review decisions, staged preview, execution/undo).
   const [workspaceEpoch, setWorkspaceEpoch] = useState(0);
@@ -426,6 +441,44 @@ export default function App() {
     setWorkspaceEpoch((epoch) => epoch + 1);
   }
 
+  // Coach whole-file import commit. Runs the all-or-nothing coach commit transaction against the
+  // committed workspace: creates coach-only teams (zero players) and replaces coaching fields on
+  // existing teams, preserving players and every unrelated field. Refused (with a calm notice, no
+  // workspace change) when any target is blocked or nothing is committable. Remembers the
+  // pre-commit values for a session undo and remounts the workbench.
+  function handleCommitWholeFileCoachImport(payload: WholeFileCoachImportCommitPayload) {
+    setWholeFileCoachImportError(null);
+    const commit = commitWholeFileCoachImport(workspace, payload.plan);
+    if (!commit.committed) {
+      setWholeFileCoachImportError(`Coach import was not applied: ${commit.message}`);
+      return;
+    }
+    setWorkspace(commit.workspace);
+    setInMemoryImport(null);
+    setWholeFileCoachImportUndo({
+      previousTeams: commit.previousTeams,
+      createdTeamIds: commit.createdTeamIds,
+      createdCount: commit.summary.teamsCreated,
+      updatedCount: commit.summary.teamsUpdated,
+      coachingStaff: commit.summary.coachingStaffImported,
+    });
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
+  // Current-session undo for the coach import: removes created coach-only teams and restores the
+  // prior coaching fields (and every other field) of updated teams, preserving players.
+  function handleUndoWholeFileCoachImport() {
+    if (!wholeFileCoachImportUndo) return;
+    const result = undoWholeFileCoachImport(
+      workspace,
+      wholeFileCoachImportUndo.previousTeams,
+      wholeFileCoachImportUndo.createdTeamIds
+    );
+    if (result.restored) setWorkspace(result.workspace);
+    setWholeFileCoachImportUndo(null);
+    setWorkspaceEpoch((epoch) => epoch + 1);
+  }
+
   // --- Milestone C3: confirm/add an unknown scraped district into the registry ---
 
   // Adds the exact scraped district name into the committed workspace district registry as an
@@ -487,6 +540,8 @@ export default function App() {
     setCommittedImportUndo(null);
     setWholeFileImportUndo(null);
     setWholeFileImportError(null);
+    setWholeFileCoachImportUndo(null);
+    setWholeFileCoachImportError(null);
     setSnapshotNotice(null);
     setWorkspaceFromImport(false);
     setSelectedSeason(null);
@@ -602,6 +657,8 @@ export default function App() {
         setCommittedImportUndo(null);
         setWholeFileImportUndo(null);
         setWholeFileImportError(null);
+        setWholeFileCoachImportUndo(null);
+        setWholeFileCoachImportError(null);
         setSelectedSeason(restored.selection.seasonId);
         setSelectedDistrict(restored.selection.districtId);
         setSelectedAgeDivision(restored.selection.ageDivisionId);
@@ -882,6 +939,40 @@ export default function App() {
         </div>
       )}
 
+      {wholeFileCoachImportUndo && (
+        <div className="committed-import-banner">
+          <div>
+            <strong>Coach import saved locally.</strong>{' '}
+            {wholeFileCoachImportUndo.createdCount} team
+            {wholeFileCoachImportUndo.createdCount === 1 ? '' : 's'} created ·{' '}
+            {wholeFileCoachImportUndo.updatedCount} updated ·{' '}
+            {wholeFileCoachImportUndo.coachingStaff} coaching staff. This is now part of your
+            workspace and auto-saves to this browser (it survives reload). Undo is available only
+            for this session.
+          </div>
+          <button
+            type="button"
+            className="committed-import-undo-button"
+            onClick={handleUndoWholeFileCoachImport}
+          >
+            Undo Coach Import
+          </button>
+        </div>
+      )}
+
+      {wholeFileCoachImportError && (
+        <div className="workspace-notice workspace-notice-error">
+          <strong>{wholeFileCoachImportError}</strong>
+          <button
+            type="button"
+            className="import-link-button"
+            onClick={() => setWholeFileCoachImportError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/*
         Both views stay mounted (visibility toggled) so an in-memory import execution and
         its Undo control are never lost by switching tabs while an execution is active.
@@ -913,6 +1004,7 @@ export default function App() {
           onCommitImport={handleCommitScrapedImport}
           onConfirmDistrict={handleConfirmScrapedDistrict}
           onCommitWholeFile={handleCommitWholeFilePlayerImport}
+          onCommitWholeFileCoach={handleCommitWholeFileCoachImport}
         />
       </div>
       <div hidden={view !== 'schedule'}>

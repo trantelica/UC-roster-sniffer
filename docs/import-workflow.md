@@ -186,6 +186,53 @@ scraped/admin district as before). A parenthetical whose base label still has no
 (e.g. `Scout White (Layton)`) resolves the district but is blocked `unparseable-team` for the
 code.
 
+### Whole-file coach import (create OR update coaching staff)
+
+A committed **coach source is authoritative evidence that a team exists** for that season, so a
+scraped coach file (nested or normalized-flat, `record_type: "coaches"`) may **create** a
+season-specific team or **update** an existing team's coaching staff — the coach counterpart of
+the player whole-file import. It reuses the same pipeline end to end (source normalization, team
+targets, canonical season/district/age/classification mapping, **parenthetical district routing**,
+district-registry resolution, empty-workspace team creation, and the shared roster-import
+commit/undo transform); it is not a parallel import system. Engine:
+`buildWholeFileCoachImportPlan` + `commitWholeFileCoachImport` / `undoWholeFileCoachImport`
+(`src/engine/uteConferenceScrapedJsonWholeFileCoachImport.ts`).
+
+Key rules:
+
+- **Preview does not mutate the workspace.** Loading a coach file only computes a plan; nothing is
+  created or changed until an explicit **Commit coach import**.
+- **Create** builds a **coach-only team** with the imported staff and **zero players**. It is a
+  **materialized team** (a team with a head coach or any assistant counts as materialized) and
+  appears in normal team selection after commit. Only the **source-backed** target is created —
+  e.g. a file with only `Corner Canyon GridIron A3` creates just `…-GI-A3`, never sibling teams.
+- **Update** replaces **only** `headCoach` / `assistantCoaches`. Players, team identity, season,
+  district, age division, classification, draft-order/division-size, games/schedules/results, and
+  every other field are preserved exactly. The committed source **replaces** the coaching fields
+  (it never appends indefinitely).
+- **Coach import is authoritative for coaching-staff fields only.** It never touches players,
+  games, schedules, districts, or unrelated team fields.
+- **Roles.** A deterministic title reader (`interpretScrapedCoachTitle`) recognizes only
+  **Head Coach** and **Asst / Assistant Coach** — no invented ontology. One recognized head fills
+  `headCoach`; recognized assistants fill `assistantCoaches` **in source order** (duplicate
+  assistant names are **not** de-duplicated). Coach names are preserved **exactly** (no
+  trim/rewrite/merge/suppress). Raw source titles are kept in the plan metadata (`staff[].rawTitle`);
+  the durable `Team` contract is **not** extended to store titles.
+- **Ambiguous / unsupported roles BLOCK, they are never discarded.** A coach row with no name, a
+  title whose role is unrecognized/ambiguous (e.g. `Assistant Head Coach`), or **more than one
+  distinct head coach** for a team blocks that target (the coach is retained in the plan's `staff`
+  evidence, never dropped).
+- **Parenthetical district routing applies to coach labels** exactly as for players
+  (`GridIron A1 (Layton)` → represented district Layton, source/admin district Alta retained,
+  team `A1`; an unresolved parenthetical district is blocked "add district first").
+- **Duplicate/collision.** Two targets resolving to the same canonical team do not silently merge;
+  the second is blocked `duplicate-target` (a source that resolves to a team already holding
+  players is a normal **update**, not a collision).
+- **Commit is explicit, atomic, and undoable.** It is **all-or-nothing** and — unlike the player
+  import — **refuses the whole-file commit while ANY target is blocked** (`empty` targets, which
+  have no coaches, do not block). Undo removes the created coach-only teams and restores the prior
+  coaching fields of updated teams, leaving players and all unrelated data untouched.
+
 ## Roster import preview (Phase 5 slice 1)
 
 Phase 5 begins with a pure, deterministic **import preview state/contract**
