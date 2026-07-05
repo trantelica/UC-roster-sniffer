@@ -339,6 +339,15 @@ up exactly where the last one stopped.
 - [x] **Materialized-team selector** — the Team selector shows only teams populated by committed
   data, not empty/seed shells (fixes the Corner Canyon "0 players / 17 prior" symptom).
 
+**Corrections (post-PR #72)**
+- [x] **Parenthetical district routing** — a scraped team label like `GridIron A1 (Layton)` is
+  routed to the **represented** Layton district (base label `GridIron A1` / code `A1`) when Layton
+  is a known district, retaining the scraped/admin district + original source label as source
+  evidence; an **unresolved** parenthetical district is blocked (`unresolved-parenthetical-district`)
+  with a clear "Add … first" reason, never collapsed into a plain code or invented. Pure helper
+  `parseParentheticalDistrictReference`; exact district matching only (no fuzzy). Also: clearer
+  spacing between the District Maintenance **Edit** and **Inactivate/Reactivate** action links.
+
 ## Next slice
 
 **Milestones 1 and 2 are complete** (A1, A2, B1, C1, C3, B2, C2, E1, E2): scraped data loads,

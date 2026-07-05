@@ -685,6 +685,7 @@ const WHOLE_FILE_STATUS_LABELS: Record<string, string> = {
   blocked: 'Blocked',
   empty: 'Empty',
   'provisional-district': 'Add district first',
+  'unresolved-parenthetical-district': 'Add parenthetical district first',
   'unparseable-team': 'Unreadable team code',
   'missing-context': 'Missing season/age',
   'duplicate-target': 'Duplicate target',
@@ -810,7 +811,12 @@ function WholeFilePlayerImportPanel({
 function statusBadge(status: string): string {
   if (status === 'create' || status === 'update') return 'ready';
   if (status === 'empty') return 'empty';
-  if (status === 'needs-review' || status === 'provisional-district') return 'needs-review';
+  if (
+    status === 'needs-review' ||
+    status === 'provisional-district' ||
+    status === 'unresolved-parenthetical-district'
+  )
+    return 'needs-review';
   return 'blocked';
 }
 

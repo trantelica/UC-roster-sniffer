@@ -155,13 +155,18 @@ describe('unknown district and unreadable team code are explicit, not silent', (
     expect(target.reasons.join(' ')).toMatch(/Add the district first/i);
   });
 
-  it('blocks a parenthetical sub-label rather than collapsing it into a plain code', () => {
+  it('blocks an UNRESOLVED parenthetical district rather than collapsing or inventing a team', () => {
+    // The empty workspace seeds Alta + Brighton only, so "Bonneville" is unknown.
     const ws = emptyWorkspace();
     const plan = planFromFlat([flatRow('Alta', 'GridIron A1 (Bonneville)', 'X')], ws);
     expect(plan.createCount).toBe(0);
-    expect(plan.targets[0].status).toBe('unparseable-team');
-    // No team was created with the plain "A1" code.
+    expect(plan.targets[0].status).toBe('unresolved-parenthetical-district');
+    expect(plan.targets[0].committable).toBe(false);
+    expect(plan.targets[0].reasons.join(' ')).toMatch(/Bonneville/);
+    // No team was created with the plain "A1" code under the scraped district, and no Bonneville
+    // team was invented either.
     expect(plan.teamsToCreate.some((t) => t.teamId === '2026-alta-GI-A1')).toBe(false);
+    expect(plan.teamsToCreate.some((t) => t.teamId === '2026-bonneville-GI-A1')).toBe(false);
   });
 });
 

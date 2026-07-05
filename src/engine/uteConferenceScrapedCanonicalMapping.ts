@@ -10,6 +10,7 @@ import type {
   UteScrapedTeamTargetSelector,
   UtePlayerImportPreviewInputResult,
 } from './uteConferenceScrapedJsonAdapter';
+import { parseParentheticalDistrictReference } from './parentheticalDistrictReference';
 
 /**
  * Phase 5 slice 11: canonical SOURCE MAPPING for Ute Conference scraped JSON —
@@ -68,6 +69,7 @@ export type UteCanonicalMappingIssueCode =
   | 'color-team-classification-unknown'
   | 'missing-district'
   | 'district-mapping-provisional'
+  | 'unresolved-parenthetical-district'
   | 'missing-season-year'
   | 'invalid-season-year'
   | 'target-not-found'
@@ -116,6 +118,27 @@ export type UteCanonicalSeasonMappingResult = {
   issues: UteCanonicalMappingIssue[];
 };
 
+/**
+ * Records that a scraped team label carried a trailing parenthetical district reference
+ * (e.g. `GridIron A1 (Layton)`) and how it was routed. The original label and the
+ * scraped/admin (source) district are retained as source evidence; the represented district
+ * is the parenthetical candidate, resolved against the registry when possible.
+ */
+export type UteParentheticalDistrictRouting = {
+  /** The original source team label, preserved EXACTLY (e.g. "GridIron A1 (Layton)"). */
+  originalTeamLabel: string;
+  /** The base team label used for classification/identity (e.g. "GridIron A1"). */
+  baseTeamLabel: string;
+  /** The parenthetical district candidate text (e.g. "Layton"). */
+  representedDistrictCandidate: string;
+  /** The represented district id when the candidate resolved against the registry, else null. */
+  representedDistrictId: string | null;
+  /** The scraped/admin district the row originally appeared under (source evidence). */
+  sourceDistrictName: string | null;
+  /** True when the candidate resolved to a known district; false blocks the target. */
+  resolved: boolean;
+};
+
 export type UteCanonicalContext = {
   seasonId: string | null;
   districtId: string | null;
@@ -147,6 +170,8 @@ export type UteCanonicalTeamContextMappingResult = {
   teamClassification: UteCanonicalTeamClassificationMappingResult;
   canonicalContext: UteCanonicalContext;
   contextConfidence: UteCanonicalMappingConfidence;
+  /** Parenthetical district routing for the team label, or null when none applies. */
+  parentheticalRouting: UteParentheticalDistrictRouting | null;
   issues: UteCanonicalMappingIssue[];
 };
 
@@ -520,6 +545,47 @@ export function mapUteScrapedDistrict(input: {
   };
 }
 
+/**
+ * Resolves a parenthetical district CANDIDATE (e.g. "Layton" from `GridIron A1 (Layton)`)
+ * against the registry using the SAME exact-name lookup as {@link mapUteScrapedDistrict}.
+ * Unlike a plain scraped district name, an unresolved parenthetical candidate is NEVER turned
+ * into a provisional slug — there is no admin district to fall back to — so it is reported as
+ * `unknown` with an error issue, blocking the target for review. No fuzzy matching. The raw
+ * candidate is preserved EXACTLY.
+ */
+function resolveParentheticalDistrict(input: {
+  candidate: string;
+  districtRegistry?: Record<string, string>;
+}): UteCanonicalDistrictMappingResult {
+  const { candidate } = input;
+  const registered =
+    input.districtRegistry && typeof input.districtRegistry[candidate] === 'string'
+      ? input.districtRegistry[candidate]
+      : null;
+  if (registered !== null) {
+    return {
+      rawValue: candidate,
+      canonicalValue: registered,
+      confidence: 'high',
+      source: 'team-name',
+      issues: [],
+    };
+  }
+  return {
+    rawValue: candidate,
+    canonicalValue: null,
+    confidence: 'unknown',
+    source: null,
+    issues: [
+      issue(
+        'unresolved-parenthetical-district',
+        'error',
+        `Parenthetical district "${candidate}" is not in the registry; the team cannot be routed. Add the district first, then re-import.`
+      ),
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Season mapping
 // ---------------------------------------------------------------------------
@@ -693,6 +759,7 @@ export function mapUteScrapedTeamTargetToCanonicalContext(
         teamClassification: null,
       },
       contextConfidence: 'unknown',
+      parentheticalRouting: null,
       issues: failIssue ? [failIssue] : [],
     };
   };
@@ -701,19 +768,41 @@ export function mapUteScrapedTeamTargetToCanonicalContext(
   if (!resolution.ok) return emptyMapping();
   const t = resolution.target;
 
+  // Parenthetical district routing: a label like `GridIron A1 (Layton)` means the team is
+  // `GridIron A1` / `A1` REPRESENTED under the Layton district, with the scraped/admin district
+  // (`t.districtName`) retained as source evidence. The base label drives classification + the
+  // age-prefix fallback; the parenthetical candidate drives the represented district.
+  const parenthetical = parseParentheticalDistrictReference(t.teamName);
+  const effectiveTeamName = parenthetical ? parenthetical.baseLabel : t.teamName ?? undefined;
+
   const season = mapUteScrapedSeason({ year: t.year, event: t.event ?? undefined });
   const ageDivision = mapUteScrapedAgeDivisionLabel({
     label: t.ageDivisionLabel ?? undefined,
     alias: t.ageDivisionAlias ?? undefined,
-    teamName: t.teamName ?? undefined,
+    teamName: effectiveTeamName,
   });
-  const district = mapUteScrapedDistrict({
-    districtName: t.districtName ?? undefined,
-    districtRegistry: options?.districtRegistry,
-  });
+  const district = parenthetical
+    ? resolveParentheticalDistrict({
+        candidate: parenthetical.districtCandidate,
+        districtRegistry: options?.districtRegistry,
+      })
+    : mapUteScrapedDistrict({
+        districtName: t.districtName ?? undefined,
+        districtRegistry: options?.districtRegistry,
+      });
   const teamClassification = mapUteScrapedTeamClassification({
-    teamName: t.teamName ?? undefined,
+    teamName: effectiveTeamName,
   });
+  const parentheticalRouting: UteParentheticalDistrictRouting | null = parenthetical
+    ? {
+        originalTeamLabel: parenthetical.originalLabel,
+        baseTeamLabel: parenthetical.baseLabel,
+        representedDistrictCandidate: parenthetical.districtCandidate,
+        representedDistrictId: district.canonicalValue,
+        sourceDistrictName: t.districtName,
+        resolved: district.canonicalValue !== null,
+      }
+    : null;
 
   const issues: UteCanonicalMappingIssue[] = [
     ...season.issues,
@@ -820,6 +909,7 @@ export function mapUteScrapedTeamTargetToCanonicalContext(
     teamClassification,
     canonicalContext,
     contextConfidence,
+    parentheticalRouting,
     issues,
   };
 }

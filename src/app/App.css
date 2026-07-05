@@ -940,6 +940,12 @@ h1 {
   white-space: nowrap;
 }
 
+/* Clear separation between the Edit and Inactivate/Reactivate action links so it is
+   visually unambiguous which action is being clicked. */
+.district-actions .import-link-button + .import-link-button {
+  margin-left: 0.75rem;
+}
+
 .district-flag {
   color: var(--color-bronze-spice);
   font-size: 0.72rem;

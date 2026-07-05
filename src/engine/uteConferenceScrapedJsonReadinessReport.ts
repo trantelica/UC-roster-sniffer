@@ -65,6 +65,7 @@ export type UteScrapedJsonReadinessReason =
   | 'empty-team'
   | 'empty-league'
   | 'provisional-district'
+  | 'unresolved-parenthetical-district'
   | 'provisional-age-division'
   | 'unknown-team-classification'
   | 'color-team-classification-unknown'
@@ -231,6 +232,9 @@ function mappingErrorReasons(
   }
   if (mapping.issues.some((i) => i.code === 'invalid-target')) {
     reasons.push('invalid-target-context');
+  }
+  if (mapping.issues.some((i) => i.code === 'unresolved-parenthetical-district')) {
+    reasons.push('unresolved-parenthetical-district');
   }
   return reasons;
 }

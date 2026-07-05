@@ -42,10 +42,17 @@ import { executeUteConferenceScrapedJsonImportTransaction } from './uteConferenc
  *    review decisions, so existing rosters stay authoritative and match-bearing rows still
  *    require review (and are not committed in the batch).
  *  - **blocked** — anything that cannot be done safely: an unregistered/provisional district
- *    ("Add district first"), a team label whose classification can't be parsed (e.g. a
- *    parenthetical sub-label like "GridIron A1 (Bonneville)" — never collapsed into "A1"), a
+ *    ("Add district first"), a team label whose classification can't be parsed, a parenthetical
+ *    district reference that does not resolve to a known district (e.g. "GridIron A1 (Bonneville)"
+ *    when Bonneville is unregistered — never collapsed into "A1" under the scraped district), a
  *    missing season/age division, an existing team that needs review, a duplicate target, an
  *    empty target, or a non-player target.
+ *
+ * Parenthetical district routing: a team label like "GridIron A1 (Layton)" is read as the team
+ * "GridIron A1" / "A1" REPRESENTED under the Layton district (when Layton is registered), with
+ * the scraped/admin district and original source label retained as source evidence. The team is
+ * created/updated under the represented district — never as a literal "GridIron A1 (Layton)"
+ * team under the scraped district.
  *
  * Guardrails: never mutates the payload, existing teams, or any input. Player names are placed
  * into new teams EXACTLY as provided (no trim/dedupe/merge/suppress). Commit is ALL-OR-NOTHING.
@@ -64,6 +71,7 @@ export type WholeFileTargetStatus =
   | 'blocked'
   | 'empty'
   | 'provisional-district'
+  | 'unresolved-parenthetical-district'
   | 'unparseable-team'
   | 'missing-context'
   | 'duplicate-target'
@@ -76,6 +84,12 @@ export type WholeFileTargetSummary = {
   districtName: string | null;
   districtId: string | null;
   districtResolved: boolean;
+  /** True when the team label routed to a represented district via a parenthetical (e.g. "(Layton)"). */
+  routedFromParenthetical: boolean;
+  /** The scraped/admin district the row appeared under when routed (source evidence), else null. */
+  sourceDistrictName: string | null;
+  /** The represented district candidate (parenthetical text) when routed, else null. */
+  representedDistrictName: string | null;
   ageDivisionId: string | null;
   ageDivisionLabel: string | null;
   teamClassification: string | null;
@@ -215,17 +229,37 @@ export function buildWholeFilePlayerImportPlan(
         })
       : null;
 
+    const routing = mapping?.parentheticalRouting ?? null;
     const common = {
       districtResolved,
       districtId: ctx?.districtId ?? reportTarget.canonicalDistrictId,
       ageDivisionId: ctx?.ageDivisionId ?? reportTarget.canonicalAgeDivisionId,
       teamClassification: ctx?.teamClassification ?? reportTarget.teamClassification,
       existingTeamId: review.available ? review.existingTeamId : null,
+      routedFromParenthetical: routing !== null,
+      sourceDistrictName: routing ? routing.sourceDistrictName : null,
+      representedDistrictName: routing ? routing.representedDistrictCandidate : null,
     };
+    // A source-trail note for routed (resolved) targets, so a routed team is never shown as if
+    // it simply came from the represented district with no source evidence.
+    const routingNote =
+      routing && routing.resolved
+        ? `Routed to ${routing.representedDistrictCandidate} from team label “${routing.originalTeamLabel}” (source district: ${routing.sourceDistrictName ?? '—'}).`
+        : null;
 
     // --- Blocked-before-action gates ------------------------------------------------
     if (reportTarget.rowCount === 0) {
       targets.push(blockedSummary(reportTarget, common, 'empty', ['No rows to import.']));
+      continue;
+    }
+    // An unresolved parenthetical district routes nowhere — block with a clear reason (never a
+    // provisional slug under the scraped/admin district, and never a literal parenthetical team).
+    if (routing && !routing.resolved) {
+      targets.push(
+        blockedSummary(reportTarget, common, 'unresolved-parenthetical-district', [
+          `Team label “${routing.originalTeamLabel}” puts district “${routing.representedDistrictCandidate}” in parentheses, but that district is not in the registry. Add “${routing.representedDistrictCandidate}” first (Districts tab), then re-import.`,
+        ])
+      );
       continue;
     }
     if (readinessStatus === 'blocked') {
@@ -300,7 +334,7 @@ export function buildWholeFilePlayerImportPlan(
         status: 'update',
         committable: true,
         playerCount: additions,
-        reasons: [],
+        reasons: routingNote ? [routingNote] : [],
       });
       continue;
     }
@@ -317,7 +351,7 @@ export function buildWholeFilePlayerImportPlan(
     if (ctx.teamClassification === null || ctx.districtId === null) {
       targets.push(
         blockedSummary(reportTarget, common, 'unparseable-team', [
-          `Could not read a team code from "${reportTarget.teamName ?? '(unnamed team)'}". Parenthetical sub-labels (e.g. “… A1 (Bonneville)”) are not supported yet and are never merged into a plain code.`,
+          `Could not read a team code from "${reportTarget.teamName ?? '(unnamed team)'}" (expected an explicit A1/B2/C1-style code). A parenthetical district (e.g. “… A1 (Layton)”) is read as a represented district, not a team code, and is never merged into a plain code.`,
         ])
       );
       continue;
@@ -355,7 +389,7 @@ export function buildWholeFilePlayerImportPlan(
       status: 'create',
       committable: true,
       playerCount: players.length,
-      reasons: [],
+      reasons: routingNote ? [routingNote] : [],
     });
   }
 
@@ -447,6 +481,9 @@ type CommonSummaryFields = {
   ageDivisionId: string | null;
   teamClassification: string | null;
   existingTeamId: string | null;
+  routedFromParenthetical: boolean;
+  sourceDistrictName: string | null;
+  representedDistrictName: string | null;
 };
 
 function baseSummaryFields(
@@ -464,6 +501,9 @@ function baseSummaryFields(
     districtName: reportTarget.districtName,
     districtId: common.districtId,
     districtResolved: common.districtResolved,
+    routedFromParenthetical: common.routedFromParenthetical,
+    sourceDistrictName: common.sourceDistrictName,
+    representedDistrictName: common.representedDistrictName,
     ageDivisionId: common.ageDivisionId,
     ageDivisionLabel: reportTarget.ageDivisionLabel,
     teamClassification: common.teamClassification,
@@ -497,6 +537,9 @@ function baseSummary(
     teamName: reportTarget.teamName,
     districtName: reportTarget.districtName,
     ageDivisionLabel: reportTarget.ageDivisionLabel,
+    routedFromParenthetical: false,
+    sourceDistrictName: null,
+    representedDistrictName: null,
     committable: rest.action !== 'blocked',
     ...rest,
   };
