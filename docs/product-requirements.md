@@ -158,9 +158,15 @@ data.
 
 - A district outside the seeded registry is **blocked** ("Add district first") or requires a
   provisional add; it is never silently invented on import.
-- **Parenthetical / sub-label** team names (e.g. `GridIron A1 (Bonneville)`) must not collapse
-  into a plain code; until disambiguation is supported they are **blocked** (future work).
-- **Coach commit** is a separate path from roster import (not yet committed via this flow).
+- **Parenthetical / sub-label** team names (e.g. `GridIron A1 (Layton)`) never collapse into a
+  plain code. A parenthetical naming a **known active district** is routed to that **represented**
+  district (base label `GridIron A1` / code `A1`), retaining the scraped/admin district and the
+  original source label as evidence; an **unresolved** parenthetical district is **blocked**
+  (`unresolved-parenthetical-district`, "Add … first") and never invented.
+- **Coach commit** is a separate path from roster import, but it does commit: a scraped **coach**
+  source may **create** a coach-only team (zero players, materialized) or **update** an existing
+  team's head/assistant coaches only, all-or-nothing and session-undoable. It never touches
+  players, games, or schedules. Coach **analytics** remain out of scope for that flow.
 - **Schedule/results** import is separate from roster import.
 
 **Optional seed.** An optional "Load Ute Conference seed" action can pre-create empty team
