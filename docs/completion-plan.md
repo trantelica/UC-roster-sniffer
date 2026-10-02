@@ -340,14 +340,14 @@ up exactly where the last one stopped.
   data, not empty/seed shells (fixes the Corner Canyon "0 players / 17 prior" symptom).
 
 **Corrections (post-PR #72)**
-- [x] **Parenthetical district routing** — a scraped team label like `GridIron A1 (Layton)` is
+- [x] **Parenthetical district routing** (PR #73 · landed 2026-07-05) — a scraped team label like `GridIron A1 (Layton)` is
   routed to the **represented** Layton district (base label `GridIron A1` / code `A1`) when Layton
   is a known district, retaining the scraped/admin district + original source label as source
   evidence; an **unresolved** parenthetical district is blocked (`unresolved-parenthetical-district`)
   with a clear "Add … first" reason, never collapsed into a plain code or invented. Pure helper
   `parseParentheticalDistrictReference`; exact district matching only (no fuzzy). Also: clearer
   spacing between the District Maintenance **Edit** and **Inactivate/Reactivate** action links.
-- [x] **Whole-file coach import (create / update / undo)** — a committed scraped **coach** source
+- [x] **Whole-file coach import (create / update / undo)** (PR #74 · landed 2026-07-05) — a committed scraped **coach** source
   (nested or normalized-flat) may **create** a season-specific **coach-only team** (zero players,
   materialized) or **update** an existing team's `headCoach`/`assistantCoaches` only, preserving
   players and every unrelated field. Reuses the player pipeline (targets, canonical mapping,

@@ -113,6 +113,28 @@ the per-target B1 flow still works for case-by-case review.
   (current session only; the committed data is durable via A1 and survives reload). A failed
   commit shows a calm error and changes nothing.
 
+## Coach import plan panel (create coach-only teams or update staff)
+
+When a scraped **coaches** file is loaded, a **Coach import plan** panel appears above the
+per-target detail — the coach counterpart of the Roster import plan panel. A note states that a
+committed coach file may **create** a season-specific team (with zero players) and **update** an
+existing team's coaching staff, that coach import is authoritative for coaching staff only, that
+loading is **preview only**, and that created coach-only teams become available in normal team
+selection after commit.
+
+- **Summary:** coach team targets · **teams to create** · **teams to update** · **blocked** ·
+  **coaching staff to import**.
+- **Table** (one row per target): team · district (a parenthetical-routed label shows
+  “Represented (from Scraped)”) · age · code · **Action** badge · **head coach** · **assistants** ·
+  notes for blocked targets.
+- **Commit coach import** (primary action) is **all-or-nothing** and, unlike the player commit,
+  is **disabled while ANY target is blocked** — a warning line says how many targets must be
+  resolved first. It is also disabled when there is nothing to create or update, or while a
+  single-target in-memory preview is executed. There is **no auto-commit** on file load.
+- After a successful commit a top banner reads **“Coach import saved locally”** with created /
+  updated team counts and coaching-staff count, notes that the data auto-saves to this browser
+  and survives reload, and offers **Undo Coach Import** (current session only).
+
 ## District Maintenance screen (Completion Milestone C2)
 
 A top-level **Districts** tab opens the District Maintenance screen
@@ -177,7 +199,7 @@ loosened to accept bad files).
 - **Roster import:** empty file, invalid JSON, and parsed-but-unsupported sources get plain
   guidance. If the file is actually a UC Roster Sniffer **dataset export**, the message says to
   use **Import Dataset**; an unsupported scraped `record_type` and unrecognized files are
-  explained. A loaded **coaches** file notes that whole-file import is player-only.
+  explained. A loaded **coaches** file points at the one-click **Coach import plan** panel for committing coaching staff and creating coach-only teams.
 
 ## Flat-source normalization note (production-blocker correction)
 
@@ -769,6 +791,12 @@ snapshot export is the durability path, and that no browser storage or cloud syn
 Coach import never modifies rosters or games; while executed, the file controls are locked
 until undo. Coach data travels with workspace snapshots; importing a snapshot clears
 transient coach-import execution/undo state.
+
+> **Update (Completion Milestone A1 + whole-file coach import):** the "in-memory only / no
+> browser storage" copy above describes the historical Phase 7 status. The workspace now
+> **auto-saves to IndexedDB** (A1), and a scraped **coaches** file can be committed into the
+> workspace through the **Coach import plan** panel (create coach-only teams / update staff).
+> This Phase 7 **Coach import tab** remains the separate row-level coach/assignment path.
 
 ## Coach performance dashboard & team performance (Phase 7 slice 28)
 
